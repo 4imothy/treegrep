@@ -95,13 +95,17 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.MACOS_CODESIGN_KEYCHAIN_PASSWORD }}
           MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
         run: |
-          echo $MACOS_CERTIFICATE | base64 --decode > certificate.p12
-          security create-keychain -p $KEYCHAIN_PASSWORD build.keychain
-          security default-keychain -s build.keychain
+          echo -n $MACOS_CERTIFICATE | base64 --decode > certificate.p12
+          KEYCHAIN_PATH=build.keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security default-keychain -s $KEYCHAIN_PATH
 
-          security unlock-keychain -p $KEYCHAIN_PASSWORD build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $KEYCHAIN_PASSWORD build.keychain
+
+          security import certificate.p12 -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $KEYCHAIN_PASSWORD $KEYCHAIN_PATH
           /usr/bin/codesign --force -s $MACOS_CERTIFICATE_NAME $RELEASE_DIR/tgrep -v
 
       - name: Upload
