@@ -22,6 +22,7 @@ use std::process::Command;
 use writer::write_results;
 
 // TODO fix the README
+// TODO add notarizing to the cr for mac to exec can be used without needing to open explicitly
 
 fn main() {
     run().unwrap_or_else(|e| exit_error(e));
