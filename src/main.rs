@@ -21,7 +21,6 @@ use std::io::{stdout, StdoutLock};
 use std::process::Command;
 use writer::write_results;
 
-// TODO fix the README
 // TODO add notarizing to the cr for mac to exec can be used without needing to open explicitly
 
 fn main() {
