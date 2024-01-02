@@ -10,7 +10,7 @@ keywords = ["regex", "grep", "search", "tree"]
 categories = ["command-line-utilities", "text-processing"]
 readme = "README.md"
 description = "A pattern matching frontend to display results in a tree"
-documentation = "https://github.com/4imothy/treegrep/tree/main/README.md"
+documentation = "https://github.com/4imothy/treegrep/tree/master/README.md"
 authors = ["Timothy Cronin"]
 exclude = [
   "/.github/",
