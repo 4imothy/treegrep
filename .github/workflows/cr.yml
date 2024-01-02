@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get the release version from the tag
+        if: env.VERSION == ''
+        run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+      - name: Check that tag version and Cargo.toml version are the same
+        shell: bash
+        run: |
+          if ! grep -q "version = \"$VERSION\"" Cargo.toml; then
+            echo "version does not match Cargo.toml" >&2
+            exit 1
+          fi
+      - name: Create GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create $VERSION --draft --verify-tag --title $VERSION
+    outputs:
+      version: ${{ env.VERSION }}
+
+  release:
+    name: build release
+    needs: ['create-release']
+    runs-on: ${{ matrix.job.os }}
+    env:
+      CARGO: cargo
+      CROSS_VERSION: v0.2.5
+    strategy:
+      fail-fast: true
+      matrix:
+        job:
+          - target: "x86_64-unknown-linux-musl"
+            os: "ubuntu-latest"
+          - target: "aarch64-unknown-linux-musl"
+            os: "ubuntu-latest"
+          - target: "x86_64-apple-darwin"
+            os: "macos-latest"
+          - target: "x86_64-pc-windows-msvc"
+            exe: "windows.exe"
+            os: "windows-latest"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.job.target }}
+
+      - name: Use Cross
+        if: matrix.job.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          dir="$RUNNER_TEMP/cross-download"
+          mkdir "$dir"
+          echo "$dir" >> $GITHUB_PATH
+          cd "$dir"
+          curl -LO "https://github.com/cross-rs/cross/releases/download/$CROSS_VERSION/cross-x86_64-unknown-linux-musl.tar.gz"
+          tar xf cross-x86_64-unknown-linux-musl.tar.gz
+          echo "CARGO=cross" >> $GITHUB_ENV
+
+      - name: Build binary
+        shell: bash
+        run: |
+          ${{ env.CARGO }} build --target ${{ matrix.job.target }} --locked --release
+          rm target/${{ matrix.job.target }}/release/tgrep.d
+          echo "RELEASE_DIR=treegrep-${{ matrix.job.target }}" >> $GITHUB_ENV
+          mkdir $RELEASE_DIR
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp target/${{ matrix.job.target }}/release/tgrep.exe $RELEASE_DIR/tgrep.exe
+          else
+            cp target/${{ matrix.job.target }}/release/tgrep $RELEASE_DIR/tgrep
+          fi
+          mv completions $RELEASE_DIR/
+
+      - name: Codesign MacOS
+        if: matrix.job.os == 'macos-latest'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_CODESIGN_KEYCHAIN_PASSWORD }}
+          MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
+        run: |
+          echo $MACOS_CERTIFICATE | base64 --decode > certificate.p12
+          security create-keychain -p $KEYCHAIN_PASSWORD build.keychain
+          security default-keychain -s build.keychain
+
+          security unlock-keychain -p $KEYCHAIN_PASSWORD build.keychain
+          security import certificate.p12 -k build.keychain -P $MACOS_CERTIFICATE_PWD -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $KEYCHAIN_PASSWORD build.keychain
+          /usr/bin/codesign --force -s $MACOS_CERTIFICATE_NAME $RELEASE_DIR/tgrep -v
+
+      - name: Upload
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          tar czf "$RELEASE_DIR".tar.gz "$RELEASE_DIR"
+          version="${{ needs.create-release.outputs.version }}"
+          gh release upload "$version" "$RELEASE_DIR".tar.gz

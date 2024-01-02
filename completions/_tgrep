@@ -1,0 +1,58 @@
+#compdef tgrep
+
+autoload -U is-at-least
+
+_tgrep() {
+    typeset -A opt_args
+    typeset -a _arguments_options
+    local ret=1
+
+    if is-at-least 5.2; then
+        _arguments_options=(-s -S -C)
+    else
+        _arguments_options=(-s -C)
+    fi
+
+    local context curcontext="$curcontext" state line
+    _arguments "${_arguments_options[@]}" \
+'*-e+[specify the regex expression]: : ' \
+'*--regexp=[specify the regex expression]: : ' \
+'-t+[specify the search target. If none provided, search the current directory.]: :_files' \
+'--target=[specify the search target. If none provided, search the current directory.]: :_files' \
+'--max-depth=[the max depth to search]: : ' \
+'--threads=[set appropriate number of threads to use]: : ' \
+'--colors=[set whether to color output]: :(always never)' \
+'-s+[executable to do the searching, currently supports rg, grep and tgrep]: : ' \
+'--searcher=[executable to do the searching, currently supports rg, grep and tgrep]: : ' \
+'-c[display number of files matched in directory and number of lines matched in a file if present]' \
+'--count[display number of files matched in directory and number of lines matched in a file if present]' \
+'-.[search hidden files]' \
+'--hidden[search hidden files]' \
+'-n[show line number of match if present]' \
+'--line-number[show line number of match if present]' \
+'-m[open results in a menu to be opened with \$EDITOR]' \
+'--menu[open results in a menu to be opened with \$EDITOR]' \
+'-f[show paths that have matches]' \
+'--files[show paths that have matches]' \
+'--links[show linked paths for symbolic links]' \
+'--trim-left[trim whitespace at beginning of lines]' \
+'--pcre2[enable pcre2 if the searcher supports it]' \
+'--no-ignore[don'\''t use ignore files]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'::regex expression-positional -- specify the regex expression:' \
+'::target-positional -- specify the search target. If none provided, search the current directory.:_files' \
+&& ret=0
+}
+
+(( $+functions[_tgrep_commands] )) ||
+_tgrep_commands() {
+    local commands; commands=()
+    _describe -t commands 'tgrep commands' commands "$@"
+}
+
+if [ "$funcstack[1]" = "_tgrep" ]; then
+    _tgrep "$@"
+else
+    compdef _tgrep tgrep
+fi

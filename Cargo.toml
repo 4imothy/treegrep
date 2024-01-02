@@ -1,0 +1,38 @@
+[package]
+name = "treegrep"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+license = "CC-BY-4.0"
+repository = "https://github.com/4imothy/treegrep"
+homepage = "https://github.com/4imothy/treegrep"
+keywords = ["regex", "grep", "search", "tree"]
+categories = ["command-line-utilities", "text-processing"]
+readme = "README.md"
+description = "A pattern matching frontend to display results in a tree"
+documentation = "https://github.com/4imothy/treegrep/tree/main/README.md"
+authors = ["Timothy Cronin"]
+exclude = [
+  "/.github/",
+  "/README/",
+  "/benchsuite/",
+  "/example/",
+  "install.sh",
+]
+
+[[bin]]
+path = "src/main.rs"
+name = "tgrep"
+
+[dependencies]
+crossterm = "0.27.0"
+clap = "4.4.11"
+dunce = "1.0.4"
+bstr = "1.9.0"
+ignore = "0.4.21"
+regex = "1.10.2"
+signal-hook = "0.3.17"
+
+[build-dependencies]
+clap = "4.3.0"
+clap_complete = "4.3.0"

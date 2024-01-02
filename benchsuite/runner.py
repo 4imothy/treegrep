@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+
+import subprocess
+import pathlib
+import time
+import os
+import os.path as path
+import datetime
+
+TARGETS_DIR = path.join(pathlib.Path(__file__).parent.resolve(), "targets")
+LINUX_LINK = 'https://github.com/torvalds/linux.git'
+LINUX_DIR_NAME = 'linux'
+ENG_SUBS_DIR_NAME = 'eng_subs'
+ENG_SUBS_LINK = 'https://object.pouta.csc.fi/OPUS-OpenSubtitles/v2016/mono/en.txt.gz'
+ENG_SUBS_NAME = 'en.txt'
+ENG_SUBS_GZ_NAME = '%s.gz' % ENG_SUBS_NAME
+
+
+def run_cmd(cmd):
+    start_time = time.time()
+    subprocess.call(cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.STDOUT)
+    end_time = time.time()
+    execution_time = end_time - start_time
+    return execution_time
+
+
+def run_benchmarks(bins):
+    results = {}
+    for name, cmd in bins.items():
+        execution_time = run_cmd(cmd)
+
+    for name, cmd in bins.items():
+        print(f"Running {str(cmd)[1:-1]}")
+        execution_time = run_cmd(cmd)
+        results[name] = execution_time
+    return results
+
+
+def download_linux_source():
+    target_dir = path.join(TARGETS_DIR, LINUX_DIR_NAME)
+    if not path.isdir(target_dir):
+        subprocess.run(["git", "clone", "--depth",
+                       "1", LINUX_LINK, target_dir])
+
+
+def download_eng_subs():
+    target_dir = path.join(TARGETS_DIR, ENG_SUBS_DIR_NAME)
+    target_zip = path.join(target_dir, ENG_SUBS_GZ_NAME)
+    target = path.join(target_dir, ENG_SUBS_NAME)
+    if not path.isdir(target_dir):
+        os.makedirs(target_dir)
+    if not path.exists(target):
+        subprocess.run(["curl", ENG_SUBS_LINK, '--output', target_zip])
+        subprocess.run(['gunzip', target_zip])
+
+
+def get_commands(to_search, directory):
+    patterns = [
+            "-e 'int'",
+            "-e 'hello'",
+            "-e 'expression'",
+            "-e 'ben'"
+            ]
+    commands = {
+            'rg': ['rg', *patterns, to_search],
+            'grep': ['grep', *patterns, "-R", to_search],
+            'tgrep_with_rg': ['tgrep', *patterns, "--searcher=rg",
+                              "--target", to_search],
+            'tgrep_with_tgrep': ['tgrep', *patterns,
+                                 "--searcher=tgrep", "--target", to_search],
+        }
+    return commands
+
+
+if __name__ == "__main__":
+    download_linux_source()
+    download_eng_subs()
+    to_search = path.join(TARGETS_DIR, ENG_SUBS_DIR_NAME, ENG_SUBS_NAME)
+    results = {}
+    commands = get_commands(to_search, False)
+    results[to_search] = run_benchmarks(commands)
+    to_search = path.join(TARGETS_DIR, LINUX_DIR_NAME,)
+    commands = get_commands(to_search, True)
+    results[to_search] = run_benchmarks(commands)
+
+    for directory_name, directory_results in results.items():
+        print(f"Results for path: {path.relpath(directory_name)}")
+        for command, execution_time in directory_results.items():
+            print(f"{command} execution time: {execution_time} seconds")
+
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    with open('benchsuite/times', "a") as file:
+        file.write(f"Benchmark Results - {current_date}\n\n")
+        for directory_name, directory_results in results.items():
+            file.write(
+                f"Results for directory: {path.relpath(directory_name)}\n")
+            for command, execution_time in directory_results.items():
+                file.write(
+                    f"{command} execution time: {execution_time} seconds\n")
+            file.write("\n")
+        file.write("------------------\n")
