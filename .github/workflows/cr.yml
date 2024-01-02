@@ -77,7 +77,8 @@ jobs:
         run: |
           ${{ env.CARGO }} build --target ${{ matrix.job.target }} --locked --release
           rm target/${{ matrix.job.target }}/release/tgrep.d
-          echo "RELEASE_DIR=treegrep-${{ matrix.job.target }}" >> $GITHUB_ENV
+          export RELEASE_DIR=treegrep-${{ matrix.job.target }}
+          echo "RELEASE_DIR=$RELEASE_DIR" >> $GITHUB_ENV
           mkdir $RELEASE_DIR
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             cp target/${{ matrix.job.target }}/release/tgrep.exe $RELEASE_DIR/tgrep.exe
