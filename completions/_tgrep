@@ -21,9 +21,9 @@ _tgrep() {
 '--target=[specify the search target. If none provided, search the current directory.]: :_files' \
 '--max-depth=[the max depth to search]: : ' \
 '--threads=[set appropriate number of threads to use]: : ' \
-'--colors=[set whether to color output]: :(always never)' \
-'-s+[executable to do the searching, currently supports rg, grep and tgrep]: : ' \
-'--searcher=[executable to do the searching, currently supports rg, grep and tgrep]: : ' \
+'--color=[set whether to color output]: :(always never)' \
+'-s+[executable to do the searching, currently supports rg  and tgrep]: : ' \
+'--searcher=[executable to do the searching, currently supports rg  and tgrep]: : ' \
 '-c[display number of files matched in directory and number of lines matched in a file if present]' \
 '--count[display number of files matched in directory and number of lines matched in a file if present]' \
 '-.[search hidden files]' \
@@ -32,10 +32,10 @@ _tgrep() {
 '--line-number[show line number of match if present]' \
 '-m[open results in a menu to be opened with \$EDITOR]' \
 '--menu[open results in a menu to be opened with \$EDITOR]' \
-'-f[show paths that have matches]' \
-'--files[show paths that have matches]' \
+'-f[show the paths that have matches]' \
+'--files[show the paths that have matches]' \
 '--links[show linked paths for symbolic links]' \
-'--trim-left[trim whitespace at beginning of lines]' \
+'--trim[trim whitespace at beginning of lines]' \
 '--pcre2[enable pcre2 if the searcher supports it]' \
 '--no-ignore[don'\''t use ignore files]' \
 '-h[Print help]' \

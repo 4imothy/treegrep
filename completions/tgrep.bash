@@ -19,7 +19,7 @@ _tgrep() {
 
     case "${cmd}" in
         tgrep)
-            opts="-e -t -c -. -n -m -f -s -h --regexp --target --count --hidden --line-number --menu --files --links --trim-left --pcre2 --no-ignore --max-depth --threads --colors --searcher --help [regex expression-positional] [target-positional]"
+            opts="-e -t -c -. -n -m -f -s -h --regexp --target --count --hidden --line-number --menu --files --links --trim --pcre2 --no-ignore --max-depth --threads --color --searcher --help [regex expression-positional] [target-positional]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -49,7 +49,7 @@ _tgrep() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
-                --colors)
+                --color)
                     COMPREPLY=($(compgen -W "always never" -- "${cur}"))
                     return 0
                     ;;
@@ -71,4 +71,8 @@ _tgrep() {
     esac
 }
 
-complete -F _tgrep -o nosort -o bashdefault -o default tgrep
+if [[ "${BASH_VERSINFO[0]}" -eq 4 && "${BASH_VERSINFO[1]}" -ge 4 || "${BASH_VERSINFO[0]}" -gt 4 ]]; then
+    complete -F _tgrep -o nosort -o bashdefault -o default tgrep
+else
+    complete -F _tgrep -o bashdefault -o default tgrep
+fi
