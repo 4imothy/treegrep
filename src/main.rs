@@ -22,6 +22,12 @@ use std::process::Command;
 use writer::write_results;
 
 // TODO add notarizing to the cr for mac to exec can be used without needing to open explicitly
+// TODO add keys to move up and down in the help message of menu, and add more keys
+// TODO add link to aur thing in the README
+// TODO come up with a good way to test
+//   Run a something on a testing dir which has links and have a predetirmed output that is run with a working version and test against it everything and assert that the things are equal
+// TODO do the --files to stop searching a file when a match is found or use the
+// --files-with-matches flag for ripgrep
 
 fn main() {
     run().unwrap_or_else(|e| exit_error(e));
@@ -29,7 +35,7 @@ fn main() {
 
 fn run() -> Result<(), Errors> {
     let (config, starter) = Config::get_config().unwrap_or_else(|e| exit_error(e));
-    let matches: Matches;
+    let matches: Option<Matches>;
     let mut out: StdoutLock = stdout().lock();
     if let Some(s) = starter {
         matches = get_matches_from_cmd(s, &config).unwrap_or_else(|e| exit_error(e));
@@ -37,12 +43,16 @@ fn run() -> Result<(), Errors> {
         matches = matcher::search(&config)?;
     }
 
+    if matches.is_none() {
+        return Ok(());
+    }
+
     if config.menu {
-        Menu::draw(&mut out, matches, &config).map_err(|e| Errors::IOError {
+        Menu::draw(&mut out, matches.unwrap(), &config).map_err(|e| Errors::IOError {
             info: e.to_string(),
         })?;
     } else {
-        write_results(&mut out, &matches, &config).map_err(|e| Errors::IOError {
+        write_results(&mut out, &matches.unwrap(), &config).map_err(|e| Errors::IOError {
             info: e.to_string(),
         })?;
     }
@@ -50,7 +60,7 @@ fn run() -> Result<(), Errors> {
     Ok(())
 }
 
-fn get_matches_from_cmd(starter: OsString, config: &Config) -> Result<Matches, Errors> {
+fn get_matches_from_cmd(starter: OsString, config: &Config) -> Result<Option<Matches>, Errors> {
     let mut cmd: Command =
         Searchers::generate_command(config, starter).unwrap_or_else(|e| exit_error(e));
 

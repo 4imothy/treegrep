@@ -32,6 +32,7 @@ bstr = "1.9.0"
 ignore = "0.4.21"
 regex = "1.10.2"
 signal-hook = "0.3.17"
+serde_json = "1.0.110"
 
 [build-dependencies]
 clap = "4.3.0"

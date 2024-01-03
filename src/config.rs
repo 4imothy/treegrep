@@ -2,7 +2,6 @@
 
 use crate::args::{arg_strs, generate_command};
 use crate::errors::Errors;
-use crate::formats;
 use crate::searchers::Searchers;
 use clap::ArgMatches;
 use dunce;
@@ -25,8 +24,7 @@ pub struct Config {
     pub pcre2: bool,
     pub max_depth: Option<usize>,
     pub threads: Option<usize>,
-    pub trim_left: bool,
-    pub new_line: String,
+    pub trim: bool,
     pub need_reset_style: bool,
 }
 
@@ -99,8 +97,6 @@ impl Config {
 
         let is_dir = path.is_dir();
 
-        let new_line = formats::NEW_LINE.to_string();
-
         let need_reset_style = match exec {
             Searchers::RipGrep => true,
             _ => false,
@@ -122,9 +118,8 @@ impl Config {
                 links,
                 max_depth,
                 threads,
-                new_line,
                 need_reset_style,
-                trim_left,
+                trim: trim_left,
                 ignore,
             },
             starter,

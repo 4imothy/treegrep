@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::formats;
-use crate::match_system::{Directory, File, Line, Match, Matches, SliceExt};
+use crate::match_system::{wrap_dirs, wrap_file, Directory, File, Line, Match, Matches};
 use crate::Errors;
 use bstr::ByteSlice;
 use ignore::WalkBuilder;
@@ -12,7 +12,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::PathBuf;
 
-pub fn search(config: &Config) -> Result<Matches, Errors> {
+pub fn search(config: &Config) -> Result<Option<Matches>, Errors> {
     let mut patterns: Vec<Regex> = Vec::new();
     for expr in &config.patterns {
         patterns.push(Regex::new(expr).map_err(|_| {
@@ -22,9 +22,13 @@ pub fn search(config: &Config) -> Result<Matches, Errors> {
         })?);
     }
     if config.is_dir {
-        Ok(Matches::Dir(search_dir(patterns, config)?))
+        Ok(wrap_dirs(search_dir(patterns, config)?))
     } else {
-        Ok(Matches::File(search_file(&config.path, &patterns, config)?))
+        Ok(wrap_file(Some(search_file(
+            &config.path,
+            &patterns,
+            config,
+        )?)))
     }
 }
 
@@ -65,10 +69,10 @@ fn search_dir(patterns: Vec<Regex>, config: &Config) -> Result<Vec<Directory>, E
                                     break;
                                 }
                                 dir.to_add = false;
-                                let t = *path_to_index.get(par_dir_path.as_os_str()).unwrap();
-                                dir = directories.get_mut(t).unwrap();
+                                let p_id = *path_to_index.get(par_dir_path.as_os_str()).unwrap();
+                                dir = directories.get_mut(p_id).unwrap();
                                 dir.children.push(prev_id);
-                                prev_id = t;
+                                prev_id = p_id;
                                 to_add = dir.to_add;
                                 dir_path = par_dir_path.to_path_buf();
                             }
@@ -104,15 +108,9 @@ fn search_file(pb: &PathBuf, patterns: &Vec<Regex>, config: &Config) -> Result<F
 
 impl File {
     fn add_matches(&mut self, contents: Vec<u8>, patterns: &Vec<Regex>, config: &Config) {
-        let lines = contents.split(|&byte| byte == b'\n');
+        let lines = contents.split_inclusive(|&byte| byte == formats::NEW_LINE as u8);
 
-        let resetter = formats::reset_bold_and_fg().into_bytes();
-        let bolder = formats::BOLD.to_string().into_bytes();
-        for (line_num, line) in lines
-            .map(|v| if config.trim_left { v.trim_left() } else { v })
-            .enumerate()
-        {
-            let mut shift = 0;
+        for (line_num, line) in lines.enumerate() {
             let mut matches: Vec<Match> = Vec::new();
             let mut was_match = false;
             for (j, pattern) in patterns.iter().enumerate() {
@@ -121,50 +119,16 @@ impl File {
                     continue;
                 }
                 for m in it {
+                    was_match = true;
                     if !config.colors {
-                        was_match = true;
                         break;
-                    }
-                    matches.push(Match {
-                        pattern_id: j,
-                        start: m.start(),
-                        end: m.end(),
-                    });
+                    };
+                    matches.push(Match::new(j, m.start(), m.end()));
                 }
             }
-            if was_match && !config.colors {
+            if was_match {
                 self.lines
-                    .push(Line::new(Some(line.to_vec()), Some(line_num)));
-                continue;
-            }
-
-            if matches.len() > 0 {
-                matches.sort_by_key(|m| m.end);
-
-                let mut m_id = 1;
-                while m_id < matches.len() {
-                    if matches[m_id].start < matches[m_id - 1].end {
-                        matches[m_id].start = matches[m_id - 1].end;
-                    }
-                    m_id += 1;
-                }
-
-                let mut styled_line = line.to_vec();
-                for m in matches {
-                    let styler = formats::get_color(m.pattern_id).to_string().into_bytes();
-                    let mut start = m.start + shift;
-                    shift += styler.len();
-                    styled_line.splice(start..start, styler.into_iter());
-                    start = m.start + shift;
-                    styled_line.splice(start..start, bolder.clone().into_iter());
-                    shift += bolder.len();
-                    let end = m.end + shift;
-                    shift += resetter.len();
-                    styled_line.splice(end..end, resetter.clone().into_iter());
-                }
-
-                self.lines
-                    .push(Line::new(Some(styled_line), Some(line_num + 1)));
+                    .push(Line::style_line(line, matches, line_num + 1, config));
             }
         }
     }

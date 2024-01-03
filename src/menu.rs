@@ -20,92 +20,6 @@ const SCROLL_OFFSET: u16 = 5;
 const START_X: u16 = 3;
 const START_Y: u16 = 0;
 
-struct Selected {
-    path: OsString,
-    line: Option<usize>,
-}
-
-impl Selected {
-    pub fn new(path: OsString, line: Option<usize>) -> Selected {
-        Selected { path, line }
-    }
-
-    fn get_selected_info(selected: usize, searched: &Matches, config: &Config) -> Selected {
-        let mut current: usize = 0;
-        match searched {
-            Matches::Dir(dirs) => {
-                return Selected::search_dir(
-                    dirs.get(0).unwrap(),
-                    selected,
-                    &mut current,
-                    dirs,
-                    config,
-                )
-                .unwrap();
-            }
-            Matches::File(file) => {
-                return Selected::search_file(file, selected, &mut current, config).unwrap();
-            }
-        }
-    }
-
-    fn search_dir(
-        dir: &Directory,
-        selected: usize,
-        current: &mut usize,
-        dirs: &Vec<Directory>,
-        config: &Config,
-    ) -> Option<Selected> {
-        let children = &dir.children;
-        let files = &dir.files;
-        let mut sel: Option<Selected>;
-        // this can be shortened to checking if just_files and then incrementing dir
-        if !config.just_files {
-            if *current == selected {
-                return Some(Selected::new(dir.path.as_os_str().to_owned(), None));
-            }
-            *current += 1;
-        }
-        for child in children {
-            sel = Selected::search_dir(dirs.get(*child).unwrap(), selected, current, dirs, config);
-            if sel.is_some() {
-                return sel;
-            }
-        }
-        for file in files {
-            sel = Selected::search_file(file, selected, current, config);
-            if sel.is_some() {
-                return sel;
-            }
-        }
-        return None;
-    }
-
-    fn search_file(
-        file: &File,
-        selected: usize,
-        current: &mut usize,
-        config: &Config,
-    ) -> Option<Selected> {
-        if *current == selected {
-            return Some(Selected::new(file.path.clone().into_os_string(), None));
-        }
-        *current += 1;
-        if !config.just_files {
-            for line in file.lines.iter() {
-                if *current == selected {
-                    return Some(Selected::new(
-                        file.path.clone().into_os_string(),
-                        line.line_num,
-                    ));
-                }
-                *current += 1;
-            }
-        }
-        None
-    }
-}
-
 pub struct Menu<'a, 'b> {
     selected_id: usize,
     cursor_y: u16,
@@ -113,6 +27,7 @@ pub struct Menu<'a, 'b> {
     searched: Matches,
     lines: Vec<String>,
     num_rows: u16,
+    colors: bool,
 }
 
 impl<'a, 'b> Menu<'a, 'b> {
@@ -124,8 +39,8 @@ impl<'a, 'b> Menu<'a, 'b> {
         let mut buffer: Vec<u8> = Vec::new();
         writer::write_results(&mut buffer, &searched, config)?;
         let lines: Vec<String> = buffer
-            .split(|&byte| byte == b'\n')
-            .map(|vec| String::from_utf8_lossy(vec).into())
+            .split(|&byte| byte == formats::NEW_LINE as u8)
+            .map(|v| String::from_utf8_lossy(v).into())
             .collect();
 
         Ok(Menu {
@@ -135,6 +50,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             searched,
             lines,
             num_rows: Menu::num_rows(),
+            colors: config.colors,
         })
     }
 
@@ -143,19 +59,6 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     pub fn draw(out: &'a mut StdoutLock<'b>, matches: Matches, config: &Config) -> io::Result<()> {
-        match &matches {
-            Matches::Dir(dirs) => {
-                if dirs.get(0).unwrap().children.len() == 0 && dirs.get(0).unwrap().files.len() == 0
-                {
-                    return Ok(());
-                }
-            }
-            Matches::File(file) => {
-                if file.lines.len() == 0 {
-                    return Ok(());
-                }
-            }
-        }
         let mut menu: Menu = Menu::new(out, matches, config)?;
 
         menu.enter()?;
@@ -307,15 +210,22 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn style_at_cursor(&mut self, cursor_y: u16) -> io::Result<()> {
-        let l: &str = self.lines.get(self.selected_id).unwrap();
-        execute!(
+        queue!(
             self.out,
-            SetBackgroundColor(formats::MENU_SELECTED),
             cursor::MoveTo(0, cursor_y),
             Print(formats::SELECTED_INDICATOR),
+        )?;
+
+        if self.colors {
+            queue!(self.out, SetBackgroundColor(formats::MENU_SELECTED))?;
+        }
+
+        queue!(
+            self.out,
             cursor::MoveTo(START_X, cursor_y),
-            Print(l)
-        )
+            Print(self.lines.get(self.selected_id).unwrap())
+        )?;
+        self.out.flush()
     }
 
     fn destyle_at_cursor(&mut self, cursor_y: u16) -> io::Result<()> {
@@ -403,5 +313,88 @@ impl<'a, 'b> Menu<'a, 'b> {
 
         command.exec();
         Ok(())
+    }
+}
+
+struct Selected {
+    path: OsString,
+    line: Option<usize>,
+}
+
+impl Selected {
+    pub fn new(path: OsString, line: Option<usize>) -> Selected {
+        Selected { path, line }
+    }
+
+    fn get_selected_info(selected: usize, searched: &Matches, config: &Config) -> Selected {
+        let mut current: usize = 0;
+        match searched {
+            Matches::Dir(dirs) => {
+                return Selected::search_dir(
+                    dirs.get(0).unwrap(),
+                    selected,
+                    &mut current,
+                    dirs,
+                    config,
+                )
+                .unwrap();
+            }
+            Matches::File(file) => {
+                return Selected::search_file(file, selected, &mut current, config).unwrap();
+            }
+        }
+    }
+
+    fn search_dir(
+        dir: &Directory,
+        selected: usize,
+        current: &mut usize,
+        dirs: &Vec<Directory>,
+        config: &Config,
+    ) -> Option<Selected> {
+        let children = &dir.children;
+        let files = &dir.files;
+        let mut sel: Option<Selected>;
+        if *current == selected {
+            return Some(Selected::new(dir.path.as_os_str().to_owned(), None));
+        }
+        *current += 1;
+        for child in children {
+            sel = Selected::search_dir(dirs.get(*child).unwrap(), selected, current, dirs, config);
+            if sel.is_some() {
+                return sel;
+            }
+        }
+        for file in files {
+            sel = Selected::search_file(file, selected, current, config);
+            if sel.is_some() {
+                return sel;
+            }
+        }
+        return None;
+    }
+
+    fn search_file(
+        file: &File,
+        selected: usize,
+        current: &mut usize,
+        config: &Config,
+    ) -> Option<Selected> {
+        if *current == selected {
+            return Some(Selected::new(file.path.clone().into_os_string(), None));
+        }
+        *current += 1;
+        if !config.just_files {
+            for line in file.lines.iter() {
+                if *current == selected {
+                    return Some(Selected::new(
+                        file.path.clone().into_os_string(),
+                        line.line_num,
+                    ));
+                }
+                *current += 1;
+            }
+        }
+        None
     }
 }

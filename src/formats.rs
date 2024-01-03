@@ -23,30 +23,18 @@ pub const BRANCH_END: &str = "└──";
 pub const VER_LINE_SPACER: &str = "│  ";
 pub const SPACER: &str = "   ";
 
-pub const NEW_LINE: &str = "\n";
+pub const NEW_LINE: char = '\n';
 
 pub fn error_prefix() -> String {
     format!("{}{}Error:{}", BOLD, RED_FG, RESET)
 }
 
-pub fn remove_reset_style_prefix(name: &str, reset_style: bool) -> &str {
-    if reset_style {
-        name.trim_start_matches(&RESET.to_string())
-    } else {
-        name
-    }
+pub fn reset_bold_and_fg() -> Vec<u8> {
+    (RESET_COLOR.to_string() + &NO_BOLD.to_string()).into_bytes()
 }
 
-pub fn remove_reset_style_suffix(name: &str, reset_style: bool) -> &str {
-    if reset_style {
-        name.trim_end_matches(&RESET.to_string())
-    } else {
-        name
-    }
-}
-
-pub fn reset_bold_and_fg() -> String {
-    RESET_COLOR.to_string() + &NO_BOLD.to_string()
+pub fn bold() -> Vec<u8> {
+    BOLD.to_string().into_bytes()
 }
 
 pub fn dir_name(name: &str) -> StyledContent<&str> {

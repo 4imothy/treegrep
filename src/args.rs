@@ -11,14 +11,13 @@ pub mod names {
 // TODO Options to Support
 //
 // excluding directories explicitly
-//
 
 pub mod arg_strs {
     pub const TARGET_POSITIONAL: &str = "target-positional";
     pub const TARGET: &str = "target";
     pub const EXPRESSION_POSITIONAL: &str = "regex expression-positional";
     pub const EXPRESSION: &str = "regex expression";
-    pub const COLORS: &str = "colors";
+    pub const COLORS: &str = "color";
     pub const COLORS_ALWAYS: &str = "always";
     pub const COLORS_NEVER: &str = "never";
     pub const SHOW_COUNT: &str = "count";
@@ -29,7 +28,7 @@ pub mod arg_strs {
     pub const MAX_DEPTH: &str = "max-depth";
     pub const SEARCHER: &str = "searcher";
     pub const LINKS: &str = "links";
-    pub const TRIM_LEFT: &str = "trim-left";
+    pub const TRIM_LEFT: &str = "trim";
     pub const PCRE2: &str = "pcre2";
     pub const THREADS: &str = "threads";
     pub const NO_IGNORE: &str = "no-ignore";
@@ -84,7 +83,7 @@ fn get_args() -> Vec<Arg> {
     create_bool_arg(arg_strs::HIDDEN, Some('.'), "search hidden files"),
     create_bool_arg(arg_strs::LINE_NUMBER, Some('n'), "show line number of match if present"),
     create_bool_arg(arg_strs::MENU, Some('m'), "open results in a menu to be opened with $EDITOR"),
-    create_bool_arg(arg_strs::FILES, Some('f'), "show paths that have matches"),
+    create_bool_arg(arg_strs::FILES, Some('f'), "show the paths that have matches"),
     create_bool_arg(arg_strs::LINKS, None, "show linked paths for symbolic links"),
     create_bool_arg(arg_strs::TRIM_LEFT, None, "trim whitespace at beginning of lines"),
     create_bool_arg(arg_strs::PCRE2, None, "enable pcre2 if the searcher supports it"),
@@ -101,7 +100,7 @@ fn get_args() -> Vec<Arg> {
     Arg::new(arg_strs::SEARCHER)
         .long(arg_strs::SEARCHER)
         .short('s')
-        .help(format!("executable to do the searching, currently supports rg, grep and {}", names::BIN_NAME))
+        .help(format!("executable to do the searching, currently supports rg  and {}", names::BIN_NAME))
         .action(ArgAction::Set)
     ]
 }
