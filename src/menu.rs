@@ -393,6 +393,13 @@ impl<'a, 'b> Menu<'a, 'b> {
                 } else {
                     command.arg(path);
                 }
+	    }
+            "jed" | "xjed" => {
+	        command.arg(path);
+		if let Some(l) = line_num {
+		    command.arg("-g");
+		    command.arg(format!("{l}"));
+		}
             }
             _ => {
                 command.arg(path);
