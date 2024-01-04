@@ -81,7 +81,7 @@ fn get_args() -> Vec<Arg> {
     create_bool_arg(arg_strs::SHOW_COUNT, Some('c'), "display number of files matched in directory and number of lines matched in a file if present"),
     create_bool_arg(arg_strs::HIDDEN, Some('.'), "search hidden files"),
     create_bool_arg(arg_strs::LINE_NUMBER, Some('n'), "show line number of match if present"),
-    create_bool_arg(arg_strs::MENU, Some('m'), "open results in a menu to be opened with $EDITOR"),
+    create_bool_arg(arg_strs::MENU, Some('m'), "open results in a menu to be opened with $EDITOR, move with j/k, n/p, up/down"),
     create_bool_arg(arg_strs::FILES, Some('f'), "show the paths that have matches"),
     create_bool_arg(arg_strs::LINKS, None, "show linked paths for symbolic links"),
     create_bool_arg(arg_strs::TRIM_LEFT, None, "trim whitespace at beginning of lines"),

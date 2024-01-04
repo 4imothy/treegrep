@@ -64,7 +64,6 @@ impl<'a, 'b> Menu<'a, 'b> {
         menu.enter()?;
         menu.write_menu()?;
 
-        let max_selected_id: usize = menu.lines.len() - 1;
         'outer: loop {
             let event = event::read();
 
@@ -77,16 +76,8 @@ impl<'a, 'b> Menu<'a, 'b> {
             {
                 match code {
                     KeyCode::Char(c) => match c {
-                        'j' => {
-                            if menu.selected_id < max_selected_id - 1 {
-                                menu.move_down()?;
-                            }
-                        }
-                        'k' => {
-                            if menu.selected_id > 0 {
-                                menu.move_up()?;
-                            }
-                        }
+                        'j' | 'n' => menu.move_down()?,
+                        'k' | 'p' => menu.move_up()?,
                         'q' => break 'outer,
                         'c' => {
                             if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
@@ -101,6 +92,8 @@ impl<'a, 'b> Menu<'a, 'b> {
                         }
                         _ => {}
                     },
+                    KeyCode::Up => menu.move_up()?,
+                    KeyCode::Down => menu.move_down()?,
                     KeyCode::Enter => {
                         let selected =
                             Selected::get_selected_info(menu.selected_id, &menu.searched, config);
@@ -163,6 +156,9 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn move_down(&mut self) -> io::Result<()> {
+        if self.selected_id == self.lines.len() - 2 {
+            return Ok(());
+        }
         self.destyle_at_cursor(self.cursor_y)?;
         self.selected_id += 1;
         self.style_at_cursor(self.cursor_y + 1)?;
@@ -186,6 +182,9 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn move_up(&mut self) -> io::Result<()> {
+        if self.selected_id == 0 {
+            return Ok(());
+        }
         self.destyle_at_cursor(self.cursor_y)?;
         self.selected_id -= 1;
         self.style_at_cursor(self.cursor_y - 1)?;
@@ -210,15 +209,14 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn style_at_cursor(&mut self, cursor_y: u16) -> io::Result<()> {
+        if self.colors {
+            queue!(self.out, SetBackgroundColor(formats::MENU_SELECTED))?;
+        }
         queue!(
             self.out,
             cursor::MoveTo(0, cursor_y),
             Print(formats::SELECTED_INDICATOR),
         )?;
-
-        if self.colors {
-            queue!(self.out, SetBackgroundColor(formats::MENU_SELECTED))?;
-        }
 
         queue!(
             self.out,
