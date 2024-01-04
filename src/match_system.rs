@@ -142,20 +142,22 @@ impl Line {
             return Line::new(Some(contents.to_vec()), Some(line_num));
         }
 
-        matches.sort_by_key(|m| m.end);
-
-        let mut m_id = 1;
-        while m_id < matches.len() {
-            if matches[m_id].start < matches[m_id - 1].end {
-                matches[m_id].start = matches[m_id - 1].end;
+        matches.sort_by(|a, b| a.start.cmp(&b.start).then_with(|| b.end.cmp(&a.end)));
+        let mut current_max_end = matches[0].end;
+        for m_id in 1..matches.len() {
+            if matches[m_id].start <= current_max_end {
+                matches[m_id].start = current_max_end;
+                matches[m_id].end = current_max_end.max(matches[m_id].end);
             }
-
-            m_id += 1;
+            current_max_end = current_max_end.max(matches[m_id].end);
         }
 
         let mut styled_line = contents.to_vec();
         let mut shift = 0;
         for mut m in matches {
+            if cut > m.start || cut > m.end || m.start == m.end {
+                continue;
+            }
             m.start -= cut;
             m.end -= cut;
             let styler = get_color(m.pattern_id).to_string().into_bytes();
