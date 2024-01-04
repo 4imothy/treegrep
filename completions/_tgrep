@@ -30,8 +30,8 @@ _tgrep() {
 '--hidden[search hidden files]' \
 '-n[show line number of match if present]' \
 '--line-number[show line number of match if present]' \
-'-m[open results in a menu to be opened with \$EDITOR]' \
-'--menu[open results in a menu to be opened with \$EDITOR]' \
+'-m[open results in a menu to be opened with \$EDITOR, move with j/k, n/p, up/down]' \
+'--menu[open results in a menu to be opened with \$EDITOR, move with j/k, n/p, up/down]' \
 '-f[show the paths that have matches]' \
 '--files[show the paths that have matches]' \
 '--links[show linked paths for symbolic links]' \

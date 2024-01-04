@@ -7,7 +7,7 @@ complete -c tgrep -s s -l searcher -d 'executable to do the searching, currently
 complete -c tgrep -s c -l count -d 'display number of files matched in directory and number of lines matched in a file if present'
 complete -c tgrep -s . -l hidden -d 'search hidden files'
 complete -c tgrep -s n -l line-number -d 'show line number of match if present'
-complete -c tgrep -s m -l menu -d 'open results in a menu to be opened with $EDITOR'
+complete -c tgrep -s m -l menu -d 'open results in a menu to be opened with $EDITOR, move with j/k, n/p, up/down'
 complete -c tgrep -s f -l files -d 'show the paths that have matches'
 complete -c tgrep -l links -d 'show linked paths for symbolic links'
 complete -c tgrep -l trim -d 'trim whitespace at beginning of lines'

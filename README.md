@@ -4,7 +4,7 @@ treegrep is a frontend for existing pattern matchers or a standalone pattern mat
 
 ### Currently Suuported Backends
 - *[ripgrep](https://github.com/BurntSushi/ripgrep)*
-- *[grep](https://en.wikipedia.org/wiki/Grep)*
+- *[treegrep](https://github.com/4imothy/treegrep)*
 
 ### To Install
 #### Cargo
@@ -22,12 +22,11 @@ https://github.com/4imothy/treegrep/assets/40186632/9c85c309-df78-4996-8127-ee5a
 
 ### *--help* Output
 ```
-treegrep
+treegrep 0.1.1
 by Timothy Cronin
 
-treegrep is a pattern matcher frontend or backend
-    which displays matches in a tree and can
-    present results in a menu to be opened
+A pattern matcher frontend or backend which displays results in a tree
+
 tgrep [OPTIONS] <regex expression-positional|--regexp <regex expression>> [target-positional]
 
 Arguments:
@@ -40,15 +39,16 @@ Options:
   -c, --count                      display number of files matched in directory and number of lines matched in a file if present
   -., --hidden                     search hidden files
   -n, --line-number                show line number of match if present
-  -m, --menu                       open results in a menu to be opened with $EDITOR
-  -f, --files                      show paths that have matches
+  -m, --menu                       open results in a menu to be opened with $EDITOR, move with j/k, n/p, up/down
+  -f, --files                      show the paths that have matches
       --links                      show linked paths for symbolic links
-      --trim-left                  trim whitespace at beginning of lines
+      --trim                       trim whitespace at beginning of lines
       --pcre2                      enable pcre2 if the searcher supports it
       --no-ignore                  don't use ignore files
       --max-depth <max-depth>      the max depth to search
       --threads <threads>          set appropriate number of threads to use
-      --colors <colors>            set whether to color output [possible values: always, never]
-  -s, --searcher <searcher>        executable to do the searching, currently supports rg, grep and tgrep
+      --color <color>              set whether to color output [possible values: always, never]
+  -s, --searcher <searcher>        executable to do the searching, currently supports rg  and tgrep
   -h, --help                       Print help
+  -V, --version                    Print version
 ```
