@@ -40,6 +40,8 @@ _tgrep() {
 '--no-ignore[don'\''t use ignore files]' \
 '-h[Print help]' \
 '--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
 '::regex expression-positional -- specify the regex expression:' \
 '::target-positional -- specify the search target. If none provided, search the current directory.:_files' \
 && ret=0

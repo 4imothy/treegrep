@@ -43,6 +43,8 @@ set edit:completion:arg-completer[tgrep] = {|@words|
             cand --no-ignore 'don''t use ignore files'
             cand -h 'Print help'
             cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
         }
     ]
     $completions[$command]

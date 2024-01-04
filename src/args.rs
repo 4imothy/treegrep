@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
 use clap::builder::PossibleValue;
-use clap::{Arg, ArgAction, ArgGroup, Command, ValueHint};
+use clap::{
+    crate_authors, crate_description, crate_name, crate_version, Arg, ArgAction, ArgGroup, Command,
+    ValueHint,
+};
 
 pub mod names {
-    pub const LONG_NAME: &str = "treegrep";
     pub const BIN_NAME: &str = "tgrep";
 }
 
@@ -34,24 +36,21 @@ pub mod arg_strs {
     pub const NO_IGNORE: &str = "no-ignore";
 }
 
-const NAME: &str = names::LONG_NAME;
-const AUTHORS: &str = "Timothy Cronin";
-const ABOUT: &str = "
-treegrep is a pattern matcher frontend or backend
-    which displays matches in a tree and can
-    present results in a menu to be opened";
-const HELP: &str = "{name}
+const HELP: &str = "{name} {version}
 by {author}
+
 {about}
+
 {usage}
 
 {all-args}";
 
 pub fn generate_command() -> Command {
-    let mut command = Command::new(NAME)
-        .author(AUTHORS)
-        .about(ABOUT)
-        .help_template(HELP.to_owned());
+    let mut command = Command::new(crate_name!())
+        .author(crate_authors!(", "))
+        .about(crate_description!())
+        .help_template(HELP.to_owned())
+        .version(crate_version!());
 
     command = add_expressions(command);
     command = add_paths(command);

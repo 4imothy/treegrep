@@ -9,7 +9,7 @@ homepage = "https://github.com/4imothy/treegrep"
 keywords = ["regex", "grep", "search", "tree"]
 categories = ["command-line-utilities", "text-processing"]
 readme = "README.md"
-description = "A pattern matching frontend to display results in a tree"
+description = "A pattern matcher frontend or backend which displays results in a tree"
 documentation = "https://github.com/4imothy/treegrep/tree/main/README.md"
 authors = ["Timothy Cronin"]
 exclude = [
@@ -26,7 +26,7 @@ name = "tgrep"
 
 [dependencies]
 crossterm = "0.27.0"
-clap = "4.4.11"
+clap = { version = "4.4.12", features = ["cargo"] }
 dunce = "1.0.4"
 bstr = "1.9.0"
 ignore = "0.4.21"
@@ -35,5 +35,5 @@ signal-hook = "0.3.17"
 serde_json = "1.0.110"
 
 [build-dependencies]
-clap = "4.3.0"
-clap_complete = "4.3.0"
+clap = { version = "4.4.12", features = ["cargo"] }
+clap_complete = "4.4.6"

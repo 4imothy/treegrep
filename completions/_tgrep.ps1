@@ -46,6 +46,8 @@ Register-ArgumentCompleter -Native -CommandName 'tgrep' -ScriptBlock {
             [CompletionResult]::new('--no-ignore', 'no-ignore', [CompletionResultType]::ParameterName, 'don''t use ignore files')
             [CompletionResult]::new('-h', 'h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', 'help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', 'V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', 'version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
     })
