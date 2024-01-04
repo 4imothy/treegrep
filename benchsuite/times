@@ -13,3 +13,18 @@ tgrep_with_rg execution time: 0.4374120235443115 seconds
 tgrep_with_tgrep execution time: 5.325469970703125 seconds
 
 ------------------
+Benchmark Results - 2024-01-03
+
+Results for directory: benchsuite/targets/eng_subs/en.txt
+rg execution time: 2.35612416267395 seconds
+grep execution time: 437.19653725624084 seconds
+tgrep_with_rg execution time: 3.4091269969940186 seconds
+tgrep_with_tgrep execution time: 55.63802981376648 seconds
+
+Results for directory: benchsuite/targets/linux
+rg execution time: 0.41819024085998535 seconds
+grep execution time: 58.738921880722046 seconds
+tgrep_with_rg execution time: 0.45057010650634766 seconds
+tgrep_with_tgrep execution time: 6.072923183441162 seconds
+
+------------------
