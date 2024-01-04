@@ -9,7 +9,9 @@ treegrep is a frontend for existing pattern matchers or a standalone pattern mat
 ### To Install
 
 #### Cargo
-```cargo install treegrep```
+```
+cargo install treegrep
+```
 
 #### Releases
 Download from [releases](https://github.com/4imothy/treegrep/releases/)
@@ -19,6 +21,7 @@ Download from [releases](https://github.com/4imothy/treegrep/releases/)
 git clone https://github.com/4imothy/treegrep
 cargo build
 ```
+
 ### Links
 [crates](https://crates.io/crates/treegrep) | [github](https://github.com/4imothy/treegrep) | [aur](https://aur.archlinux.org/packages/treegrep-bin)
 
