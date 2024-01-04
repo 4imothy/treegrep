@@ -21,13 +21,12 @@ use std::io::{stdout, StdoutLock};
 use std::process::Command;
 use writer::write_results;
 
-// TODO add notarizing to the cr for mac to exec can be used without needing to open explicitly
-// TODO add keys to move up and down in the help message of menu, and add more keys
-// TODO add link to aur thing in the README
+// TODO add notarizing mac to exec can be used without needing to open from finder
 // TODO come up with a good way to test
 //   Run a something on a testing dir which has links and have a predetirmed output that is run with a working version and test against it everything and assert that the things are equal
 // TODO do the --files to stop searching a file when a match is found or use the
 // --files-with-matches flag for ripgrep
+// TODO vim plugin or something
 
 fn main() {
     run().unwrap_or_else(|e| exit_error(e));
