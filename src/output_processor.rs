@@ -145,7 +145,10 @@ pub fn process_json_lines(lines: Vec<&[u8]>, config: &Config) -> Result<Option<M
                 }
 
                 cur_file.as_mut().unwrap().lines.push(Line::style_line(
-                    res["data"]["lines"]["text"].as_str().unwrap().as_bytes(),
+                    match res["data"]["lines"]["text"].as_str() {
+                        Some(text) => text.as_bytes(),
+                        None => res["data"]["lines"]["bytes"].as_str().unwrap().as_bytes(),
+                    },
                     matches,
                     res["data"]["line_number"].as_usize().unwrap(),
                     config,
