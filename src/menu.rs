@@ -16,7 +16,11 @@ use std::ffi::OsString;
 use std::io::{self, StdoutLock, Write};
 use std::process::Command;
 
-const SCROLL_OFFSET: u16 = 5;
+// TODO more controls
+//
+// Go to first/last match
+// Go to next / previous path
+
 const START_X: u16 = 3;
 const START_Y: u16 = 0;
 
@@ -28,6 +32,9 @@ pub struct Menu<'a, 'b> {
     lines: Vec<String>,
     num_rows: u16,
     colors: bool,
+    scroll_offset: u16,
+    big_jump: u16,
+    small_jump: u16,
 }
 
 impl<'a, 'b> Menu<'a, 'b> {
@@ -43,19 +50,28 @@ impl<'a, 'b> Menu<'a, 'b> {
             .map(|v| String::from_utf8_lossy(v).into())
             .collect();
 
+        let (num_rows, scroll_offset, big_jump, small_jump) = Menu::scroll_info();
+
         Ok(Menu {
             selected_id: 0,
             cursor_y: 0,
             out,
             searched,
             lines,
-            num_rows: Menu::num_rows(),
             colors: config.colors,
+            num_rows,
+            scroll_offset,
+            big_jump,
+            small_jump,
         })
     }
 
-    fn num_rows() -> u16 {
-        terminal::size().ok().map(|(_, height)| height).unwrap()
+    fn scroll_info() -> (u16, u16, u16, u16) {
+        let num_rows = terminal::size().ok().map(|(_, height)| height).unwrap();
+        let scroll_offset = num_rows / 5;
+        let big_jump = scroll_offset;
+        let small_jump = 1;
+        (num_rows, scroll_offset, big_jump, small_jump)
     }
 
     pub fn draw(out: &'a mut StdoutLock<'b>, matches: Matches, config: &Config) -> io::Result<()> {
@@ -76,8 +92,10 @@ impl<'a, 'b> Menu<'a, 'b> {
             {
                 match code {
                     KeyCode::Char(c) => match c {
-                        'j' | 'n' => menu.move_down()?,
-                        'k' | 'p' => menu.move_up()?,
+                        'j' | 'n' => menu.move_down(menu.small_jump)?,
+                        'k' | 'p' => menu.move_up(menu.small_jump)?,
+                        'J' | 'N' | '}' | ']' => menu.move_down(menu.big_jump)?,
+                        'K' | 'P' | '{' | '[' => menu.move_up(menu.big_jump)?,
                         'q' => break 'outer,
                         'c' => {
                             if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
@@ -92,8 +110,8 @@ impl<'a, 'b> Menu<'a, 'b> {
                         }
                         _ => {}
                     },
-                    KeyCode::Up => menu.move_up()?,
-                    KeyCode::Down => menu.move_down()?,
+                    KeyCode::Up => menu.move_up(menu.small_jump)?,
+                    KeyCode::Down => menu.move_down(menu.small_jump)?,
                     KeyCode::Enter => {
                         let selected =
                             Selected::get_selected_info(menu.selected_id, &menu.searched, config);
@@ -125,17 +143,18 @@ impl<'a, 'b> Menu<'a, 'b> {
             queue!(self.out, cursor::MoveTo(START_X, cursor_y), Print(line))?;
             cursor_y += 1;
         }
-        self.style_at_cursor(self.cursor_y)?;
+        self.style_at_cursor()?;
         self.out.flush()
     }
 
     // TODO make this work with keeping the selected id
     fn redraw(&mut self) -> io::Result<()> {
         execute!(self.out, terminal::Clear(ClearType::All))?;
+        self.destyle_at_cursor()?;
         self.write_menu()?;
         self.selected_id = 0;
         self.cursor_y = START_Y;
-        self.style_at_cursor(self.cursor_y)?;
+        self.style_at_cursor()?;
         Ok(())
     }
 
@@ -149,89 +168,98 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn resume(&mut self) -> io::Result<()> {
-        self.num_rows = Menu::num_rows();
+        (
+            self.num_rows,
+            self.scroll_offset,
+            self.big_jump,
+            self.small_jump,
+        ) = Menu::scroll_info();
         self.enter()?;
         self.redraw()?;
         Ok(())
     }
 
-    fn move_down(&mut self) -> io::Result<()> {
-        if self.selected_id == self.lines.len() - 2 {
-            return Ok(());
-        }
-        self.destyle_at_cursor(self.cursor_y)?;
-        self.selected_id += 1;
-        self.style_at_cursor(self.cursor_y + 1)?;
-        if self.cursor_y + SCROLL_OFFSET != self.num_rows {
-            self.cursor_y += 1;
-        } else {
-            execute!(self.out, terminal::ScrollUp(1))?;
-            if (self.selected_id + SCROLL_OFFSET as usize) < self.lines.len() {
-                execute!(self.out, cursor::MoveTo(START_X, self.num_rows))?;
-                execute!(
-                    self.out,
-                    Print(
-                        self.lines
-                            .get(self.selected_id - 1 + SCROLL_OFFSET as usize)
-                            .unwrap()
-                    )
-                )?;
+    fn move_down(&mut self, dist: u16) -> io::Result<()> {
+        self.destyle_at_cursor()?;
+        for _ in 0..dist {
+            if self.selected_id == self.lines.len() - 2 {
+                break;
+            }
+            self.selected_id += 1;
+            if self.cursor_y + self.scroll_offset != self.num_rows {
+                self.cursor_y += 1;
+            } else {
+                execute!(self.out, terminal::ScrollUp(1))?;
+                if (self.selected_id + self.scroll_offset as usize) < self.lines.len() {
+                    execute!(
+                        self.out,
+                        cursor::MoveTo(START_X, self.num_rows),
+                        Print(
+                            self.lines
+                                .get(self.selected_id - 1 + self.scroll_offset as usize)
+                                .unwrap()
+                        )
+                    )?;
+                }
             }
         }
+        self.style_at_cursor()?;
         Ok(())
     }
 
-    fn move_up(&mut self) -> io::Result<()> {
-        if self.selected_id == 0 {
-            return Ok(());
-        }
-        self.destyle_at_cursor(self.cursor_y)?;
-        self.selected_id -= 1;
-        self.style_at_cursor(self.cursor_y - 1)?;
-        if self.selected_id < SCROLL_OFFSET as usize || self.cursor_y != SCROLL_OFFSET {
-            self.cursor_y -= 1;
-        } else {
-            execute!(self.out, terminal::ScrollDown(1))?;
-            if self.selected_id + 1 > SCROLL_OFFSET as usize {
-                execute!(self.out, cursor::MoveTo(START_X, START_Y))?;
-                execute!(
-                    self.out,
-                    Print(
-                        self.lines
-                            .get(self.selected_id - SCROLL_OFFSET as usize)
-                            .unwrap()
-                    )
-                )?;
+    fn move_up(&mut self, dist: u16) -> io::Result<()> {
+        self.destyle_at_cursor()?;
+        for _ in 0..dist {
+            if self.selected_id == 0 {
+                break;
+            }
+            self.selected_id -= 1;
+            if self.selected_id < self.scroll_offset as usize || self.cursor_y != self.scroll_offset
+            {
+                self.cursor_y -= 1;
+            } else {
+                execute!(self.out, terminal::ScrollDown(1))?;
+                if self.selected_id + 1 > self.scroll_offset as usize {
+                    execute!(
+                        self.out,
+                        cursor::MoveTo(START_X, START_Y),
+                        Print(
+                            self.lines
+                                .get(self.selected_id - self.scroll_offset as usize)
+                                .unwrap()
+                        )
+                    )?;
+                }
             }
         }
-
+        self.style_at_cursor()?;
         Ok(())
     }
 
-    fn style_at_cursor(&mut self, cursor_y: u16) -> io::Result<()> {
+    fn style_at_cursor(&mut self) -> io::Result<()> {
         if self.colors {
             queue!(self.out, SetBackgroundColor(formats::MENU_SELECTED))?;
         }
         queue!(
             self.out,
-            cursor::MoveTo(0, cursor_y),
+            cursor::MoveTo(0, self.cursor_y),
             Print(formats::SELECTED_INDICATOR),
         )?;
 
         queue!(
             self.out,
-            cursor::MoveTo(START_X, cursor_y),
+            cursor::MoveTo(START_X, self.cursor_y),
             Print(self.lines.get(self.selected_id).unwrap())
         )?;
         self.out.flush()
     }
 
-    fn destyle_at_cursor(&mut self, cursor_y: u16) -> io::Result<()> {
+    fn destyle_at_cursor(&mut self) -> io::Result<()> {
         execute!(
             self.out,
-            cursor::MoveTo(0, cursor_y),
+            cursor::MoveTo(0, self.cursor_y),
             Print(formats::SELECTED_INDICATOR_CLEAR),
-            cursor::MoveTo(START_X, cursor_y),
+            cursor::MoveTo(START_X, self.cursor_y),
             Print(self.lines.get(self.selected_id).unwrap())
         )
     }
