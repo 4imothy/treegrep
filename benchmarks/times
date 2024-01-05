@@ -1,12 +1,12 @@
 Benchmark Results - 2024-01-01
 
-Results for directory: benchsuite/targets/eng_subs/en.txt
+Results for directory: benchmarks/targets/eng_subs/en.txt
 rg execution time: 2.5643961429595947 seconds
 grep execution time: 445.1207449436188 seconds
 tgrep_with_rg execution time: 3.039889097213745 seconds
 tgrep_with_tgrep execution time: 39.47535991668701 seconds
 
-Results for directory: benchsuite/targets/linux
+Results for directory: benchmarks/targets/linux
 rg execution time: 0.4255208969116211 seconds
 grep execution time: 59.600473165512085 seconds
 tgrep_with_rg execution time: 0.4374120235443115 seconds
@@ -15,16 +15,31 @@ tgrep_with_tgrep execution time: 5.325469970703125 seconds
 ------------------
 Benchmark Results - 2024-01-03
 
-Results for directory: benchsuite/targets/eng_subs/en.txt
+Results for directory: benchmarks/targets/eng_subs/en.txt
 rg execution time: 2.35612416267395 seconds
 grep execution time: 437.19653725624084 seconds
 tgrep_with_rg execution time: 3.4091269969940186 seconds
 tgrep_with_tgrep execution time: 55.63802981376648 seconds
 
-Results for directory: benchsuite/targets/linux
+Results for directory: benchmarks/targets/linux
 rg execution time: 0.41819024085998535 seconds
 grep execution time: 58.738921880722046 seconds
 tgrep_with_rg execution time: 0.45057010650634766 seconds
 tgrep_with_tgrep execution time: 6.072923183441162 seconds
+
+------------------
+Benchmark Results - 2024-01-05
+
+Results for directory: benchmarks/targets/eng_subs/en.txt
+rg execution time: 2.2102460861206055 seconds
+grep execution time: 430.96298003196716 seconds
+tgrep_with_rg execution time: 3.098724126815796 seconds
+tgrep_with_tgrep execution time: 57.21597599983215 seconds
+
+Results for directory: benchmarks/targets/linux
+rg execution time: 0.4352269172668457 seconds
+grep execution time: 59.28410577774048 seconds
+tgrep_with_rg execution time: 0.45580005645751953 seconds
+tgrep_with_tgrep execution time: 6.399776935577393 seconds
 
 ------------------

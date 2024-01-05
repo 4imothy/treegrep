@@ -91,7 +91,7 @@ if __name__ == "__main__":
             print(f"{command} execution time: {execution_time} seconds")
 
     current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-    with open('benchsuite/times', "a") as file:
+    with open('benchmarks/times', "a") as file:
         file.write(f"Benchmark Results - {current_date}\n\n")
         for directory_name, directory_results in results.items():
             file.write(

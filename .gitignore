@@ -1,5 +1,5 @@
 .DS_Store
 target
-benchsuite/targets/
+benchmarks/targets/
 example/
 install.sh
