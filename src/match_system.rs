@@ -37,16 +37,18 @@ pub enum Matches {
 pub struct Directory {
     pub name: String,
     pub path: PathBuf,
+    pub linked: Option<OsString>,
     pub children: Vec<usize>,
     pub files: Vec<File>,
     pub to_add: bool,
 }
 
 impl Directory {
-    pub fn new(path: &Path) -> Result<Self, Errors> {
+    pub fn new(path: &Path, config: &Config) -> Result<Self, Errors> {
         Ok(Directory {
             name: path_name(path)?,
             path: path.to_path_buf(),
+            linked: get_linked(path, config),
             children: Vec::new(),
             files: Vec::new(),
             to_add: true,
@@ -63,40 +65,40 @@ pub struct File {
 
 impl File {
     pub fn new(path: &Path, config: &Config) -> Result<Self, Errors> {
-        let linked: Option<OsString>;
-
-        if config.links {
-            if let Some(p_str) = path.as_os_str().to_str() {
-                linked = PathBuf::from(p_str)
-                    .read_link()
-                    .ok()
-                    .and_then(|target_path| match std::env::var("HOME") {
-                        Ok(home) => {
-                            if target_path.starts_with(&home) {
-                                target_path
-                                    .strip_prefix(&home)
-                                    .ok()
-                                    .map(|clean_path| PathBuf::from("~").join(clean_path))
-                            } else {
-                                Some(target_path)
-                            }
-                        }
-                        Err(_) => Some(target_path),
-                    })
-                    .map(|v| v.as_os_str().to_owned());
-            } else {
-                linked = None;
-            }
-        } else {
-            linked = None;
-        }
-
         Ok(File {
             name: path_name(path)?,
-            linked,
+            linked: get_linked(path, config),
             path: path.to_path_buf(),
             lines: Vec::new(),
         })
+    }
+}
+
+fn get_linked(path: &Path, config: &Config) -> Option<OsString> {
+    if config.links {
+        if let Some(p_str) = path.as_os_str().to_str() {
+            PathBuf::from(p_str)
+                .read_link()
+                .ok()
+                .and_then(|target_path| match std::env::var("HOME") {
+                    Ok(home) => {
+                        if target_path.starts_with(&home) {
+                            target_path
+                                .strip_prefix(&home)
+                                .ok()
+                                .map(|clean_path| PathBuf::from("~").join(clean_path))
+                        } else {
+                            Some(target_path)
+                        }
+                    }
+                    Err(_) => Some(target_path),
+                })
+                .map(|v| v.as_os_str().to_owned())
+        } else {
+            None
+        }
+    } else {
+        None
     }
 }
 

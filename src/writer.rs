@@ -3,6 +3,8 @@
 use crate::config::Config;
 use crate::formats::{self, BRANCH_END, BRANCH_HAS_NEXT, SPACER, VER_LINE_SPACER};
 use crate::match_system::{Directory, File, Line, Matches};
+use crossterm::style::StyledContent;
+use std::ffi::OsString;
 use std::io::{self, Write};
 
 impl Directory {
@@ -18,7 +20,14 @@ impl Directory {
         let flen = files.len();
         let clen = children.len();
         if clen > 0 || flen > 0 {
-            self.write_name(out, config)?;
+            write_name(
+                &self.name,
+                &self.linked,
+                self.children.len() + self.files.len(),
+                &formats::dir_name,
+                out,
+                config,
+            )?;
         }
         let mut i: usize = 0;
         for child_id in children {
@@ -46,20 +55,6 @@ impl Directory {
         }
         Ok(())
     }
-
-    fn write_name(&self, out: &mut impl Write, config: &Config) -> io::Result<()> {
-        if config.colors {
-            write!(out, "{}", formats::dir_name(&self.name))?;
-        } else {
-            write!(out, "{}", self.name)?;
-        }
-        if config.count {
-            write!(out, ": {}", self.files.len() + self.children.len())?;
-        }
-        writeln!(out)?;
-
-        Ok(())
-    }
 }
 
 impl File {
@@ -71,16 +66,21 @@ impl File {
         config: &Config,
     ) -> io::Result<()> {
         if !config.is_dir {
-            self.write_name(out, config)?;
         } else if parent_has_next {
             write!(out, "{}{}", prefix, BRANCH_HAS_NEXT)?;
-            self.write_name(out, config)?;
             prefix += VER_LINE_SPACER;
         } else {
             write!(out, "{}{}", prefix, BRANCH_END)?;
-            self.write_name(out, config)?;
             prefix += SPACER;
         }
+        write_name(
+            &self.name,
+            &self.linked,
+            self.lines.len(),
+            &formats::file_name,
+            out,
+            config,
+        )?;
 
         if config.just_files {
             return Ok(());
@@ -98,33 +98,40 @@ impl File {
 
         Ok(())
     }
+}
 
-    pub fn write_name(&self, out: &mut impl Write, config: &Config) -> io::Result<()> {
-        if let Some(linked) = &self.linked {
-            if config.colors {
-                write!(out, "{} -> ", formats::file_name(&self.name))?;
-            } else {
-                write!(out, "{} -> ", self.name)?
-            }
-            if config.colors {
-                write!(out, "{}", formats::file_name(&linked.to_string_lossy()))?;
-            } else {
-                write!(out, "{}", linked.to_string_lossy())?;
-            }
+fn write_name(
+    name: &String,
+    linked: &Option<OsString>,
+    count: usize,
+    format: &dyn Fn(&str) -> StyledContent<&str>,
+    out: &mut impl Write,
+    config: &Config,
+) -> io::Result<()> {
+    if let Some(l) = linked {
+        if config.colors {
+            write!(out, "{} -> ", format(&name))?;
         } else {
-            if config.colors {
-                write!(out, "{}", formats::file_name(&self.name))?;
-            } else {
-                write!(out, "{}", self.name)?;
-            }
+            write!(out, "{} -> ", name)?
         }
-        if config.count {
-            write!(out, ": {}", self.lines.len())?;
+        if config.colors {
+            write!(out, "{}", format(&l.to_string_lossy()))?;
+        } else {
+            write!(out, "{}", l.to_string_lossy())?;
         }
-        writeln!(out)?;
-
-        Ok(())
+    } else {
+        if config.colors {
+            write!(out, "{}", format(&name))?;
+        } else {
+            write!(out, "{}", name)?;
+        }
     }
+    if config.count {
+        write!(out, ": {}", count)?;
+    }
+    writeln!(out)?;
+
+    Ok(())
 }
 
 impl Line {

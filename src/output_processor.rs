@@ -49,7 +49,7 @@ impl File {
                 } else if let Some(id) = path_to_index.get(dir_path.as_os_str()) {
                     d_id = *id;
                 } else {
-                    let n_dir = Directory::new(&dir_path)?;
+                    let n_dir = Directory::new(&dir_path, config)?;
                     path_to_index.insert(n_dir.path.as_os_str().to_owned(), dirs.len());
                     d_id = dirs.len();
                     to_add_id = Some(d_id);
@@ -70,7 +70,7 @@ impl File {
                         }
                         let m_id = path_to_index.get(p_parent.as_os_str());
                         if m_id.is_none() {
-                            let mut n_dir = Directory::new(&p_parent)?;
+                            let mut n_dir = Directory::new(&p_parent, config)?;
                             let n_id = dirs.len();
                             path_to_index.insert(n_dir.path.as_os_str().to_owned(), n_id);
                             if let Some(id) = to_add_id {
@@ -111,7 +111,7 @@ pub fn process_json_lines(lines: Vec<&[u8]>, config: &Config) -> Result<Option<M
     let mut path_to_index: HashMap<OsString, usize> = HashMap::new();
     let mut dirs: Vec<Directory> = Vec::new();
 
-    dirs.push(Directory::new(&config.path)?);
+    dirs.push(Directory::new(&config.path, config)?);
 
     let mut cur_file: Option<&mut File> = None;
     let mut d_id = 0;
