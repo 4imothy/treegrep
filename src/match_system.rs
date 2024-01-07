@@ -116,6 +116,18 @@ impl Match {
             end,
         }
     }
+
+    fn remove_overlapping(matches: &mut Vec<Match>) {
+        matches.sort_by(|a, b| a.start.cmp(&b.start).then_with(|| b.end.cmp(&a.end)));
+        let mut current_max_end = matches[0].end;
+        for m_id in 1..matches.len() {
+            if matches[m_id].start <= current_max_end {
+                matches[m_id].start = current_max_end;
+                matches[m_id].end = current_max_end.max(matches[m_id].end);
+            }
+            current_max_end = current_max_end.max(matches[m_id].end);
+        }
+    }
 }
 
 pub struct Line {
@@ -144,15 +156,7 @@ impl Line {
             return Line::new(Some(contents.to_vec()), Some(line_num));
         }
 
-        matches.sort_by(|a, b| a.start.cmp(&b.start).then_with(|| b.end.cmp(&a.end)));
-        let mut current_max_end = matches[0].end;
-        for m_id in 1..matches.len() {
-            if matches[m_id].start <= current_max_end {
-                matches[m_id].start = current_max_end;
-                matches[m_id].end = current_max_end.max(matches[m_id].end);
-            }
-            current_max_end = current_max_end.max(matches[m_id].end);
-        }
+        Match::remove_overlapping(&mut matches);
 
         let mut styled_line = contents.to_vec();
         let mut shift = 0;
@@ -199,5 +203,109 @@ impl SliceExt for [u8] {
             .count();
 
         (&self[start..], start)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fmt::{Debug, Error, Formatter};
+
+    impl PartialEq for Match {
+        fn eq(&self, other: &Self) -> bool {
+            self.pattern_id == other.pattern_id
+                && self.start == other.start
+                && self.end == other.end
+        }
+    }
+    impl Debug for Match {
+        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+            f.debug_struct("Match")
+                .field("pattern_id", &self.pattern_id)
+                .field("start", &self.start)
+                .field("end", &self.end)
+                .finish()
+        }
+    }
+
+    #[test]
+    fn test_remove_overlapping() {
+        let pid = 1;
+        let mut input = vec![
+            Match::new(pid, 0, 5),
+            Match::new(pid, 6, 10),
+            Match::new(pid, 12, 15),
+        ];
+        Match::remove_overlapping(&mut input);
+        assert_eq!(
+            input,
+            vec![
+                Match::new(pid, 0, 5),
+                Match::new(pid, 6, 10),
+                Match::new(pid, 12, 15),
+            ]
+        );
+
+        input = vec![
+            Match::new(pid, 0, 5),
+            Match::new(pid, 4, 8),
+            Match::new(pid, 7, 12),
+        ];
+        Match::remove_overlapping(&mut input);
+        assert_eq!(
+            input,
+            vec![
+                Match::new(pid, 0, 5),
+                Match::new(pid, 5, 8),
+                Match::new(pid, 8, 12),
+            ]
+        );
+
+        input = vec![
+            Match::new(pid, 0, 10),
+            Match::new(pid, 0, 3),
+            Match::new(pid, 5, 10),
+            Match::new(pid, 11, 12),
+        ];
+        Match::remove_overlapping(&mut input);
+        assert_eq!(
+            input,
+            vec![
+                Match::new(1, 0, 10),
+                Match::new(1, 10, 10),
+                Match::new(1, 10, 10),
+                Match::new(1, 11, 12),
+            ]
+        );
+
+        input = vec![Match::new(1, 0, 5)];
+        Match::remove_overlapping(&mut input);
+
+        assert_eq!(input, vec![Match::new(1, 0, 5),]);
+    }
+
+    #[test]
+    fn test_path_name() {
+        let mut path = Path::new("/path/to/file.txt");
+        assert_eq!(path_name(&path).ok(), Some("file.txt".to_string()));
+
+        path = Path::new("/path/to/unicode_åß∂ƒ.txt");
+        assert_eq!(path_name(&path).ok(), Some("unicode_åß∂ƒ.txt".to_string()));
+
+        path = Path::new("/path/to/directory/");
+        assert_eq!(path_name(&path).ok(), Some("directory".to_string()));
+
+        path = Path::new("/");
+        assert_eq!(path_name(&path).ok(), None);
+    }
+
+    #[test]
+    fn test_trim_left() {
+        let bytes: &[u8] = b"    \t  Hello, World!";
+
+        let (trimmed, count) = bytes.trim_left();
+
+        assert_eq!(trimmed, b"Hello, World!");
+        assert_eq!(count, 7);
     }
 }

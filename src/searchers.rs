@@ -90,15 +90,8 @@ impl Options for Rg {
         Ok(())
     }
 
-    fn colors(cmd: &mut Command, want: bool) -> Result<(), Errors> {
-        if want {
-            // cmd.arg("--color=always");
-            // cmd.arg("--colors=path:none");
-            // cmd.arg("--colors=line:none");
-            // cmd.arg("--colors=column:none");
-        } else {
-            cmd.arg("--color=never");
-        }
+    fn colors(cmd: &mut Command, _want: bool) -> Result<(), Errors> {
+        cmd.arg("--color=never");
         Ok(())
     }
 
@@ -214,5 +207,66 @@ impl Searchers {
             all.push(s);
         }
         all
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_options_add_args_rg() {
+        let mut cmd = Command::new("rg");
+        let config = Config {
+            colors: true,
+            line_number: true,
+            pcre2: true,
+            hidden: true,
+            max_depth: Some(5),
+            threads: Some(8),
+            links: true,
+            just_files: true,
+            ignore: false,
+            patterns: vec!["pattern1".to_string(), "pattern2".to_string()],
+            path: PathBuf::from("test_path"),
+            is_dir: true,
+            exec: Searchers::TreeGrep,
+            count: true,
+            menu: true,
+            trim: true,
+        };
+
+        assert!(Rg::add_args(&mut cmd, &config).is_ok());
+
+        let expected_args = vec![
+            "--json",
+            "--color=never",
+            "--line-number",
+            "--pcre2",
+            "--hidden",
+            "--max-depth=5",
+            "--threads=8",
+            "--follow",
+            "--no-ignore",
+            "--regexp=pattern1",
+            "--regexp=pattern2",
+            "test_path",
+        ];
+
+        assert_eq!(
+            cmd.get_args()
+                .map(|s| s.to_str().unwrap())
+                .collect::<Vec<&str>>(),
+            expected_args
+        );
+    }
+
+    #[test]
+    fn test_all_to_str() {
+        let res = Searchers::all_to_str();
+        #[cfg(target_os = "windows")]
+        assert_eq!(res, vec!["rg.exe", "rg", "tgrep.exe", "tgrep"]);
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(res, vec!["rg", "tgrep"]);
     }
 }
