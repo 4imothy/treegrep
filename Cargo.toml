@@ -19,10 +19,15 @@ exclude = [
   "/example/",
   "install.sh",
 ]
+autotests = false
 
 [[bin]]
-path = "src/main.rs"
 name = "tgrep"
+path = "src/main.rs"
+
+[[test]]
+name = "integration"
+path = "tests/tests.rs"
 
 [dependencies]
 crossterm = "0.27.0"
