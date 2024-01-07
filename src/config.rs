@@ -25,7 +25,6 @@ pub struct Config {
     pub max_depth: Option<usize>,
     pub threads: Option<usize>,
     pub trim: bool,
-    pub need_reset_style: bool,
 }
 
 fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, Errors> {
@@ -55,7 +54,7 @@ impl Config {
 
         let colors: bool = matches
             .get_one::<String>(arg_strs::COLORS)
-            .map(|s| s == "always")
+            .map(|s| s == arg_strs::COLORS_ALWAYS)
             .unwrap_or(true);
 
         let count: bool = *matches.get_one::<bool>(arg_strs::SHOW_COUNT).unwrap();
@@ -64,7 +63,7 @@ impl Config {
         let menu: bool = *matches.get_one::<bool>(arg_strs::MENU).unwrap();
         let just_files: bool = *matches.get_one::<bool>(arg_strs::FILES).unwrap();
         let links: bool = *matches.get_one::<bool>(arg_strs::LINKS).unwrap();
-        let trim_left: bool = *matches.get_one::<bool>(arg_strs::TRIM_LEFT).unwrap();
+        let trim: bool = *matches.get_one::<bool>(arg_strs::TRIM_LEFT).unwrap();
         let pcre2: bool = *matches.get_one::<bool>(arg_strs::PCRE2).unwrap();
         let ignore: bool = !*matches.get_one::<bool>(arg_strs::NO_IGNORE).unwrap();
 
@@ -97,11 +96,6 @@ impl Config {
 
         let is_dir = path.is_dir();
 
-        let need_reset_style = match exec {
-            Searchers::RipGrep => true,
-            _ => false,
-        };
-
         Ok((
             Config {
                 path,
@@ -118,8 +112,7 @@ impl Config {
                 links,
                 max_depth,
                 threads,
-                need_reset_style,
-                trim: trim_left,
+                trim,
                 ignore,
             },
             starter,

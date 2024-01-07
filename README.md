@@ -2,6 +2,9 @@
 
 treegrep is a frontend for existing pattern matchers or a standalone pattern matcher which presents results in a tree format
 
+[![tests](https://github.com/4imothy/treegrep/actions/workflows/ci.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
+[![release](https://github.com/4imothy/treegrep/actions/workflows/cr.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
+
 ### Currently Suuported Backends
 - *[ripgrep](https://github.com/BurntSushi/ripgrep)*
 - *[treegrep](https://github.com/4imothy/treegrep)*

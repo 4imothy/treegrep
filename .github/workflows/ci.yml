@@ -1,0 +1,47 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: test
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - os: "ubuntu-latest"
+          - os: "macos-latest"
+          - os: "windows-latest"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install ripgrep
+        shell: bash
+        run: |
+          cargo install ripgrep
+
+      - name: Test
+        shell: bash
+        run: |
+          cargo test
+
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Install toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+    - name: Check formatting
+      run: cargo fmt
