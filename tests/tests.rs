@@ -2,15 +2,13 @@
 // which is not always the case so we
 // can't have a directory that has more than one file in it
 
-const OVERWRITE: bool = false;
-
 mod file_system;
+mod utils;
 use file_system::Dir;
-use std::env;
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
+use utils::*;
 
 #[test]
 fn deep_directory_tree() {
@@ -87,6 +85,13 @@ fn max_depth() {
     check_results(tar_path, rg_results, tg_results);
 }
 
+#[cfg(windows)]
+const PLATFORM_SUFFIX: &str = "windows";
+#[cfg(target_os = "macos")]
+const PLATFORM_SUFFIX: &str = "macos";
+#[cfg(target_os = "linux")]
+const PLATFORM_SUFFIX: &str = "linux";
+
 #[test]
 fn links() {
     let tar_dir: PathBuf = target_dir();
@@ -103,19 +108,14 @@ fn links() {
     );
     dir.link_dir(&linked_dir, "link_to_dir");
 
-    let tar_path;
-    if cfg!(windows) {
-        tar_path = tar_dir.join("links_windows");
-    } else {
-        tar_path = tar_dir.join("links");
-    }
+    let tar_path = tar_dir.join(format!("links_{}", PLATFORM_SUFFIX));
     let (_, results) = get_outputs(&dir.path, ".", Some("--links"));
 
     if OVERWRITE {
         let mut file = fs::File::create(tar_path).unwrap();
         file.write_all(&results).unwrap();
     } else {
-        let contents = fs::read(&tar_path).unwrap();
+        let contents = get_target_contents(tar_path);
 
         println!("file contents");
         println!("{}", String::from_utf8_lossy(&contents));
@@ -124,100 +124,4 @@ fn links() {
 
         assert_eq!(contents, results);
     }
-}
-
-fn check_results(tar_path: PathBuf, rg_results: Vec<u8>, tg_results: Vec<u8>) {
-    if OVERWRITE {
-        let mut file = fs::File::create(tar_path).unwrap();
-        file.write_all(&rg_results).unwrap();
-    } else {
-        let contents = fs::read(&tar_path).unwrap();
-        let rg_str = String::from_utf8_lossy(&rg_results);
-        let tg_str = String::from_utf8_lossy(&tg_results);
-        let contents_str = String::from_utf8_lossy(&contents);
-
-        println!("file contents");
-        println!("{}", contents_str);
-        println!("rg output");
-        println!("{}", rg_str);
-        println!("tg output");
-        println!("{}", tg_str);
-
-        assert_eq!(contents, rg_results);
-        assert_eq!(contents, tg_results);
-    }
-}
-
-fn get_outputs(path: &Path, expr: &str, extra_option: Option<&str>) -> (Vec<u8>, Vec<u8>) {
-    let cmd_path = env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(format!("tgrep{}", env::consts::EXE_SUFFIX));
-
-    let mut rg_cmd;
-    let mut tg_cmd;
-    match cross_runner() {
-        None => {
-            rg_cmd = Command::new(&cmd_path);
-            tg_cmd = Command::new(&cmd_path);
-        }
-        Some(runner) => {
-            rg_cmd = Command::new(&runner);
-            rg_cmd.arg(&cmd_path);
-            tg_cmd = Command::new(&runner);
-            tg_cmd.arg(&cmd_path);
-        }
-    }
-    tg_cmd.arg("--color=never");
-    rg_cmd.arg("--color=never");
-    if let Some(o) = extra_option {
-        rg_cmd.arg(o);
-        tg_cmd.arg(o);
-    }
-    rg_cmd.arg(expr);
-    tg_cmd.arg(expr);
-    rg_cmd.arg(path);
-    tg_cmd.arg(path);
-
-    rg_cmd.arg("--searcher=rg");
-    tg_cmd.arg("--searcher=tgrep");
-    let rg_out = rg_cmd.output().ok().unwrap();
-    if !rg_out.status.success() && rg_out.stderr.len() > 0 {
-        panic!("cmd failed {}", String::from_utf8_lossy(&rg_out.stderr));
-    }
-
-    let tg_out = tg_cmd.output().ok().unwrap();
-    if !tg_out.status.success() && rg_out.stderr.len() > 0 {
-        panic!("cmd failed {}", String::from_utf8_lossy(&rg_out.stderr));
-    }
-
-    let rg_results: Vec<u8> = rg_out.stdout;
-    let tg_results: Vec<u8> = tg_out.stdout;
-
-    (rg_results, tg_results)
-}
-
-fn cross_runner() -> Option<String> {
-    let runner = std::env::var("CROSS_RUNNER").ok()?;
-    if runner.is_empty() {
-        return None;
-    }
-    if cfg!(target_arch = "powerpc64") {
-        Some("qemu-ppc64".to_string())
-    } else if cfg!(target_arch = "x86") {
-        Some("i386".to_string())
-    } else {
-        Some(format!("qemu-{}", std::env::consts::ARCH))
-    }
-}
-
-fn target_dir() -> PathBuf {
-    let p = env::current_dir().unwrap().join("tests").join("targets");
-    if !p.exists() {
-        fs::create_dir_all(&p).unwrap();
-    }
-    p
 }
