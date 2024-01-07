@@ -85,6 +85,20 @@ fn max_depth() {
     check_results(tar_path, rg_results, tg_results);
 }
 
+#[test]
+fn file() {
+    let tar_dir: PathBuf = target_dir();
+
+    let pool: &[u8] = include_bytes!("pool/alice_adventures_in_wonderland_by_lewis_carroll.txt");
+    let dir = Dir::new("file");
+    let file = dir.path.join("actual_file");
+    dir.create_file_bytes(&file.to_string_lossy(), pool);
+
+    let tar_path = tar_dir.join("file");
+    let (rg_results, tg_results) = get_outputs(&file, "hat", Some("--line-number"));
+    check_results(tar_path, rg_results, tg_results);
+}
+
 #[cfg(windows)]
 const PLATFORM_SUFFIX: &str = "windows";
 #[cfg(target_os = "macos")]

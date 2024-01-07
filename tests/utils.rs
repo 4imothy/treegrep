@@ -78,6 +78,7 @@ pub fn get_outputs(path: &Path, expr: &str, extra_option: Option<&str>) -> (Vec<
     }
     rg_cmd.arg(expr);
     tg_cmd.arg(expr);
+
     rg_cmd.arg(path);
     tg_cmd.arg(path);
 
