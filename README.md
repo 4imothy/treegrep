@@ -22,7 +22,8 @@ Download from [releases](https://github.com/4imothy/treegrep/releases/)
 #### Manual
 ```
 git clone https://github.com/4imothy/treegrep
-cargo build
+cd treegrep
+cargo build --release
 ```
 
 ### Links
