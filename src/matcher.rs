@@ -52,7 +52,7 @@ fn search_dir(patterns: Vec<Regex>, config: &Config) -> Result<Vec<Directory>, E
                 if path.is_dir() {
                     if path_to_index.get(path.as_os_str()).is_none() {
                         path_to_index.insert(path.clone().into_os_string(), directories.len());
-                        let dir = Directory::new(&path)?;
+                        let dir = Directory::new(&path, config)?;
                         directories.push(dir);
                     }
                 } else if path.is_file() {
