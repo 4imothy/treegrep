@@ -151,7 +151,6 @@ impl Line {
             if config.line_number {
                 write!(out, "{}", formats::line_number(line_num.unwrap()))?;
             } else if config.menu {
-                // TODO dont think this else actually does anything
                 write!(out, "{}", formats::RESET_COLOR)?;
             }
             write!(out, "{}", String::from_utf8_lossy(&contents))?;
