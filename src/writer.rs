@@ -137,13 +137,10 @@ fn write_name(
 impl Line {
     pub fn write(&self, out: &mut impl Write, config: &Config) -> std::io::Result<()> {
         let contents: &[u8] = self.contents.as_ref().unwrap();
-        let need_new_line;
+        let mut need_new_line = false;
         if !contents.ends_with(&[formats::NEW_LINE as u8]) {
             need_new_line = true;
-        } else {
-            need_new_line = false;
         }
-
         let line_num = self.line_num;
         if !config.colors {
             if config.line_number {

@@ -24,6 +24,7 @@ pub struct Config {
     pub pcre2: bool,
     pub max_depth: Option<usize>,
     pub threads: Option<usize>,
+    pub max_length: Option<usize>,
     pub trim: bool,
 }
 
@@ -69,6 +70,7 @@ impl Config {
 
         let max_depth: Option<usize> = get_usize_option(&matches, arg_strs::MAX_DEPTH)?;
         let threads: Option<usize> = get_usize_option(&matches, arg_strs::THREADS)?;
+        let max_length: Option<usize> = get_usize_option(&matches, arg_strs::MAX_LENGTH)?;
 
         let (exec, starter) =
             Searchers::get_searcher(matches.get_one::<String>(arg_strs::SEARCHER))?;
@@ -114,6 +116,7 @@ impl Config {
                 threads,
                 trim,
                 ignore,
+                max_length,
             },
             starter,
         ))

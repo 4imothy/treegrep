@@ -152,6 +152,11 @@ impl Line {
         } else {
             cut = 0;
         }
+        if let Some(max_len) = config.max_length {
+            if max_len < contents.len() {
+                contents = &contents[0..max_len];
+            }
+        }
         if !config.colors {
             return Line::new(Some(contents.to_vec()), Some(line_num));
         }
@@ -161,6 +166,12 @@ impl Line {
         let mut styled_line = contents.to_vec();
         let mut shift = 0;
         for mut m in matches {
+            if m.start >= contents.len() {
+                break;
+            }
+            if m.end >= contents.len() {
+                m.end = contents.len();
+            }
             if cut > m.start || cut > m.end || m.start == m.end {
                 continue;
             }

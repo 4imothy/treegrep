@@ -224,6 +224,7 @@ mod tests {
             hidden: true,
             max_depth: Some(5),
             threads: Some(8),
+            max_length: None,
             links: true,
             just_files: true,
             ignore: false,

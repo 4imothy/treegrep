@@ -34,6 +34,7 @@ pub mod arg_strs {
     pub const PCRE2: &str = "pcre2";
     pub const THREADS: &str = "threads";
     pub const NO_IGNORE: &str = "no-ignore";
+    pub const MAX_LENGTH: &str = "max-length";
 }
 
 const HELP: &str = "{name} {version}
@@ -89,6 +90,7 @@ fn get_args() -> Vec<Arg> {
     create_bool_arg(arg_strs::NO_IGNORE, None, "don't use ignore files"),
     create_set_arg(arg_strs::MAX_DEPTH, "the max depth to search"),
     create_set_arg(arg_strs::THREADS, "set appropriate number of threads to use"),
+    create_set_arg(arg_strs::MAX_LENGTH, "set the max length for a matched line"),
     Arg::new(arg_strs::COLORS)
         .long(arg_strs::COLORS)
         .help("set whether to color output")

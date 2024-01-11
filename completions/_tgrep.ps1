@@ -27,6 +27,7 @@ Register-ArgumentCompleter -Native -CommandName 'tgrep' -ScriptBlock {
             [CompletionResult]::new('--target', 'target', [CompletionResultType]::ParameterName, 'specify the search target. If none provided, search the current directory.')
             [CompletionResult]::new('--max-depth', 'max-depth', [CompletionResultType]::ParameterName, 'the max depth to search')
             [CompletionResult]::new('--threads', 'threads', [CompletionResultType]::ParameterName, 'set appropriate number of threads to use')
+            [CompletionResult]::new('--max-length', 'max-length', [CompletionResultType]::ParameterName, 'set the max length for a matched line')
             [CompletionResult]::new('--color', 'color', [CompletionResultType]::ParameterName, 'set whether to color output')
             [CompletionResult]::new('-s', 's', [CompletionResultType]::ParameterName, 'executable to do the searching, currently supports rg  and tgrep')
             [CompletionResult]::new('--searcher', 'searcher', [CompletionResultType]::ParameterName, 'executable to do the searching, currently supports rg  and tgrep')

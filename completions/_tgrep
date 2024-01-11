@@ -21,6 +21,7 @@ _tgrep() {
 '--target=[specify the search target. If none provided, search the current directory.]: :_files' \
 '--max-depth=[the max depth to search]: : ' \
 '--threads=[set appropriate number of threads to use]: : ' \
+'--max-length=[set the max length for a matched line]: : ' \
 '--color=[set whether to color output]: :(always never)' \
 '-s+[executable to do the searching, currently supports rg  and tgrep]: : ' \
 '--searcher=[executable to do the searching, currently supports rg  and tgrep]: : ' \

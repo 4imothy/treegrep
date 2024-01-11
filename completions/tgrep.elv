@@ -24,6 +24,7 @@ set edit:completion:arg-completer[tgrep] = {|@words|
             cand --target 'specify the search target. If none provided, search the current directory.'
             cand --max-depth 'the max depth to search'
             cand --threads 'set appropriate number of threads to use'
+            cand --max-length 'set the max length for a matched line'
             cand --color 'set whether to color output'
             cand -s 'executable to do the searching, currently supports rg  and tgrep'
             cand --searcher 'executable to do the searching, currently supports rg  and tgrep'
