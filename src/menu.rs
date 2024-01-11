@@ -151,10 +151,9 @@ impl<'a, 'b> Menu<'a, 'b> {
     fn redraw(&mut self) -> io::Result<()> {
         execute!(self.out, terminal::Clear(ClearType::All))?;
         self.destyle_at_cursor()?;
-        self.write_menu()?;
         self.selected_id = 0;
         self.cursor_y = START_Y;
-        self.style_at_cursor()?;
+        self.write_menu()?;
         Ok(())
     }
 
