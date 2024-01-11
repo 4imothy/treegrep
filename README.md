@@ -35,7 +35,7 @@ https://github.com/4imothy/treegrep/assets/40186632/9c85c309-df78-4996-8127-ee5a
 
 ### *--help* Output
 ```
-treegrep 0.1.1
+treegrep 0.1.2
 by Timothy Cronin
 
 A pattern matcher frontend or backend which displays results in a tree
@@ -60,6 +60,7 @@ Options:
       --no-ignore                  don't use ignore files
       --max-depth <max-depth>      the max depth to search
       --threads <threads>          set appropriate number of threads to use
+      --max-length <max-length>    set the max length for a matched line
       --color <color>              set whether to color output [possible values: always, never]
   -s, --searcher <searcher>        executable to do the searching, currently supports rg  and tgrep
   -h, --help                       Print help
