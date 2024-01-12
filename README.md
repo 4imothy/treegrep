@@ -16,6 +16,11 @@ treegrep is a frontend for existing pattern matchers or a standalone pattern mat
 cargo install treegrep
 ```
 
+#### NetBSD
+```
+pkgin install treegrep
+```
+
 #### Releases
 Download from [releases](https://github.com/4imothy/treegrep/releases/)
 
