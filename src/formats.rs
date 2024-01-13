@@ -46,7 +46,7 @@ pub fn file_name(name: &str) -> StyledContent<&str> {
 }
 
 pub fn line_number(num: usize) -> StyledContent<String> {
-    format!("{}: ", num)
+    format!("{}:", num)
         .with(Color::Yellow)
         .attribute(Attribute::Bold)
 }

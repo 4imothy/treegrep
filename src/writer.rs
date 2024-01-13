@@ -153,7 +153,7 @@ impl Line {
             } else if config.menu {
                 write!(out, "{}", formats::RESET_COLOR)?;
             }
-            write!(out, "{}", String::from_utf8_lossy(&contents))?;
+            write!(out, " {}", String::from_utf8_lossy(&contents))?;
         }
 
         if need_new_line {
