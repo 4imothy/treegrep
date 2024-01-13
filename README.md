@@ -32,7 +32,7 @@ cargo build --release
 ```
 
 ### Links
-[crates](https://crates.io/crates/treegrep) | [github](https://github.com/4imothy/treegrep) | [aur](https://aur.archlinux.org/packages/treegrep-bin)
+[crates.io](https://crates.io/crates/treegrep) | [GitHub](https://github.com/4imothy/treegrep) | [AUR](https://aur.archlinux.org/packages/treegrep-bin) | [NetBSD](https://mail-index.netbsd.org/pkgsrc-changes/2024/01/11/msg290674.html)
 
 
 https://github.com/4imothy/treegrep/assets/40186632/9c85c309-df78-4996-8127-ee5ad9f91ec3

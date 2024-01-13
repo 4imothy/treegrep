@@ -18,7 +18,7 @@ use std::process::Command;
 
 // TODO more controls
 //
-// Go to first/last match
+// Go to first / last match
 // Go to next / previous path
 
 const START_X: u16 = 3;

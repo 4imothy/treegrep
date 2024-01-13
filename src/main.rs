@@ -24,7 +24,7 @@ use writer::write_results;
 // TODO add notarizing mac to exec can be used without needing to open from finder
 // TODO do the --files to stop searching a file when a match is found or use the
 // --files-with-matches flag for ripgrep
-// TODO vim plugin or something
+// TODO vim plugin
 
 fn main() {
     run().unwrap_or_else(|e| exit_error(e));
