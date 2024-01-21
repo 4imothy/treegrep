@@ -14,12 +14,16 @@ impl Directory {
         prefix: String,
         dirs: &Vec<Directory>,
         config: &Config,
+        path_ids: &mut Option<&mut Vec<usize>>,
+        cur_id: &mut usize,
     ) -> io::Result<()> {
         let children = &self.children;
         let files = &self.files;
         let flen = files.len();
         let clen = children.len();
         if clen > 0 || flen > 0 {
+            path_ids.as_mut().map(|p| p.push(*cur_id));
+            *cur_id += 1;
             write_name(
                 &self.name,
                 &self.linked,
@@ -33,25 +37,18 @@ impl Directory {
         for child_id in children {
             i += 1;
             let dir = dirs.get(*child_id).unwrap();
+            let new_prefix: String;
             if i != clen || flen > 0 {
                 write!(out, "{}{}", prefix, BRANCH_HAS_NEXT)?;
-                dir.write(
-                    out,
-                    (prefix.clone() + VER_LINE_SPACER).clone(),
-                    dirs,
-                    config,
-                )?;
+                new_prefix = (prefix.clone() + VER_LINE_SPACER).clone();
             } else {
                 write!(out, "{}{}", prefix, BRANCH_END)?;
-                dir.write(out, (prefix.clone() + SPACER).clone(), dirs, config)?;
+                new_prefix = (prefix.clone() + SPACER).clone();
             }
+            dir.write(out, new_prefix, dirs, config, path_ids, cur_id)?;
         }
         for (i, file) in files.iter().enumerate() {
-            if i + 1 != flen {
-                file.write(out, prefix.clone(), true, config)?;
-            } else {
-                file.write(out, prefix.clone(), false, config)?;
-            }
+            file.write(out, prefix.clone(), i + 1 != flen, config, path_ids, cur_id)?;
         }
         Ok(())
     }
@@ -64,15 +61,20 @@ impl File {
         mut prefix: String,
         parent_has_next: bool,
         config: &Config,
+        path_ids: &mut Option<&mut Vec<usize>>,
+        cur_id: &mut usize,
     ) -> io::Result<()> {
-        if !config.is_dir {
-        } else if parent_has_next {
-            write!(out, "{}{}", prefix, BRANCH_HAS_NEXT)?;
-            prefix += VER_LINE_SPACER;
-        } else {
-            write!(out, "{}{}", prefix, BRANCH_END)?;
-            prefix += SPACER;
+        if config.is_dir {
+            if parent_has_next {
+                write!(out, "{}{}", prefix, BRANCH_HAS_NEXT)?;
+                prefix += VER_LINE_SPACER;
+            } else {
+                write!(out, "{}{}", prefix, BRANCH_END)?;
+                prefix += SPACER;
+            }
         }
+        path_ids.as_mut().map(|p| p.push(*cur_id));
+        *cur_id += 1;
         write_name(
             &self.name,
             &self.linked,
@@ -94,6 +96,7 @@ impl File {
                 write!(out, "{}{}", prefix, BRANCH_END)?;
             }
             line.write(out, config)?;
+            *cur_id += 1;
         }
 
         Ok(())
@@ -163,12 +166,29 @@ impl Line {
     }
 }
 
-pub fn write_results(out: &mut impl Write, result: &Matches, config: &Config) -> io::Result<()> {
+pub fn write_results(
+    out: &mut impl Write,
+    result: &Matches,
+    config: &Config,
+    mut path_ids: Option<&mut Vec<usize>>,
+) -> io::Result<()> {
     let prefix: String = "".into();
+    let mut cur_id: usize = 0;
     match &result {
-        Matches::Dir(dirs) => dirs.get(0).unwrap().write(out, prefix, dirs, config)?,
+        Matches::Dir(dirs) => {
+            dirs.get(0)
+                .unwrap()
+                .write(out, prefix, dirs, config, &mut path_ids, &mut cur_id)?
+        }
         Matches::File(file) => {
-            file.write(out, "".to_string(), false, config)?;
+            file.write(
+                out,
+                "".to_string(),
+                false,
+                config,
+                &mut path_ids,
+                &mut cur_id,
+            )?;
         }
     }
 

@@ -22,7 +22,7 @@ pub fn search(config: &Config) -> Result<Option<Matches>, Errors> {
         })?);
     }
     if config.is_dir {
-        Ok(wrap_dirs(search_dir(patterns, config)?))
+        Ok(wrap_dirs(search_dir(&patterns, config)?))
     } else {
         Ok(wrap_file(Some(search_file(
             &config.path,
@@ -32,7 +32,7 @@ pub fn search(config: &Config) -> Result<Option<Matches>, Errors> {
     }
 }
 
-fn search_dir(patterns: Vec<Regex>, config: &Config) -> Result<Vec<Directory>, Errors> {
+fn search_dir(patterns: &Vec<Regex>, config: &Config) -> Result<Vec<Directory>, Errors> {
     let walker = WalkBuilder::new(&config.path)
         .hidden(!config.hidden)
         .max_depth(config.max_depth)

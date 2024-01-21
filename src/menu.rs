@@ -4,31 +4,91 @@ use crate::config::Config;
 use crate::formats;
 use crate::match_system::{Directory, File, Matches};
 use crate::writer;
-use crossterm::style::SetBackgroundColor;
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent},
     execute, queue,
-    style::{self, Print},
+    style::{self, Print, SetBackgroundColor},
     terminal::{self, ClearType},
 };
 use std::ffi::OsString;
 use std::io::{self, StdoutLock, Write};
 use std::process::Command;
 
-// TODO more controls
-//
-// Go to first / last match
-// Go to next / previous path
-
 const START_X: u16 = 3;
 const START_Y: u16 = 0;
 
+struct PathStore {
+    paths: Vec<usize>,
+    prev: usize,
+    next: usize,
+    past: bool,
+}
+
+impl PathStore {
+    pub fn new(paths: Vec<usize>) -> PathStore {
+        PathStore {
+            paths,
+            prev: 0,
+            next: 1,
+            past: false,
+        }
+    }
+
+    pub fn move_to_top(&mut self) {
+        self.prev = 0;
+        self.next = 1;
+    }
+
+    pub fn move_to_bottom(&mut self, files: bool) {
+        let mut shift = 0;
+        if files {
+            shift = 1;
+        }
+        self.prev = self.paths.len() - 1 - shift;
+        self.next = self.paths.len() - shift;
+    }
+
+    pub fn shift_down(&mut self, selected_id: usize) {
+        if self.past {
+            self.prev += 1;
+            self.past = false;
+        }
+        if self.next != self.paths.len() && selected_id == *self.paths.get(self.next).unwrap() {
+            self.next += 1;
+            self.past = true;
+        }
+    }
+
+    pub fn shift_up(&mut self, selected_id: usize) {
+        if self.past {
+            self.next -= 1;
+            self.past = false;
+        }
+        if self.prev != 0 && selected_id == *self.paths.get(self.prev).unwrap() {
+            self.prev -= 1;
+            self.past = true;
+        }
+    }
+
+    pub fn dist_down(&self, selected_id: usize) -> u16 {
+        if self.next == self.paths.len() {
+            return 0;
+        }
+        (*self.paths.get(self.next).unwrap() - selected_id) as u16
+    }
+
+    pub fn dist_up(&self, selected_id: usize) -> u16 {
+        (selected_id - *self.paths.get(self.prev).unwrap()) as u16
+    }
+}
+
 pub struct Menu<'a, 'b> {
+    ps: PathStore,
     selected_id: usize,
     cursor_y: u16,
     out: &'a mut StdoutLock<'b>,
-    searched: Matches,
+    searched: &'a Matches,
     lines: Vec<String>,
     num_rows: u16,
     colors: bool,
@@ -40,17 +100,19 @@ pub struct Menu<'a, 'b> {
 impl<'a, 'b> Menu<'a, 'b> {
     fn new(
         out: &'a mut StdoutLock<'b>,
-        searched: Matches,
+        searched: &'a Matches,
         config: &Config,
     ) -> io::Result<Menu<'a, 'b>> {
         let mut buffer: Vec<u8> = Vec::new();
-        writer::write_results(&mut buffer, &searched, config)?;
+        let mut path_ids: Vec<usize> = Vec::new();
+        writer::write_results(&mut buffer, &searched, config, Some(&mut path_ids))?;
         let lines: Vec<String> = buffer
             .split(|&byte| byte == formats::NEW_LINE as u8)
             .map(|v| String::from_utf8_lossy(v).into())
             .collect();
 
-        let (num_rows, scroll_offset, big_jump, small_jump) = Menu::scroll_info();
+        let num_rows = Menu::num_rows();
+        let (scroll_offset, big_jump, small_jump) = Menu::scroll_info(num_rows);
 
         Ok(Menu {
             selected_id: 0,
@@ -59,6 +121,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             searched,
             lines,
             colors: config.colors,
+            ps: PathStore::new(path_ids),
             num_rows,
             scroll_offset,
             big_jump,
@@ -66,23 +129,29 @@ impl<'a, 'b> Menu<'a, 'b> {
         })
     }
 
-    fn scroll_info() -> (u16, u16, u16, u16) {
-        let num_rows = terminal::size().ok().map(|(_, height)| height).unwrap();
+    fn num_rows() -> u16 {
+        terminal::size().ok().map(|(_, num_rows)| num_rows).unwrap()
+    }
+
+    fn page_jump(&self) -> u16 {
+        self.num_rows - 1
+    }
+
+    fn scroll_info(num_rows: u16) -> (u16, u16, u16) {
         let scroll_offset = num_rows / 5;
         let big_jump = scroll_offset;
         let small_jump = 1;
-        (num_rows, scroll_offset, big_jump, small_jump)
+        (scroll_offset, big_jump, small_jump)
     }
 
-    pub fn draw(out: &'a mut StdoutLock<'b>, matches: Matches, config: &Config) -> io::Result<()> {
-        let mut menu: Menu = Menu::new(out, matches, config)?;
+    pub fn enter(out: &'a mut StdoutLock<'b>, matches: Matches, config: &Config) -> io::Result<()> {
+        let mut menu: Menu = Menu::new(out, &matches, config)?;
 
-        menu.enter()?;
-        menu.write_menu()?;
+        menu.setup()?;
+        menu.draw()?;
 
         'outer: loop {
             let event = event::read();
-
             if let Ok(Event::Key(KeyEvent {
                 code,
                 modifiers,
@@ -94,8 +163,10 @@ impl<'a, 'b> Menu<'a, 'b> {
                     KeyCode::Char(c) => match c {
                         'j' | 'n' => menu.move_down(menu.small_jump)?,
                         'k' | 'p' => menu.move_up(menu.small_jump)?,
-                        'J' | 'N' | '}' | ']' => menu.move_down(menu.big_jump)?,
-                        'K' | 'P' | '{' | '[' => menu.move_up(menu.big_jump)?,
+                        'J' | 'N' => menu.move_down(menu.big_jump)?,
+                        'K' | 'P' => menu.move_up(menu.big_jump)?,
+                        '}' | ']' => menu.move_down_path()?,
+                        '{' | '[' => menu.move_up_path()?,
                         'q' => break 'outer,
                         'c' => {
                             if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
@@ -108,21 +179,32 @@ impl<'a, 'b> Menu<'a, 'b> {
                                 menu.resume()?;
                             }
                         }
+                        'G' | '>' => menu.move_to_bottom(config.just_files)?,
+                        'g' | '<' => menu.move_to_top()?,
+                        'f' => {
+                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                                menu.move_down(menu.page_jump())?;
+                            }
+                        }
+                        'b' => {
+                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                                menu.move_up(menu.page_jump())?;
+                            }
+                        }
                         _ => {}
                     },
                     KeyCode::Up => menu.move_up(menu.small_jump)?,
+                    KeyCode::Home => menu.move_to_top()?,
+                    KeyCode::End => menu.move_to_bottom(config.just_files)?,
                     KeyCode::Down => menu.move_down(menu.small_jump)?,
+                    KeyCode::PageUp => menu.move_up(menu.page_jump())?,
+                    KeyCode::PageDown => menu.move_down(menu.page_jump())?,
                     KeyCode::Enter => {
-                        let selected =
-                            Selected::get_selected_info(menu.selected_id, &menu.searched, config);
-                        let line_num: Option<usize> = selected.line;
-                        let path = config
-                            .path
-                            .join(selected.path)
-                            .to_string_lossy()
-                            .to_string();
+                        let match_info = MatchInfo::find(menu.selected_id, &menu.searched, config);
+                        let path = config.path.join(match_info.path);
 
-                        return menu.exit_and_open(path, line_num);
+                        return menu
+                            .exit_and_open(path.as_os_str().to_os_string(), match_info.line_num);
                     }
                     _ => {}
                 }
@@ -137,23 +219,37 @@ impl<'a, 'b> Menu<'a, 'b> {
         menu.leave()
     }
 
-    fn write_menu(&mut self) -> io::Result<()> {
-        let mut cursor_y: u16 = START_Y;
-        for line in self.lines.iter().take(self.num_rows as usize) {
-            queue!(self.out, cursor::MoveTo(START_X, cursor_y), Print(line))?;
-            cursor_y += 1;
+    fn draw(&mut self) -> io::Result<()> {
+        queue!(self.out, terminal::Clear(ClearType::All))?;
+        let skip: usize = if self.selected_id > self.num_rows as usize / 2 {
+            self.cursor_y = self.num_rows / 2;
+            self.selected_id - self.num_rows as usize / 2
+        } else {
+            0
+        };
+        for (i, line) in self
+            .lines
+            .iter()
+            .skip(skip as usize)
+            .take(self.num_rows as usize)
+            .enumerate()
+        {
+            queue!(
+                self.out,
+                cursor::MoveTo(START_X, START_Y + i as u16),
+                Print(line)
+            )?;
         }
         self.style_at_cursor()?;
         self.out.flush()
     }
 
-    // TODO make this work with keeping the selected id
     fn redraw(&mut self) -> io::Result<()> {
-        execute!(self.out, terminal::Clear(ClearType::All))?;
-        self.destyle_at_cursor()?;
-        self.selected_id = 0;
-        self.cursor_y = START_Y;
-        self.write_menu()?;
+        let (scroll_offset, big_jump, small_jump) = Menu::scroll_info(self.num_rows);
+        self.scroll_offset = scroll_offset;
+        self.big_jump = big_jump;
+        self.small_jump = small_jump;
+        self.draw()?;
         Ok(())
     }
 
@@ -167,24 +263,44 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn resume(&mut self) -> io::Result<()> {
-        (
-            self.num_rows,
-            self.scroll_offset,
-            self.big_jump,
-            self.small_jump,
-        ) = Menu::scroll_info();
-        self.enter()?;
+        self.num_rows = Menu::num_rows();
+        (self.scroll_offset, self.big_jump, self.small_jump) = Menu::scroll_info(self.num_rows);
+        self.setup()?;
         self.redraw()?;
         Ok(())
+    }
+
+    fn max_line_id(&self) -> usize {
+        self.lines.len() - 2
+    }
+
+    fn move_to_bottom(&mut self, files: bool) -> io::Result<()> {
+        self.ps.move_to_bottom(files);
+        self.selected_id = self.max_line_id();
+        self.cursor_y = if self.max_line_id() > self.num_rows as usize {
+            self.num_rows - self.scroll_offset
+        } else {
+            self.max_line_id() as u16
+        };
+        self.draw()
+    }
+
+    fn move_to_top(&mut self) -> io::Result<()> {
+        self.ps.move_to_top();
+        self.selected_id = 0;
+        self.cursor_y = 0;
+        self.draw()
     }
 
     fn move_down(&mut self, dist: u16) -> io::Result<()> {
         self.destyle_at_cursor()?;
         for _ in 0..dist {
-            if self.selected_id == self.lines.len() - 2 {
+            if self.selected_id == self.max_line_id() {
                 break;
             }
             self.selected_id += 1;
+            // check if this passes the current if it does then increment
+            self.ps.shift_down(self.selected_id);
             if self.cursor_y + self.scroll_offset != self.num_rows {
                 self.cursor_y += 1;
             } else {
@@ -206,6 +322,22 @@ impl<'a, 'b> Menu<'a, 'b> {
         Ok(())
     }
 
+    pub fn move_down_path(&mut self) -> io::Result<()> {
+        let dist = self.ps.dist_down(self.selected_id);
+        if dist != 0 {
+            self.move_down(dist)?;
+        }
+        Ok(())
+    }
+
+    fn move_up_path(&mut self) -> io::Result<()> {
+        let dist = self.ps.dist_up(self.selected_id);
+        if dist != 0 {
+            self.move_up(dist)?;
+        }
+        Ok(())
+    }
+
     fn move_up(&mut self, dist: u16) -> io::Result<()> {
         self.destyle_at_cursor()?;
         for _ in 0..dist {
@@ -213,6 +345,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                 break;
             }
             self.selected_id -= 1;
+            self.ps.shift_up(self.selected_id);
             if self.selected_id < self.scroll_offset as usize || self.cursor_y != self.scroll_offset
             {
                 self.cursor_y -= 1;
@@ -263,7 +396,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         )
     }
 
-    fn enter(&mut self) -> io::Result<()> {
+    fn setup(&mut self) -> io::Result<()> {
         execute!(
             self.out,
             cursor::Hide,
@@ -287,7 +420,7 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     #[cfg(windows)]
-    fn exit_and_open(&mut self, path: String, _line_num: Option<usize>) -> io::Result<()> {
+    fn exit_and_open(&mut self, path: OsString, _line_num: Option<usize>) -> io::Result<()> {
         Command::new("cmd")
             .arg("/C")
             .arg("start")
@@ -297,7 +430,7 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     #[cfg(not(windows))]
-    fn exit_and_open(&mut self, path: String, line_num: Option<usize>) -> io::Result<()> {
+    fn exit_and_open(&mut self, mut path: OsString, line_num: Option<usize>) -> io::Result<()> {
         let opener = match std::env::var("EDITOR") {
             Ok(val) if !val.is_empty() => val,
             _ => match std::env::consts::OS {
@@ -316,7 +449,8 @@ impl<'a, 'b> Menu<'a, 'b> {
             }
             "hx" => {
                 if let Some(l) = line_num {
-                    command.arg(format!("{path}:{l}"));
+                    path.push(format!(":{l}"));
+                    command.arg(path);
                 } else {
                     command.arg(path);
                 }
@@ -324,7 +458,8 @@ impl<'a, 'b> Menu<'a, 'b> {
             "code" => {
                 if let Some(l) = line_num {
                     command.arg("--goto");
-                    command.arg(format!("{path}:{l}"));
+                    path.push(format!(":{l}"));
+                    command.arg(path);
                 } else {
                     command.arg(path);
                 }
@@ -348,21 +483,21 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 }
 
-struct Selected {
+struct MatchInfo {
     path: OsString,
-    line: Option<usize>,
+    line_num: Option<usize>,
 }
 
-impl Selected {
-    pub fn new(path: OsString, line: Option<usize>) -> Selected {
-        Selected { path, line }
+impl MatchInfo {
+    pub fn new(path: OsString, line_num: Option<usize>) -> Self {
+        MatchInfo { path, line_num }
     }
 
-    fn get_selected_info(selected: usize, searched: &Matches, config: &Config) -> Selected {
+    pub fn find(selected: usize, searched: &Matches, config: &Config) -> MatchInfo {
         let mut current: usize = 0;
         match searched {
             Matches::Dir(dirs) => {
-                return Selected::search_dir(
+                return Self::search_dir(
                     dirs.get(0).unwrap(),
                     selected,
                     &mut current,
@@ -372,7 +507,7 @@ impl Selected {
                 .unwrap();
             }
             Matches::File(file) => {
-                return Selected::search_file(file, selected, &mut current, config).unwrap();
+                return Self::search_file(file, selected, &mut current, config).unwrap();
             }
         }
     }
@@ -383,24 +518,23 @@ impl Selected {
         current: &mut usize,
         dirs: &Vec<Directory>,
         config: &Config,
-    ) -> Option<Selected> {
+    ) -> Option<Self> {
         let children = &dir.children;
         let files = &dir.files;
-        let mut sel: Option<Selected>;
         if *current == selected {
-            return Some(Selected::new(dir.path.as_os_str().to_owned(), None));
+            return Some(Self::new(dir.path.as_os_str().to_owned(), None));
         }
         *current += 1;
         for child in children {
-            sel = Selected::search_dir(dirs.get(*child).unwrap(), selected, current, dirs, config);
-            if sel.is_some() {
-                return sel;
+            if let Some(sel) =
+                Self::search_dir(dirs.get(*child).unwrap(), selected, current, dirs, config)
+            {
+                return Some(sel);
             }
         }
         for file in files {
-            sel = Selected::search_file(file, selected, current, config);
-            if sel.is_some() {
-                return sel;
+            if let Some(sel) = Self::search_file(file, selected, current, config) {
+                return Some(sel);
             }
         }
         return None;
@@ -411,18 +545,15 @@ impl Selected {
         selected: usize,
         current: &mut usize,
         config: &Config,
-    ) -> Option<Selected> {
+    ) -> Option<Self> {
         if *current == selected {
-            return Some(Selected::new(file.path.clone().into_os_string(), None));
+            return Some(Self::new(file.path.clone().into_os_string(), None));
         }
         *current += 1;
         if !config.just_files {
             for line in file.lines.iter() {
                 if *current == selected {
-                    return Some(Selected::new(
-                        file.path.clone().into_os_string(),
-                        line.line_num,
-                    ));
+                    return Some(Self::new(file.path.clone().into_os_string(), line.line_num));
                 }
                 *current += 1;
             }
