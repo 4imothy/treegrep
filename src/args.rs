@@ -46,6 +46,14 @@ by {author}
 
 {all-args}";
 
+const MENU_HELP: &str = "open results in a menu to be edited with $EDITOR
+navigate through the menu using the following commands:
+- move up/down: k/j, p/n, up arrow/down arrow
+- move up/down with a bigger jump: K/J, P/N
+- move up/down paths: {/}, [/]
+- move to the start/end: g/G, </>, home/end
+- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown";
+
 pub fn generate_command() -> Command {
     let mut command = Command::new(crate_name!())
         .author(crate_authors!(", "))
@@ -61,16 +69,25 @@ pub fn generate_command() -> Command {
     return command;
 }
 
-fn create_bool_arg(long: &'static str, short: Option<char>, help: &'static str) -> Arg {
-    let arg = Arg::new(long)
+fn create_bool_arg(
+    long: &'static str,
+    short: Option<char>,
+    help: &'static str,
+    long_help: Option<&'static str>,
+) -> Arg {
+    let mut arg = Arg::new(long)
         .long(long)
         .help(help)
         .action(ArgAction::SetTrue);
 
-    match short {
-        Some(s) => arg.short(s),
-        None => arg,
+    if let Some(s) = short {
+        arg = arg.short(s);
     }
+
+    if let Some(lh) = long_help {
+        arg = arg.long_help(lh);
+    }
+    arg
 }
 
 fn create_set_arg(long: &'static str, help: &'static str) -> Arg {
@@ -78,31 +95,37 @@ fn create_set_arg(long: &'static str, help: &'static str) -> Arg {
 }
 
 fn get_args() -> Vec<Arg> {
-    vec![
-    create_bool_arg(arg_strs::SHOW_COUNT, Some('c'), "display number of files matched in directory and number of lines matched in a file if present"),
-    create_bool_arg(arg_strs::HIDDEN, Some('.'), "search hidden files"),
-    create_bool_arg(arg_strs::LINE_NUMBER, Some('n'), "show line number of match if present"),
-    create_bool_arg(arg_strs::MENU, Some('m'), "open results in a menu to be opened with $EDITOR, move with j/k, n/p, up/down"),
-    create_bool_arg(arg_strs::FILES, Some('f'), "show the paths that have matches"),
-    create_bool_arg(arg_strs::LINKS, None, "show linked paths for symbolic links"),
-    create_bool_arg(arg_strs::TRIM_LEFT, None, "trim whitespace at beginning of lines"),
-    create_bool_arg(arg_strs::PCRE2, None, "enable pcre2 if the searcher supports it"),
-    create_bool_arg(arg_strs::NO_IGNORE, None, "don't use ignore files"),
-    create_set_arg(arg_strs::MAX_DEPTH, "the max depth to search"),
-    create_set_arg(arg_strs::THREADS, "set appropriate number of threads to use"),
-    create_set_arg(arg_strs::MAX_LENGTH, "set the max length for a matched line"),
-    Arg::new(arg_strs::COLORS)
+    let color = Arg::new(arg_strs::COLORS)
         .long(arg_strs::COLORS)
         .help("set whether to color output")
         .value_parser([
-                      PossibleValue::new(arg_strs::COLORS_ALWAYS),
-                      PossibleValue::new(arg_strs::COLORS_NEVER)
-        ]),
-    Arg::new(arg_strs::SEARCHER)
+            PossibleValue::new(arg_strs::COLORS_ALWAYS),
+            PossibleValue::new(arg_strs::COLORS_NEVER),
+        ]);
+    let searcher = Arg::new(arg_strs::SEARCHER)
         .long(arg_strs::SEARCHER)
         .short('s')
-        .help(format!("executable to do the searching, currently supports rg  and {}", names::BIN_NAME))
-        .action(ArgAction::Set)
+        .help(format!(
+            "executable to do the searching, currently supports rg  and {}",
+            names::BIN_NAME
+        ))
+        .action(ArgAction::Set);
+
+    vec![
+        create_bool_arg(arg_strs::SHOW_COUNT, Some('c'), "display number of files matched in directory and number of lines matched in a file if present", None),
+        create_bool_arg(arg_strs::HIDDEN, Some('.'), "search hidden files", None),
+        create_bool_arg(arg_strs::LINE_NUMBER, Some('n'), "show line number of match if present", None),
+        create_bool_arg(arg_strs::MENU, Some('m'), MENU_HELP, None),
+        create_bool_arg(arg_strs::FILES, Some('f'), "show the paths that have matches", None),
+        create_bool_arg(arg_strs::LINKS, None, "show linked paths for symbolic links", None),
+        create_bool_arg(arg_strs::TRIM_LEFT, None, "trim whitespace at the beginning of lines", None),
+        create_bool_arg(arg_strs::PCRE2, None, "enable PCRE2 if the searcher supports it", None),
+        create_bool_arg(arg_strs::NO_IGNORE, None, "don't use ignore files", None),
+        create_set_arg(arg_strs::MAX_DEPTH, "the max depth to search"),
+        create_set_arg(arg_strs::THREADS, "set the appropriate number of threads to use"),
+        create_set_arg(arg_strs::MAX_LENGTH, "set the max length for a matched line"),
+        color,
+        searcher
     ]
 }
 

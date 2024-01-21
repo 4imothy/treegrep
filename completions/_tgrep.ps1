@@ -26,7 +26,7 @@ Register-ArgumentCompleter -Native -CommandName 'tgrep' -ScriptBlock {
             [CompletionResult]::new('-t', 't', [CompletionResultType]::ParameterName, 'specify the search target. If none provided, search the current directory.')
             [CompletionResult]::new('--target', 'target', [CompletionResultType]::ParameterName, 'specify the search target. If none provided, search the current directory.')
             [CompletionResult]::new('--max-depth', 'max-depth', [CompletionResultType]::ParameterName, 'the max depth to search')
-            [CompletionResult]::new('--threads', 'threads', [CompletionResultType]::ParameterName, 'set appropriate number of threads to use')
+            [CompletionResult]::new('--threads', 'threads', [CompletionResultType]::ParameterName, 'set the appropriate number of threads to use')
             [CompletionResult]::new('--max-length', 'max-length', [CompletionResultType]::ParameterName, 'set the max length for a matched line')
             [CompletionResult]::new('--color', 'color', [CompletionResultType]::ParameterName, 'set whether to color output')
             [CompletionResult]::new('-s', 's', [CompletionResultType]::ParameterName, 'executable to do the searching, currently supports rg  and tgrep')
@@ -37,13 +37,25 @@ Register-ArgumentCompleter -Native -CommandName 'tgrep' -ScriptBlock {
             [CompletionResult]::new('--hidden', 'hidden', [CompletionResultType]::ParameterName, 'search hidden files')
             [CompletionResult]::new('-n', 'n', [CompletionResultType]::ParameterName, 'show line number of match if present')
             [CompletionResult]::new('--line-number', 'line-number', [CompletionResultType]::ParameterName, 'show line number of match if present')
-            [CompletionResult]::new('-m', 'm', [CompletionResultType]::ParameterName, 'open results in a menu to be opened with $EDITOR, move with j/k, n/p, up/down')
-            [CompletionResult]::new('--menu', 'menu', [CompletionResultType]::ParameterName, 'open results in a menu to be opened with $EDITOR, move with j/k, n/p, up/down')
+            [CompletionResult]::new('-m', 'm', [CompletionResultType]::ParameterName, 'open results in a menu to be edited with $EDITOR
+navigate through the menu using the following commands:
+- move up/down: k/j, p/n, up arrow/down arrow
+- move up/down with a bigger jump: K/J, P/N
+- move up/down paths: {/}, [/]
+- move to the start/end: g/G, </>, home/end
+- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown')
+            [CompletionResult]::new('--menu', 'menu', [CompletionResultType]::ParameterName, 'open results in a menu to be edited with $EDITOR
+navigate through the menu using the following commands:
+- move up/down: k/j, p/n, up arrow/down arrow
+- move up/down with a bigger jump: K/J, P/N
+- move up/down paths: {/}, [/]
+- move to the start/end: g/G, </>, home/end
+- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown')
             [CompletionResult]::new('-f', 'f', [CompletionResultType]::ParameterName, 'show the paths that have matches')
             [CompletionResult]::new('--files', 'files', [CompletionResultType]::ParameterName, 'show the paths that have matches')
             [CompletionResult]::new('--links', 'links', [CompletionResultType]::ParameterName, 'show linked paths for symbolic links')
-            [CompletionResult]::new('--trim', 'trim', [CompletionResultType]::ParameterName, 'trim whitespace at beginning of lines')
-            [CompletionResult]::new('--pcre2', 'pcre2', [CompletionResultType]::ParameterName, 'enable pcre2 if the searcher supports it')
+            [CompletionResult]::new('--trim', 'trim', [CompletionResultType]::ParameterName, 'trim whitespace at the beginning of lines')
+            [CompletionResult]::new('--pcre2', 'pcre2', [CompletionResultType]::ParameterName, 'enable PCRE2 if the searcher supports it')
             [CompletionResult]::new('--no-ignore', 'no-ignore', [CompletionResultType]::ParameterName, 'don''t use ignore files')
             [CompletionResult]::new('-h', 'h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', 'help', [CompletionResultType]::ParameterName, 'Print help')

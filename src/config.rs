@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
 use crate::args::{arg_strs, generate_command};
-use crate::errors::Errors;
+use crate::errors::{bail, Message};
 use crate::searchers::Searchers;
 use clap::ArgMatches;
 use dunce;
@@ -28,21 +28,34 @@ pub struct Config {
     pub trim: bool,
 }
 
-fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, Errors> {
+fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, Message> {
     matches.get_one::<String>(name).map_or(Ok(None), |s| {
-        s.parse::<usize>()
-            .map(Some)
-            .map_err(|_| Errors::OptionIsntUsize {
-                given: s.to_string(),
-                option: name.to_string(),
-            })
+        s.parse::<usize>().map(Some).map_err(|_| {
+            bail!(
+                "failed to parse `{}` to a usize for option `{}`",
+                s.to_string(),
+                name.to_string()
+            )
+        })
     })
 }
 
 impl Config {
-    pub fn get_config() -> Result<(Self, Option<OsString>), Errors> {
-        let matches = generate_command().get_matches();
+    pub fn get_matches() -> ArgMatches {
+        generate_command().get_matches()
+    }
 
+    pub fn get_colors(matches: &ArgMatches) -> bool {
+        matches
+            .get_one::<String>(arg_strs::COLORS)
+            .map(|s| s == arg_strs::COLORS_ALWAYS)
+            .unwrap_or(true)
+    }
+
+    pub fn get_config(
+        matches: ArgMatches,
+        colors: bool,
+    ) -> Result<(Self, Option<OsString>), Message> {
         let mut patterns: Vec<String> = Vec::new();
         if let Some(expr) = matches.get_one::<String>(arg_strs::EXPRESSION_POSITIONAL) {
             patterns.push(expr.to_owned());
@@ -52,11 +65,6 @@ impl Config {
                 patterns.push(e.to_owned());
             }
         }
-
-        let colors: bool = matches
-            .get_one::<String>(arg_strs::COLORS)
-            .map(|s| s == arg_strs::COLORS_ALWAYS)
-            .unwrap_or(true);
 
         let count: bool = *matches.get_one::<bool>(arg_strs::SHOW_COUNT).unwrap();
         let hidden: bool = *matches.get_one::<bool>(arg_strs::HIDDEN).unwrap();
@@ -83,17 +91,21 @@ impl Config {
         let p = if let Some(target) = target {
             let path = PathBuf::from(target);
             if !path.exists() {
-                return Err(Errors::FailedToFindPath {
-                    info: path.to_string_lossy().to_string(),
-                });
+                return Err(bail!(
+                    "failed to find path {}",
+                    path.to_string_lossy().to_string()
+                ));
             }
             path
         } else {
-            std::env::current_dir().map_err(|_| Errors::FailedToGetCWD)?
+            std::env::current_dir().map_err(|_| bail!("failed to get current working directory"))?
         };
 
-        let path = dunce::canonicalize(&p).map_err(|_| Errors::FailedToCanonicalizePath {
-            info: p.to_string_lossy().to_string(),
+        let path = dunce::canonicalize(&p).map_err(|_| {
+            bail!(
+                "failed to canonicalize given path `{}`",
+                p.to_string_lossy().to_owned()
+            )
         })?;
 
         let is_dir = path.is_dir();

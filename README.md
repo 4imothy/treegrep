@@ -57,14 +57,20 @@ Options:
   -c, --count                      display number of files matched in directory and number of lines matched in a file if present
   -., --hidden                     search hidden files
   -n, --line-number                show line number of match if present
-  -m, --menu                       open results in a menu to be opened with $EDITOR, move with j/k, n/p, up/down
+  -m, --menu                       open results in a menu to be edited with $EDITOR
+                                   navigate through the menu using the following commands:
+                                   - move up/down: k/j, p/n, up arrow/down arrow
+                                   - move up/down with a bigger jump: K/J, P/N
+                                   - move up/down paths: {/}, [/]
+                                   - move to the start/end: g/G, </>, home/end
+                                   - move up/down a page: ctrl + b/ctrl + f, pageup/pagedown
   -f, --files                      show the paths that have matches
       --links                      show linked paths for symbolic links
-      --trim                       trim whitespace at beginning of lines
-      --pcre2                      enable pcre2 if the searcher supports it
+      --trim                       trim whitespace at the beginning of lines
+      --pcre2                      enable PCRE2 if the searcher supports it
       --no-ignore                  don't use ignore files
       --max-depth <max-depth>      the max depth to search
-      --threads <threads>          set appropriate number of threads to use
+      --threads <threads>          set the appropriate number of threads to use
       --max-length <max-length>    set the max length for a matched line
       --color <color>              set whether to color output [possible values: always, never]
   -s, --searcher <searcher>        executable to do the searching, currently supports rg  and tgrep
