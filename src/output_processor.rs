@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
 use crate::config::Config;
-use crate::errors::Errors;
+use crate::errors::{bail, Message, SUBMIT_ISSUE};
 use crate::formats;
 use crate::match_system::{wrap_dirs, wrap_file, Directory, File, Line, Match, Matches};
 use crate::Searchers;
@@ -14,14 +14,16 @@ pub fn is_start_path(dir_path: &Path, root_path: &Path) -> bool {
     dir_path.parent().is_none() || dir_path == root_path
 }
 
-pub fn process_results(results: Vec<u8>, config: &Config) -> Result<Option<Matches>, Errors> {
+pub fn process_results(results: Vec<u8>, config: &Config) -> Result<Option<Matches>, Message> {
     let lines = results
         .split(|&byte| byte == formats::NEW_LINE as u8)
         .collect();
     match config.exec {
         Searchers::RipGrep => process_json_lines(lines, config),
         Searchers::TreeGrep => {
-            return Err(Errors::ProcessingInternalSearcherAsExternal);
+            return Err(bail!(
+                "tried to use external command when using the treegrep searcher {SUBMIT_ISSUE}"
+            ))
         }
     }
 }
@@ -32,14 +34,15 @@ impl File {
         dirs: &mut Vec<Directory>,
         path_to_index: &mut HashMap<OsString, usize>,
         config: &Config,
-    ) -> Result<(usize, usize), Errors> {
+    ) -> Result<(usize, usize), Message> {
         let f_path = PathBuf::from(path);
         let file = File::new(&f_path, config)?;
 
         f_path.parent().map_or(
-            Err(Errors::FailedToGetParent {
-                info: f_path.as_os_str().to_owned(),
-            }),
+            Err(bail!(
+                "failed to get parent to path `{}`",
+                f_path.as_os_str().to_string_lossy()
+            )),
             |mut dir_path| {
                 let d_id: usize;
                 let mut to_add_id: Option<usize> = None;
@@ -107,7 +110,7 @@ impl AsUsize for Value {
     }
 }
 
-pub fn process_json_lines(lines: Vec<&[u8]>, config: &Config) -> Result<Option<Matches>, Errors> {
+pub fn process_json_lines(lines: Vec<&[u8]>, config: &Config) -> Result<Option<Matches>, Message> {
     let mut path_to_index: HashMap<OsString, usize> = HashMap::new();
     let mut dirs: Vec<Directory> = Vec::new();
 
@@ -120,8 +123,12 @@ pub fn process_json_lines(lines: Vec<&[u8]>, config: &Config) -> Result<Option<M
         if line.is_empty() {
             continue;
         }
-        let res: Value = serde_json::from_slice(line).map_err(|e| Errors::InvalidJson {
-            serde_json_mes: e.to_string(),
+        let res: Value = serde_json::from_slice(line).map_err(|e| {
+            bail!(
+                "error message `{}` for line `{}`",
+                e.to_string(),
+                String::from_utf8_lossy(line)
+            )
         })?;
         match res["type"].as_str().unwrap() {
             "begin" => {

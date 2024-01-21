@@ -2,7 +2,7 @@
 
 use crate::args::names;
 use crate::config::Config;
-use crate::errors::Errors;
+use crate::errors::{bail, Message, SUBMIT_ISSUE};
 use std::env;
 #[cfg(target_os = "windows")]
 use std::env::consts::EXE_SUFFIX;
@@ -32,18 +32,18 @@ fn get_exe_path(bin: &str) -> Option<OsString> {
 }
 
 trait Options {
-    fn colors(cmd: &mut Command, want: bool) -> Result<(), Errors>;
-    fn line_num(cmd: &mut Command, want: bool) -> Result<(), Errors>;
-    fn pcre2(cmd: &mut Command, want: bool) -> Result<(), Errors>;
-    fn hidden(cmd: &mut Command, want: bool) -> Result<(), Errors>;
-    fn links(cmd: &mut Command, want: bool) -> Result<(), Errors>;
-    fn files(cmd: &mut Command, want: bool) -> Result<(), Errors>;
-    fn ignore(cmd: &mut Command, want: bool) -> Result<(), Errors>;
-    fn max_depth(cmd: &mut Command, md: Option<usize>) -> Result<(), Errors>;
-    fn threads(cmd: &mut Command, threads: Option<usize>) -> Result<(), Errors>;
-    fn add_args(cmd: &mut Command, config: &Config) -> Result<(), Errors>;
+    fn colors(cmd: &mut Command, want: bool) -> Result<(), Message>;
+    fn line_num(cmd: &mut Command, want: bool) -> Result<(), Message>;
+    fn pcre2(cmd: &mut Command, want: bool) -> Result<(), Message>;
+    fn hidden(cmd: &mut Command, want: bool) -> Result<(), Message>;
+    fn links(cmd: &mut Command, want: bool) -> Result<(), Message>;
+    fn files(cmd: &mut Command, want: bool) -> Result<(), Message>;
+    fn ignore(cmd: &mut Command, want: bool) -> Result<(), Message>;
+    fn max_depth(cmd: &mut Command, md: Option<usize>) -> Result<(), Message>;
+    fn threads(cmd: &mut Command, threads: Option<usize>) -> Result<(), Message>;
+    fn add_args(cmd: &mut Command, config: &Config) -> Result<(), Message>;
 
-    fn add_options(cmd: &mut Command, config: &Config) -> Result<(), Errors> {
+    fn add_options(cmd: &mut Command, config: &Config) -> Result<(), Message> {
         Self::colors(cmd, config.colors)?;
         Self::line_num(cmd, config.line_number)?;
         Self::pcre2(cmd, config.pcre2)?;
@@ -60,7 +60,7 @@ trait Options {
 struct Rg;
 
 impl Options for Rg {
-    fn add_args(cmd: &mut Command, config: &Config) -> Result<(), Errors> {
+    fn add_args(cmd: &mut Command, config: &Config) -> Result<(), Message> {
         cmd.arg("--json");
         Rg::add_options(cmd, config)?;
 
@@ -71,57 +71,57 @@ impl Options for Rg {
         Ok(())
     }
 
-    fn files(_cmd: &mut Command, want: bool) -> Result<(), Errors> {
+    fn files(_cmd: &mut Command, want: bool) -> Result<(), Message> {
         if want {}
         Ok(())
     }
 
-    fn max_depth(cmd: &mut Command, md: Option<usize>) -> Result<(), Errors> {
+    fn max_depth(cmd: &mut Command, md: Option<usize>) -> Result<(), Message> {
         if let Some(d) = md {
             cmd.arg(format!("--max-depth={}", d));
         }
         Ok(())
     }
 
-    fn threads(cmd: &mut Command, threads: Option<usize>) -> Result<(), Errors> {
+    fn threads(cmd: &mut Command, threads: Option<usize>) -> Result<(), Message> {
         if let Some(t) = threads {
             cmd.arg(format!("--threads={}", t));
         }
         Ok(())
     }
 
-    fn colors(cmd: &mut Command, _want: bool) -> Result<(), Errors> {
+    fn colors(cmd: &mut Command, _want: bool) -> Result<(), Message> {
         cmd.arg("--color=never");
         Ok(())
     }
 
-    fn line_num(cmd: &mut Command, _want: bool) -> Result<(), Errors> {
+    fn line_num(cmd: &mut Command, _want: bool) -> Result<(), Message> {
         cmd.arg("--line-number");
         Ok(())
     }
 
-    fn pcre2(cmd: &mut Command, want: bool) -> Result<(), Errors> {
+    fn pcre2(cmd: &mut Command, want: bool) -> Result<(), Message> {
         if want {
             cmd.arg("--pcre2");
         }
         Ok(())
     }
 
-    fn ignore(cmd: &mut Command, want: bool) -> Result<(), Errors> {
+    fn ignore(cmd: &mut Command, want: bool) -> Result<(), Message> {
         if !want {
             cmd.arg("--no-ignore");
         }
         Ok(())
     }
 
-    fn hidden(cmd: &mut Command, want: bool) -> Result<(), Errors> {
+    fn hidden(cmd: &mut Command, want: bool) -> Result<(), Message> {
         if want {
             cmd.arg("--hidden");
         }
         Ok(())
     }
 
-    fn links(cmd: &mut Command, want: bool) -> Result<(), Errors> {
+    fn links(cmd: &mut Command, want: bool) -> Result<(), Message> {
         if want {
             cmd.arg("--follow");
         }
@@ -135,7 +135,7 @@ pub enum Searchers {
 }
 
 impl Searchers {
-    pub fn get_searcher(chosen: Option<&String>) -> Result<(Self, Option<OsString>), Errors> {
+    pub fn get_searcher(chosen: Option<&String>) -> Result<(Self, Option<OsString>), Message> {
         if let Some(c) = chosen {
             if c == &Searchers::TreeGrep.to_str() {
                 return Ok((Searchers::TreeGrep, None));
@@ -143,9 +143,7 @@ impl Searchers {
             if let Some(path) = get_exe_path(c) {
                 return Ok((Searchers::from_str(c)?, Some(path)));
             }
-            return Err(Errors::FailedToFindGivenSearcher {
-                chosen: c.to_owned(),
-            });
+            return Err(bail!("failed to find searcher `{}`", c.to_owned()));
         } else {
             for exec in Searchers::all() {
                 match exec {
@@ -160,20 +158,23 @@ impl Searchers {
                 }
             }
         }
-        Err(Errors::NoSupportedBinary {
-            info: Searchers::all_to_str().join(", "),
-        })
+        Err(bail!(
+            "no supported searcher found, tried `{}`",
+            Searchers::all_to_str().join(", ")
+        ))
     }
 
-    pub fn generate_command(config: &Config, starter: OsString) -> Result<Command, Errors> {
+    pub fn generate_command(config: &Config, starter: OsString) -> Result<Command, Message> {
         let mut cmd = Command::new(starter);
 
         match config.exec {
             Searchers::RipGrep => Rg::add_args(&mut cmd, config)?,
             Searchers::TreeGrep => {
-                return Err(Errors::ProcessingInternalSearcherAsExternal);
+                return Err(bail!(
+                    "tried to use external command when using the treegrep searcher {SUBMIT_ISSUE}"
+                ))
             }
-        };
+        }
         Ok(cmd)
     }
 
@@ -184,13 +185,14 @@ impl Searchers {
         }
     }
 
-    fn from_str(s: &str) -> Result<Self, Errors> {
+    fn from_str(s: &str) -> Result<Self, Message> {
         match (s, cfg!(target_os = "windows")) {
             ("rg", _) | ("rg.exe", true) => Ok(Searchers::RipGrep),
-            _ => Err(Errors::InvalidSearcherExe {
-                info: s.to_string(),
-                supported: Searchers::all_to_str().join(", "),
-            }),
+            _ => Err(bail!(
+                "searcher `{}` is invalid, tried `{}`",
+                s.to_string(),
+                Searchers::all_to_str().join(", ")
+            )),
         }
     }
 

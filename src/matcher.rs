@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
 use crate::config::Config;
+use crate::errors::{bail, Message};
 use crate::formats;
 use crate::match_system::{wrap_dirs, wrap_file, Directory, File, Line, Match, Matches};
-use crate::Errors;
 use bstr::ByteSlice;
 use ignore::WalkBuilder;
 use regex::bytes::Regex;
@@ -12,13 +12,11 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::PathBuf;
 
-pub fn search(config: &Config) -> Result<Option<Matches>, Errors> {
+pub fn search(config: &Config) -> Result<Option<Matches>, Message> {
     let mut patterns: Vec<Regex> = Vec::new();
     for expr in &config.patterns {
         patterns.push(Regex::new(expr).map_err(|_| {
-            return Errors::InvalidRegex {
-                regex: expr.to_string(),
-            };
+            return bail!("regex expression `{}` is invalid", expr.to_string());
         })?);
     }
     if config.is_dir {
@@ -32,7 +30,7 @@ pub fn search(config: &Config) -> Result<Option<Matches>, Errors> {
     }
 }
 
-fn search_dir(patterns: &Vec<Regex>, config: &Config) -> Result<Vec<Directory>, Errors> {
+fn search_dir(patterns: &Vec<Regex>, config: &Config) -> Result<Vec<Directory>, Message> {
     let walker = WalkBuilder::new(&config.path)
         .hidden(!config.hidden)
         .max_depth(config.max_depth)
@@ -86,7 +84,7 @@ fn search_dir(patterns: &Vec<Regex>, config: &Config) -> Result<Vec<Directory>, 
     Ok(directories)
 }
 
-fn search_file(pb: &PathBuf, patterns: &Vec<Regex>, config: &Config) -> Result<File, Errors> {
+fn search_file(pb: &PathBuf, patterns: &Vec<Regex>, config: &Config) -> Result<File, Message> {
     let m_content_bytes: Option<Vec<u8>> = fs::read(pb).ok();
 
     let mut file = File::new(pb, config)?;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
 use crate::config::Config;
-use crate::errors::Errors;
+use crate::errors::{bail, Message};
 use crate::formats::{bold, get_color, reset_bold_and_fg};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -17,16 +17,18 @@ pub fn wrap_file(file: Option<File>) -> Option<Matches> {
     file.filter(|f| !f.lines.is_empty()).map(Matches::File)
 }
 
-fn path_name(path: &Path) -> Result<String, Errors> {
-    let name = path.file_name().ok_or(Errors::FailedToGetName {
-        info: path.as_os_str().to_owned(),
-    })?;
+fn path_name(path: &Path) -> Result<String, Message> {
+    let name = path.file_name().ok_or(bail!(
+        "failed to get name of `{}`",
+        path.as_os_str().to_string_lossy()
+    ))?;
 
-    name.to_os_string()
-        .into_string()
-        .map_err(|_| Errors::FailedToGetName {
-            info: path.as_os_str().to_owned(),
-        })
+    name.to_os_string().into_string().map_err(|_| {
+        bail!(
+            "failed to get name of `{}`",
+            path.as_os_str().to_string_lossy()
+        )
+    })
 }
 
 pub enum Matches {
@@ -44,7 +46,7 @@ pub struct Directory {
 }
 
 impl Directory {
-    pub fn new(path: &Path, config: &Config) -> Result<Self, Errors> {
+    pub fn new(path: &Path, config: &Config) -> Result<Self, Message> {
         Ok(Directory {
             name: path_name(path)?,
             path: path.to_path_buf(),
@@ -64,7 +66,7 @@ pub struct File {
 }
 
 impl File {
-    pub fn new(path: &Path, config: &Config) -> Result<Self, Errors> {
+    pub fn new(path: &Path, config: &Config) -> Result<Self, Message> {
         Ok(File {
             name: path_name(path)?,
             linked: get_linked(path, config),

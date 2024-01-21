@@ -25,8 +25,13 @@ pub const SPACER: &str = "   ";
 
 pub const NEW_LINE: char = '\n';
 
-pub fn error_prefix() -> String {
-    format!("{}{}Error:{}", BOLD, RED_FG, RESET)
+pub fn error_prefix(colors: bool) -> String {
+    let e_str = "Error:";
+    if colors {
+        format!("{}{}{}{}", BOLD, RED_FG, e_str, RESET)
+    } else {
+        e_str.to_string()
+    }
 }
 
 pub fn reset_bold_and_fg() -> Vec<u8> {

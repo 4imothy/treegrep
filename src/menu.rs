@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
+// TODO on pressing h show a help message
 use crate::config::Config;
 use crate::formats;
 use crate::match_system::{Directory, File, Matches};
@@ -15,7 +16,7 @@ use std::ffi::OsString;
 use std::io::{self, StdoutLock, Write};
 use std::process::Command;
 
-const START_X: u16 = 3;
+const START_X: u16 = formats::SELECTED_INDICATOR.len() as u16;
 const START_Y: u16 = 0;
 
 struct PathStore {
@@ -299,7 +300,6 @@ impl<'a, 'b> Menu<'a, 'b> {
                 break;
             }
             self.selected_id += 1;
-            // check if this passes the current if it does then increment
             self.ps.shift_down(self.selected_id);
             if self.cursor_y + self.scroll_offset != self.num_rows {
                 self.cursor_y += 1;
