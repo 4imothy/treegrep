@@ -11,8 +11,9 @@ pub mod names {
 }
 
 // TODO Options to Support
-//
 // excluding directories explicitly
+// change --files to just show the files that would be searched like rg
+// use --paths to be to just show the paths
 
 pub mod arg_strs {
     pub const TARGET_POSITIONAL: &str = "target-positional";
