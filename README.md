@@ -40,7 +40,7 @@ https://github.com/4imothy/treegrep/assets/40186632/9c85c309-df78-4996-8127-ee5a
 
 ### *--help* Output
 ```
-treegrep 0.1.2
+treegrep 0.1.3
 by Timothy Cronin
 
 A pattern matcher frontend or backend which displays results in a tree
