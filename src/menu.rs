@@ -36,18 +36,17 @@ impl PathStore {
         }
     }
 
-    pub fn move_to_top(&mut self) {
+    pub fn top(&mut self) {
         self.prev = 0;
         self.next = 1;
+        self.past = false;
     }
 
-    pub fn move_to_bottom(&mut self, files: bool) {
-        let mut shift = 0;
-        if files {
-            shift = 1;
-        }
+    pub fn bottom(&mut self, files: bool) {
+        let shift = if files { 1 } else { 0 };
         self.prev = self.paths.len() - 1 - shift;
         self.next = self.paths.len() - shift;
+        self.past = false;
     }
 
     pub fn shift_down(&mut self, selected_id: usize) {
@@ -138,6 +137,15 @@ impl<'a, 'b> Menu<'a, 'b> {
         self.num_rows - 1
     }
 
+    fn max_line_id(&self) -> usize {
+        self.lines.len() - 2
+    }
+
+    fn set_rows(&mut self, num_rows: u16) {
+        self.num_rows = num_rows;
+        (self.scroll_offset, self.big_jump, self.small_jump) = Menu::scroll_info(self.num_rows);
+    }
+
     fn scroll_info(num_rows: u16) -> (u16, u16, u16) {
         let scroll_offset = num_rows / 5;
         let big_jump = scroll_offset;
@@ -148,8 +156,8 @@ impl<'a, 'b> Menu<'a, 'b> {
     pub fn enter(out: &'a mut StdoutLock<'b>, matches: Matches, config: &Config) -> io::Result<()> {
         let mut menu: Menu = Menu::new(out, &matches, config)?;
 
-        menu.setup()?;
-        menu.draw()?;
+        menu.setup_term()?;
+        menu.draw(false)?;
 
         'outer: loop {
             let event = event::read();
@@ -161,45 +169,35 @@ impl<'a, 'b> Menu<'a, 'b> {
             })) = event
             {
                 match code {
-                    KeyCode::Char(c) => match c {
-                        'j' | 'n' => menu.move_down(menu.small_jump)?,
-                        'k' | 'p' => menu.move_up(menu.small_jump)?,
-                        'J' | 'N' => menu.move_down(menu.big_jump)?,
-                        'K' | 'P' => menu.move_up(menu.big_jump)?,
-                        '}' | ']' => menu.move_down_path()?,
-                        '{' | '[' => menu.move_up_path()?,
-                        'q' => break 'outer,
-                        'c' => {
-                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                                break 'outer;
-                            }
+                    KeyCode::Char('j') | KeyCode::Char('n') | KeyCode::Down => {
+                        menu.down(menu.small_jump)?
+                    }
+                    KeyCode::Char('k') | KeyCode::Char('p') | KeyCode::Up => {
+                        menu.up(menu.small_jump)?
+                    }
+                    KeyCode::Char('J') | KeyCode::Char('N') => menu.down(menu.big_jump)?,
+                    KeyCode::Char('}') | KeyCode::Char(']') => menu.down_path()?,
+                    KeyCode::Char('{') | KeyCode::Char('[') => menu.up_path()?,
+                    KeyCode::Char('z') => {
+                        if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                            menu.suspend()?;
+                            menu.resume()?;
                         }
-                        'z' => {
-                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                                menu.suspend()?;
-                                menu.resume()?;
-                            }
+                    }
+                    KeyCode::Char('G') | KeyCode::Char('>') | KeyCode::End => {
+                        menu.bottom(config.just_files)?
+                    }
+                    KeyCode::Char('g') | KeyCode::Char('<') | KeyCode::Home => menu.top()?,
+                    KeyCode::Char('f') | KeyCode::PageDown => {
+                        if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                            menu.down(menu.page_jump())?;
                         }
-                        'G' | '>' => menu.move_to_bottom(config.just_files)?,
-                        'g' | '<' => menu.move_to_top()?,
-                        'f' => {
-                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                                menu.move_down(menu.page_jump())?;
-                            }
+                    }
+                    KeyCode::Char('b') | KeyCode::PageUp => {
+                        if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                            menu.up(menu.page_jump())?;
                         }
-                        'b' => {
-                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                                menu.move_up(menu.page_jump())?;
-                            }
-                        }
-                        _ => {}
-                    },
-                    KeyCode::Up => menu.move_up(menu.small_jump)?,
-                    KeyCode::Home => menu.move_to_top()?,
-                    KeyCode::End => menu.move_to_bottom(config.just_files)?,
-                    KeyCode::Down => menu.move_down(menu.small_jump)?,
-                    KeyCode::PageUp => menu.move_up(menu.page_jump())?,
-                    KeyCode::PageDown => menu.move_down(menu.page_jump())?,
+                    }
                     KeyCode::Enter => {
                         let match_info = MatchInfo::find(menu.selected_id, &menu.searched, config);
                         let path = config.path.join(match_info.path);
@@ -207,12 +205,18 @@ impl<'a, 'b> Menu<'a, 'b> {
                         return menu
                             .exit_and_open(path.as_os_str().to_os_string(), match_info.line_num);
                     }
+                    KeyCode::Char('q') => break 'outer,
+                    KeyCode::Char('c') => {
+                        if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                            break 'outer;
+                        }
+                    }
                     _ => {}
                 }
             } else if let Ok(Event::Resize(_, rows)) = event {
                 if menu.num_rows != rows {
-                    menu.num_rows = rows;
-                    menu.redraw()?;
+                    menu.set_rows(rows);
+                    menu.draw(true)?;
                 }
             }
         }
@@ -220,11 +224,13 @@ impl<'a, 'b> Menu<'a, 'b> {
         menu.leave()
     }
 
-    fn draw(&mut self) -> io::Result<()> {
+    fn draw(&mut self, resize: bool) -> io::Result<()> {
         queue!(self.out, terminal::Clear(ClearType::All))?;
-        let skip: usize = if self.selected_id > self.num_rows as usize / 2 {
+        if resize && self.selected_id > (self.num_rows / 2) as usize {
             self.cursor_y = self.num_rows / 2;
-            self.selected_id - self.num_rows as usize / 2
+        }
+        let skip: usize = if self.selected_id > self.cursor_y as usize {
+            self.selected_id - self.cursor_y as usize
         } else {
             0
         };
@@ -245,15 +251,6 @@ impl<'a, 'b> Menu<'a, 'b> {
         self.out.flush()
     }
 
-    fn redraw(&mut self) -> io::Result<()> {
-        let (scroll_offset, big_jump, small_jump) = Menu::scroll_info(self.num_rows);
-        self.scroll_offset = scroll_offset;
-        self.big_jump = big_jump;
-        self.small_jump = small_jump;
-        self.draw()?;
-        Ok(())
-    }
-
     fn suspend(&mut self) -> io::Result<()> {
         #[cfg(not(windows))]
         {
@@ -264,36 +261,31 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn resume(&mut self) -> io::Result<()> {
-        self.num_rows = Menu::num_rows();
-        (self.scroll_offset, self.big_jump, self.small_jump) = Menu::scroll_info(self.num_rows);
-        self.setup()?;
-        self.redraw()?;
+        self.set_rows(Menu::num_rows());
+        self.setup_term()?;
+        self.draw(false)?;
         Ok(())
     }
 
-    fn max_line_id(&self) -> usize {
-        self.lines.len() - 2
-    }
-
-    fn move_to_bottom(&mut self, files: bool) -> io::Result<()> {
-        self.ps.move_to_bottom(files);
+    fn bottom(&mut self, files: bool) -> io::Result<()> {
+        self.ps.bottom(files);
         self.selected_id = self.max_line_id();
-        self.cursor_y = if self.max_line_id() > self.num_rows as usize {
-            self.num_rows - self.scroll_offset
-        } else {
+        self.cursor_y = if self.max_line_id() < self.num_rows as usize {
             self.max_line_id() as u16
+        } else {
+            self.num_rows - self.scroll_offset
         };
-        self.draw()
+        self.draw(false)
     }
 
-    fn move_to_top(&mut self) -> io::Result<()> {
-        self.ps.move_to_top();
+    fn top(&mut self) -> io::Result<()> {
+        self.ps.top();
         self.selected_id = 0;
         self.cursor_y = 0;
-        self.draw()
+        self.draw(false)
     }
 
-    fn move_down(&mut self, dist: u16) -> io::Result<()> {
+    fn down(&mut self, dist: u16) -> io::Result<()> {
         self.destyle_at_cursor()?;
         for _ in 0..dist {
             if self.selected_id == self.max_line_id() {
@@ -304,9 +296,9 @@ impl<'a, 'b> Menu<'a, 'b> {
             if self.cursor_y + self.scroll_offset != self.num_rows {
                 self.cursor_y += 1;
             } else {
-                execute!(self.out, terminal::ScrollUp(1))?;
+                queue!(self.out, terminal::ScrollUp(1))?;
                 if (self.selected_id + self.scroll_offset as usize) < self.lines.len() {
-                    execute!(
+                    queue!(
                         self.out,
                         cursor::MoveTo(START_X, self.num_rows),
                         Print(
@@ -319,26 +311,10 @@ impl<'a, 'b> Menu<'a, 'b> {
             }
         }
         self.style_at_cursor()?;
-        Ok(())
+        self.out.flush()
     }
 
-    pub fn move_down_path(&mut self) -> io::Result<()> {
-        let dist = self.ps.dist_down(self.selected_id);
-        if dist != 0 {
-            self.move_down(dist)?;
-        }
-        Ok(())
-    }
-
-    fn move_up_path(&mut self) -> io::Result<()> {
-        let dist = self.ps.dist_up(self.selected_id);
-        if dist != 0 {
-            self.move_up(dist)?;
-        }
-        Ok(())
-    }
-
-    fn move_up(&mut self, dist: u16) -> io::Result<()> {
+    fn up(&mut self, dist: u16) -> io::Result<()> {
         self.destyle_at_cursor()?;
         for _ in 0..dist {
             if self.selected_id == 0 {
@@ -350,9 +326,9 @@ impl<'a, 'b> Menu<'a, 'b> {
             {
                 self.cursor_y -= 1;
             } else {
-                execute!(self.out, terminal::ScrollDown(1))?;
+                queue!(self.out, terminal::ScrollDown(1))?;
                 if self.selected_id + 1 > self.scroll_offset as usize {
-                    execute!(
+                    queue!(
                         self.out,
                         cursor::MoveTo(START_X, START_Y),
                         Print(
@@ -365,6 +341,22 @@ impl<'a, 'b> Menu<'a, 'b> {
             }
         }
         self.style_at_cursor()?;
+        self.out.flush()
+    }
+
+    pub fn down_path(&mut self) -> io::Result<()> {
+        let dist = self.ps.dist_down(self.selected_id);
+        if dist != 0 {
+            self.down(dist)?;
+        }
+        Ok(())
+    }
+
+    fn up_path(&mut self) -> io::Result<()> {
+        let dist = self.ps.dist_up(self.selected_id);
+        if dist != 0 {
+            self.up(dist)?;
+        }
         Ok(())
     }
 
@@ -376,18 +368,13 @@ impl<'a, 'b> Menu<'a, 'b> {
             self.out,
             cursor::MoveTo(0, self.cursor_y),
             Print(formats::SELECTED_INDICATOR),
-        )?;
-
-        queue!(
-            self.out,
             cursor::MoveTo(START_X, self.cursor_y),
             Print(self.lines.get(self.selected_id).unwrap())
-        )?;
-        self.out.flush()
+        )
     }
 
     fn destyle_at_cursor(&mut self) -> io::Result<()> {
-        execute!(
+        queue!(
             self.out,
             cursor::MoveTo(0, self.cursor_y),
             Print(formats::SELECTED_INDICATOR_CLEAR),
@@ -396,7 +383,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         )
     }
 
-    fn setup(&mut self) -> io::Result<()> {
+    fn setup_term(&mut self) -> io::Result<()> {
         execute!(
             self.out,
             cursor::Hide,
