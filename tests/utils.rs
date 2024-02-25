@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: CC-BY-4.0
+
 use std::env;
 use std::fs;
 use std::io::Write;

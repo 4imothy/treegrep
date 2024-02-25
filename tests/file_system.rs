@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: CC-BY-4.0
+
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{env, fs};

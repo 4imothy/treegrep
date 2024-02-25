@@ -13,7 +13,11 @@ pub mod names {
 // TODO Options to Support
 // excluding directories explicitly
 // change --files to just show the files that would be searched like rg
+// use --paths as what --files does now
 // use --paths to be to just show the paths
+
+// TODO I think I can set this up with just clap:
+// one of the exprs is needed only when --files is not present
 
 pub mod arg_strs {
     pub const TARGET_POSITIONAL: &str = "target-positional";

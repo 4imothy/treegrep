@@ -27,6 +27,8 @@ use writer::write_results;
 // TODO do the --files to stop searching a file when a match is found or use the
 // --files-with-matches flag for ripgrep
 // TODO vim plugin put it in the plugin folder and run cargo build --release and get the dir
+// TODO make the stdin, piping work with collecting the paths to search and then require the
+// pattern
 
 fn main() {
     let matches = Config::get_matches();

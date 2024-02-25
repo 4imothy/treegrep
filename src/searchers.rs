@@ -200,7 +200,7 @@ impl Searchers {
         vec![Searchers::RipGrep, Searchers::TreeGrep]
     }
 
-    fn all_to_str<'a>() -> Vec<String> {
+    fn all_to_str() -> Vec<String> {
         let mut all: Vec<String> = Vec::new();
         for e in Searchers::all() {
             let s = e.to_str();
