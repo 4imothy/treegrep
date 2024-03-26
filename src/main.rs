@@ -7,6 +7,7 @@ mod formats;
 mod match_system;
 mod matcher;
 mod menu;
+mod options;
 mod output_processor;
 mod searchers;
 mod writer;
@@ -23,10 +24,9 @@ use std::process::Command;
 use writer::write_results;
 
 // TODO add notarizing mac to exec can be used without needing to open from finder
-// TODO need to throw error when trying to do unsupported things using tgrep like pcre2
 // TODO do the --files to stop searching a file when a match is found or use the
 // --files-with-matches flag for ripgrep
-// TODO vim plugin put it in the plugin folder and run cargo build --release and get the dir
+// TODO nvim plugin put it in the plugin folder and run cargo build --release and get the dir
 // TODO make the stdin, piping work with collecting the paths to search and then require the
 // pattern
 
@@ -40,11 +40,11 @@ fn main() {
 }
 
 fn run(matches: ArgMatches, colors: bool) -> Result<(), Message> {
-    let (config, starter) = Config::get_config(matches, colors)?;
+    let (config, searcher_path) = Config::get_config(matches, colors)?;
 
     let matches: Option<Matches>;
     let mut out: StdoutLock = stdout().lock();
-    if let Some(s) = starter {
+    if let Some(s) = searcher_path {
         matches = get_matches_from_cmd(s, &config)?;
     } else {
         matches = matcher::search(&config)?;
@@ -64,8 +64,11 @@ fn run(matches: ArgMatches, colors: bool) -> Result<(), Message> {
     Ok(())
 }
 
-fn get_matches_from_cmd(starter: OsString, config: &Config) -> Result<Option<Matches>, Message> {
-    let mut cmd: Command = Searchers::generate_command(config, starter)?;
+fn get_matches_from_cmd(
+    searcher_path: OsString,
+    config: &Config,
+) -> Result<Option<Matches>, Message> {
+    let mut cmd: Command = Searchers::generate_command(config, searcher_path)?;
 
     let output = cmd.output().map_err(|e| {
         bail!(

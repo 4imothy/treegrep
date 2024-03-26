@@ -61,8 +61,8 @@ impl Config {
             patterns.push(expr.to_owned());
         }
         if let Some(exprs) = matches.get_many::<String>(arg_strs::EXPRESSION) {
-            for e in exprs.into_iter() {
-                patterns.push(e.to_owned());
+            for expr in exprs.into_iter() {
+                patterns.push(expr.to_owned());
             }
         }
 
@@ -80,8 +80,14 @@ impl Config {
         let threads: Option<usize> = get_usize_option(&matches, arg_strs::THREADS)?;
         let max_length: Option<usize> = get_usize_option(&matches, arg_strs::MAX_LENGTH)?;
 
-        let (exec, starter) =
+        let (searcher, searcher_path) =
             Searchers::get_searcher(matches.get_one::<String>(arg_strs::SEARCHER))?;
+
+        if let Searchers::TreeGrep = searcher {
+            if pcre2 {
+                return Err(bail!("treegrep searcher does not support pcre2"));
+            }
+        }
 
         let target: Option<String> = matches
             .get_one::<String>(arg_strs::TARGET_POSITIONAL)
@@ -114,7 +120,7 @@ impl Config {
             Config {
                 path,
                 is_dir,
-                exec,
+                exec: searcher,
                 patterns,
                 line_number,
                 colors,
@@ -130,7 +136,7 @@ impl Config {
                 ignore,
                 max_length,
             },
-            starter,
+            searcher_path,
         ))
     }
 }

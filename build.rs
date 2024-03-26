@@ -24,7 +24,7 @@ fn main() -> Result<(), Error> {
 
     let mut cmd = generate_command();
     for &shell in Shell::value_variants() {
-        generate_to(shell, &mut cmd, names::BIN_NAME, &completions_dir_path)?;
+        generate_to(shell, &mut cmd, names::TREEGREP_BIN, &completions_dir_path)?;
     }
 
     Ok(())

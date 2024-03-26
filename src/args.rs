@@ -7,7 +7,10 @@ use clap::{
 };
 
 pub mod names {
-    pub const BIN_NAME: &str = "tgrep";
+    pub const TREEGREP: &str = "treegrep";
+    pub const TREEGREP_BIN: &str = "tgrep";
+    pub const RIPGREP: &str = "ripgrep";
+    pub const RIPGREP_BIN: &str = "rg";
 }
 
 // TODO Options to Support
@@ -111,8 +114,8 @@ fn get_args() -> Vec<Arg> {
         .long(arg_strs::SEARCHER)
         .short('s')
         .help(format!(
-            "executable to do the searching, currently supports rg  and {}",
-            names::BIN_NAME
+            "executable to do the searching, currently supports rg and {}",
+            names::TREEGREP_BIN
         ))
         .action(ArgAction::Set);
 
