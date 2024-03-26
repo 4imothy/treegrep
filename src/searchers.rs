@@ -219,7 +219,7 @@ mod tests {
     fn test_all_to_str() {
         let res = Searchers::all_to_str();
         #[cfg(target_os = "windows")]
-        assert_eq!(res, vec!["rg.exe", "rg", "tgrep.exe", "tgrep"]);
+        assert_eq!(res, vec!["rg", "rg.exe", "tgrep", "tgrep.exe"]);
         #[cfg(not(target_os = "windows"))]
         assert_eq!(res, vec!["rg", "tgrep"]);
     }
