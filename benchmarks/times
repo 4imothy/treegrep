@@ -43,3 +43,22 @@ tgrep_with_rg execution time: 0.45580005645751953 seconds
 tgrep_with_tgrep execution time: 6.399776935577393 seconds
 
 ------------------
+Benchmark Results - 2024-03-28
+
+Results for directory: benchmarks/targets/eng_subs/en.txt
+rg execution time: 2.231774091720581 seconds
+grep execution time: 437.5264117717743 seconds
+tgrep_with_rg execution time: 2.763260841369629 seconds
+tgrep_with_tgrep execution time: 35.313382148742676 seconds
+
+Results for directory: benchmarks/targets/linux
+rg execution time: 2.0596771240234375 seconds
+grep execution time: 58.13109588623047 seconds
+tgrep_with_rg execution time: 2.2235491275787354 seconds
+tgrep_with_tgrep execution time: 4.532656192779541 seconds
+
+Results for directory: benchmarks/targets/linux with just printing files
+rg execution time: 0.09616708755493164 seconds
+tgrep execution time: 0.6679878234863281 seconds
+
+------------------

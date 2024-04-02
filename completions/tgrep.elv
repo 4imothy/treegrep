@@ -28,26 +28,16 @@ set edit:completion:arg-completer[tgrep] = {|@words|
             cand --color 'set whether to color output'
             cand -s 'executable to do the searching, currently supports rg and tgrep'
             cand --searcher 'executable to do the searching, currently supports rg and tgrep'
+            cand -l 'display the files that would be search in tree format'
+            cand --tree 'display the files that would be search in tree format'
             cand -c 'display number of files matched in directory and number of lines matched in a file if present'
             cand --count 'display number of files matched in directory and number of lines matched in a file if present'
             cand -. 'search hidden files'
             cand --hidden 'search hidden files'
             cand -n 'show line number of match if present'
             cand --line-number 'show line number of match if present'
-            cand -m 'open results in a menu to be edited with $EDITOR
-navigate through the menu using the following commands:
-- move up/down: k/j, p/n, up arrow/down arrow
-- move up/down with a bigger jump: K/J, P/N
-- move up/down paths: {/}, [/]
-- move to the start/end: g/G, </>, home/end
-- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown'
-            cand --menu 'open results in a menu to be edited with $EDITOR
-navigate through the menu using the following commands:
-- move up/down: k/j, p/n, up arrow/down arrow
-- move up/down with a bigger jump: K/J, P/N
-- move up/down paths: {/}, [/]
-- move to the start/end: g/G, </>, home/end
-- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown'
+            cand -m 'open results in a menu to be edited with $EDITOR navigate through the menu using the following commands: 	- move up/down: k/j, p/n, up arrow/down arrow 	- move up/down with a bigger jump: K/J, P/N 	- move up/down paths: {/}, [/] 	- move to the start/end: g/G, </>, home/end 	- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown'
+            cand --menu 'open results in a menu to be edited with $EDITOR navigate through the menu using the following commands: 	- move up/down: k/j, p/n, up arrow/down arrow 	- move up/down with a bigger jump: K/J, P/N 	- move up/down paths: {/}, [/] 	- move to the start/end: g/G, </>, home/end 	- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown'
             cand -f 'show the paths that have matches'
             cand --files 'show the paths that have matches'
             cand --links 'show linked paths for symbolic links'

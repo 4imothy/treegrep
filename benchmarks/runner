@@ -15,7 +15,6 @@ ENG_SUBS_LINK = 'https://object.pouta.csc.fi/OPUS-OpenSubtitles/v2016/mono/en.tx
 ENG_SUBS_NAME = 'en.txt'
 ENG_SUBS_GZ_NAME = '%s.gz' % ENG_SUBS_NAME
 
-
 def run_cmd(cmd):
     start_time = time.time()
     subprocess.call(cmd,
@@ -56,7 +55,7 @@ def download_eng_subs():
         subprocess.run(['gunzip', target_zip])
 
 
-def get_commands(to_search, directory):
+def get_commands(to_search):
     patterns = [
             "-e 'int'",
             "-e 'hello'",
@@ -73,17 +72,29 @@ def get_commands(to_search, directory):
         }
     return commands
 
+def get_files_commands(to_search):
+    commands = {
+            'rg': ['rg', '--files', to_search],
+            'tgrep': ['tgrep', '--tree', '--target', to_search]
+        }
+    return commands
 
 if __name__ == "__main__":
     download_linux_source()
     download_eng_subs()
-    to_search = path.join(TARGETS_DIR, ENG_SUBS_DIR_NAME, ENG_SUBS_NAME)
     results = {}
-    commands = get_commands(to_search, False)
+
+    to_search = path.join(TARGETS_DIR, ENG_SUBS_DIR_NAME, ENG_SUBS_NAME)
+    commands = get_commands(to_search)
     results[to_search] = run_benchmarks(commands)
+
     to_search = path.join(TARGETS_DIR, LINUX_DIR_NAME,)
-    commands = get_commands(to_search, True)
+    commands = get_commands(to_search)
     results[to_search] = run_benchmarks(commands)
+
+    to_search = path.join(TARGETS_DIR, LINUX_DIR_NAME,)
+    commands = get_files_commands(to_search)
+    results[to_search + " with just printing files"] = run_benchmarks(commands)
 
     for directory_name, directory_results in results.items():
         print(f"Results for path: {path.relpath(directory_name)}")

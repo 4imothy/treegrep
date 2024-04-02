@@ -31,26 +31,16 @@ Register-ArgumentCompleter -Native -CommandName 'tgrep' -ScriptBlock {
             [CompletionResult]::new('--color', 'color', [CompletionResultType]::ParameterName, 'set whether to color output')
             [CompletionResult]::new('-s', 's', [CompletionResultType]::ParameterName, 'executable to do the searching, currently supports rg and tgrep')
             [CompletionResult]::new('--searcher', 'searcher', [CompletionResultType]::ParameterName, 'executable to do the searching, currently supports rg and tgrep')
+            [CompletionResult]::new('-l', 'l', [CompletionResultType]::ParameterName, 'display the files that would be search in tree format')
+            [CompletionResult]::new('--tree', 'tree', [CompletionResultType]::ParameterName, 'display the files that would be search in tree format')
             [CompletionResult]::new('-c', 'c', [CompletionResultType]::ParameterName, 'display number of files matched in directory and number of lines matched in a file if present')
             [CompletionResult]::new('--count', 'count', [CompletionResultType]::ParameterName, 'display number of files matched in directory and number of lines matched in a file if present')
             [CompletionResult]::new('-.', '.', [CompletionResultType]::ParameterName, 'search hidden files')
             [CompletionResult]::new('--hidden', 'hidden', [CompletionResultType]::ParameterName, 'search hidden files')
             [CompletionResult]::new('-n', 'n', [CompletionResultType]::ParameterName, 'show line number of match if present')
             [CompletionResult]::new('--line-number', 'line-number', [CompletionResultType]::ParameterName, 'show line number of match if present')
-            [CompletionResult]::new('-m', 'm', [CompletionResultType]::ParameterName, 'open results in a menu to be edited with $EDITOR
-navigate through the menu using the following commands:
-- move up/down: k/j, p/n, up arrow/down arrow
-- move up/down with a bigger jump: K/J, P/N
-- move up/down paths: {/}, [/]
-- move to the start/end: g/G, </>, home/end
-- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown')
-            [CompletionResult]::new('--menu', 'menu', [CompletionResultType]::ParameterName, 'open results in a menu to be edited with $EDITOR
-navigate through the menu using the following commands:
-- move up/down: k/j, p/n, up arrow/down arrow
-- move up/down with a bigger jump: K/J, P/N
-- move up/down paths: {/}, [/]
-- move to the start/end: g/G, </>, home/end
-- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown')
+            [CompletionResult]::new('-m', 'm', [CompletionResultType]::ParameterName, 'open results in a menu to be edited with $EDITOR navigate through the menu using the following commands: 	- move up/down: k/j, p/n, up arrow/down arrow 	- move up/down with a bigger jump: K/J, P/N 	- move up/down paths: {/}, [/] 	- move to the start/end: g/G, </>, home/end 	- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown')
+            [CompletionResult]::new('--menu', 'menu', [CompletionResultType]::ParameterName, 'open results in a menu to be edited with $EDITOR navigate through the menu using the following commands: 	- move up/down: k/j, p/n, up arrow/down arrow 	- move up/down with a bigger jump: K/J, P/N 	- move up/down paths: {/}, [/] 	- move to the start/end: g/G, </>, home/end 	- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown')
             [CompletionResult]::new('-f', 'f', [CompletionResultType]::ParameterName, 'show the paths that have matches')
             [CompletionResult]::new('--files', 'files', [CompletionResultType]::ParameterName, 'show the paths that have matches')
             [CompletionResult]::new('--links', 'links', [CompletionResultType]::ParameterName, 'show linked paths for symbolic links')
