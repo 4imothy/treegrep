@@ -26,7 +26,7 @@ pub const SPACER: &str = "   ";
 pub const NEW_LINE: char = '\n';
 
 pub fn error_prefix(colors: bool) -> String {
-    let e_str = "Error:";
+    let e_str = "error:";
     if colors {
         format!("{}{}{}{}", BOLD, RED_FG, e_str, RESET)
     } else {

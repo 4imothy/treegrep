@@ -13,8 +13,9 @@ pub fn wrap_dirs(dirs: Vec<Directory>) -> Option<Matches> {
     Some(Matches::Dir(dirs))
 }
 
-pub fn wrap_file(file: Option<File>) -> Option<Matches> {
-    file.filter(|f| !f.lines.is_empty()).map(Matches::File)
+pub fn wrap_file(file: Option<File>, tree: bool) -> Option<Matches> {
+    file.filter(|f| !f.lines.is_empty() || tree)
+        .map(Matches::File)
 }
 
 fn path_name(path: &Path) -> Result<String, Message> {

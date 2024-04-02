@@ -117,7 +117,7 @@ impl Searchers {
     pub fn generate_command(config: &Config, starter: OsString) -> Result<Command, Message> {
         let mut cmd = Command::new(starter);
 
-        match config.exec {
+        match config.searcher {
             Searchers::RipGrep => Rg::add_args(&mut cmd, config)?,
             Searchers::TreeGrep => panic!(
                 "tried to use external command when using the treegrep searcher {SUBMIT_ISSUE}"
@@ -166,29 +166,31 @@ impl Searchers {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::args::{generate_command, names};
+    use crate::config::Config;
 
     #[test]
     fn test_options_add_args_rg() {
         let mut cmd = Command::new("rg");
-        let config = Config {
-            colors: true,
-            line_number: true,
-            pcre2: true,
-            hidden: true,
-            max_depth: Some(5),
-            threads: Some(8),
-            max_length: None,
-            links: true,
-            just_files: true,
-            ignore: false,
-            patterns: vec!["pattern1".to_string(), "pattern2".to_string()],
-            path: PathBuf::from("test_path"),
-            is_dir: true,
-            exec: Searchers::TreeGrep,
-            count: true,
-            menu: true,
-            trim: true,
-        };
+        let (config, _) = Config::get_config(
+            generate_command().get_matches_from([
+                names::TREEGREP_BIN,
+                "--line-number",
+                "--max-depth=5",
+                "--pcre2",
+                "--no-ignore",
+                "--regexp=pattern1",
+                "--regexp=pattern2",
+                "--hidden",
+                "--threads=8",
+                "--count",
+                "--links",
+                "--trim",
+            ]),
+            true,
+        )
+        .ok()
+        .unwrap();
 
         assert!(Rg::add_args(&mut cmd, &config).is_ok());
 
@@ -204,11 +206,11 @@ mod tests {
             "--no-ignore",
             "--regexp=pattern1",
             "--regexp=pattern2",
-            "test_path",
         ];
 
         assert_eq!(
             cmd.get_args()
+                .take(cmd.get_args().len() - 1)
                 .map(|s| s.to_str().unwrap())
                 .collect::<Vec<&str>>(),
             expected_args

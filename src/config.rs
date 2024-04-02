@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
-use crate::args::{arg_strs, generate_command};
+use crate::args::{self, generate_command};
 use crate::errors::{bail, Message};
 use crate::searchers::Searchers;
 use clap::ArgMatches;
@@ -10,9 +10,10 @@ use std::path::PathBuf;
 
 pub struct Config {
     pub path: PathBuf,
+    pub tree: bool,
     pub is_dir: bool,
     pub patterns: Vec<String>,
-    pub exec: Searchers,
+    pub searcher: Searchers,
     pub colors: bool,
     pub count: bool,
     pub hidden: bool,
@@ -47,8 +48,8 @@ impl Config {
 
     pub fn get_colors(matches: &ArgMatches) -> bool {
         matches
-            .get_one::<String>(arg_strs::COLORS)
-            .map(|s| s == arg_strs::COLORS_ALWAYS)
+            .get_one::<String>(args::COLORS.id)
+            .map(|s| s == args::COLORS_ALWAYS)
             .unwrap_or(true)
     }
 
@@ -57,31 +58,38 @@ impl Config {
         colors: bool,
     ) -> Result<(Self, Option<OsString>), Message> {
         let mut patterns: Vec<String> = Vec::new();
-        if let Some(expr) = matches.get_one::<String>(arg_strs::EXPRESSION_POSITIONAL) {
+        if let Some(expr) = matches.get_one::<String>(args::EXPRESSION_POSITIONAL.id) {
             patterns.push(expr.to_owned());
         }
-        if let Some(exprs) = matches.get_many::<String>(arg_strs::EXPRESSION) {
+        if let Some(exprs) = matches.get_many::<String>(args::EXPRESSION.id) {
             for expr in exprs.into_iter() {
                 patterns.push(expr.to_owned());
             }
         }
 
-        let count: bool = *matches.get_one::<bool>(arg_strs::SHOW_COUNT).unwrap();
-        let hidden: bool = *matches.get_one::<bool>(arg_strs::HIDDEN).unwrap();
-        let line_number: bool = *matches.get_one::<bool>(arg_strs::LINE_NUMBER).unwrap();
-        let menu: bool = *matches.get_one::<bool>(arg_strs::MENU).unwrap();
-        let just_files: bool = *matches.get_one::<bool>(arg_strs::FILES).unwrap();
-        let links: bool = *matches.get_one::<bool>(arg_strs::LINKS).unwrap();
-        let trim: bool = *matches.get_one::<bool>(arg_strs::TRIM_LEFT).unwrap();
-        let pcre2: bool = *matches.get_one::<bool>(arg_strs::PCRE2).unwrap();
-        let ignore: bool = !*matches.get_one::<bool>(arg_strs::NO_IGNORE).unwrap();
+        let tree: bool = matches.get_flag(args::TREE.id);
+        let count: bool = matches.get_flag(args::SHOW_COUNT.id);
+        let hidden: bool = matches.get_flag(args::HIDDEN.id);
+        let line_number: bool = matches.get_flag(args::LINE_NUMBER.id);
+        let menu: bool = matches.get_flag(args::MENU.id);
+        let just_files: bool = matches.get_flag(args::FILES.id);
+        let links: bool = matches.get_flag(args::LINKS.id);
+        let trim: bool = matches.get_flag(args::TRIM_LEFT.id);
+        let pcre2: bool = matches.get_flag(args::PCRE2.id);
+        let ignore: bool = !matches.get_flag(args::NO_IGNORE.id);
 
-        let max_depth: Option<usize> = get_usize_option(&matches, arg_strs::MAX_DEPTH)?;
-        let threads: Option<usize> = get_usize_option(&matches, arg_strs::THREADS)?;
-        let max_length: Option<usize> = get_usize_option(&matches, arg_strs::MAX_LENGTH)?;
+        let max_depth: Option<usize> = get_usize_option(&matches, args::MAX_DEPTH.id)?;
+        let threads: Option<usize> = get_usize_option(&matches, args::THREADS.id)?;
+        let max_length: Option<usize> = get_usize_option(&matches, args::MAX_LENGTH.id)?;
 
         let (searcher, searcher_path) =
-            Searchers::get_searcher(matches.get_one::<String>(arg_strs::SEARCHER))?;
+            Searchers::get_searcher(matches.get_one::<String>(args::SEARCHER.id))?;
+
+        if let Searchers::TreeGrep = searcher {
+            if threads.map_or(false, |t| t > 1) {
+                return Err(bail!("treegrep searcher does not support multithreading"));
+            }
+        }
 
         if let Searchers::TreeGrep = searcher {
             if pcre2 {
@@ -90,15 +98,15 @@ impl Config {
         }
 
         let target: Option<String> = matches
-            .get_one::<String>(arg_strs::TARGET_POSITIONAL)
-            .or_else(|| matches.get_one::<String>(arg_strs::TARGET))
+            .get_one::<String>(args::TARGET_POSITIONAL.id)
+            .or_else(|| matches.get_one::<String>(args::TARGET.id))
             .map(|value| value.to_string());
 
         let p = if let Some(target) = target {
             let path = PathBuf::from(target);
             if !path.exists() {
                 return Err(bail!(
-                    "failed to find path {}",
+                    "failed to find path `{}`",
                     path.to_string_lossy().to_string()
                 ));
             }
@@ -109,7 +117,7 @@ impl Config {
 
         let path = dunce::canonicalize(&p).map_err(|_| {
             bail!(
-                "failed to canonicalize given path `{}`",
+                "failed to canonicalize path `{}`",
                 p.to_string_lossy().to_owned()
             )
         })?;
@@ -119,8 +127,9 @@ impl Config {
         Ok((
             Config {
                 path,
+                tree,
                 is_dir,
-                exec: searcher,
+                searcher,
                 patterns,
                 line_number,
                 colors,
@@ -138,5 +147,125 @@ impl Config {
             },
             searcher_path,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::args::names;
+
+    #[test]
+    fn test_longs() {
+        let (config, _) = Config::get_config(
+            generate_command().get_matches_from([
+                names::TREEGREP_BIN,
+                "posexpr",
+                "--line-number",
+                "--max-depth=5",
+                "--max-length=20",
+                "--pcre2",
+                "--no-ignore",
+                "--hidden",
+                "--threads=8",
+                "--count",
+                "--links",
+                "--trim",
+                "--color=always",
+                "--menu",
+                "--files",
+                "--searcher=rg",
+                "--regexp=pattern1",
+                "--regexp=pattern2",
+            ]),
+            true,
+        )
+        .ok()
+        .unwrap();
+        assert!(config.line_number);
+        assert_eq!(config.max_depth, Some(5));
+        assert_eq!(config.max_length, Some(20));
+        assert!(config.pcre2);
+        assert!(!config.ignore);
+        assert!(config.hidden);
+        assert!(config.threads == Some(8));
+        assert!(config.count);
+        assert!(config.links);
+        assert!(config.trim);
+        assert!(config.colors);
+        assert!(config.menu);
+        assert!(config.just_files);
+        match config.searcher {
+            Searchers::RipGrep => {}
+            _ => panic!("wrong searcher"),
+        }
+        assert_eq!(config.patterns, vec!["posexpr", "pattern1", "pattern2"]);
+    }
+
+    #[test]
+    fn test_shorts() {
+        let (config, _) = Config::get_config(
+            generate_command().get_matches_from([
+                names::TREEGREP_BIN,
+                "posexpr",
+                "-n.cmf",
+                "-e=pattern1",
+                "-e=pattern2",
+            ]),
+            true,
+        )
+        .ok()
+        .unwrap();
+        assert!(config.line_number);
+        assert!(config.hidden);
+        assert!(config.count);
+        assert!(config.menu);
+        assert!(config.just_files);
+        assert_eq!(config.patterns, vec!["posexpr", "pattern1", "pattern2"]);
+    }
+
+    #[test]
+    fn test_longs_tree() {
+        let (config, _) = Config::get_config(
+            generate_command().get_matches_from([
+                names::TREEGREP_BIN,
+                "--tree",
+                "--max-depth=5",
+                "--no-ignore",
+                "--hidden",
+                "--links",
+                "--color=always",
+                "--menu",
+            ]),
+            true,
+        )
+        .ok()
+        .unwrap();
+        assert_eq!(config.max_depth, Some(5));
+        assert!(!config.ignore);
+        assert!(config.hidden);
+        assert!(config.tree);
+        assert!(config.links);
+        assert!(config.colors);
+        assert!(config.menu);
+        assert!(generate_command()
+            .try_get_matches_from([names::TREEGREP_BIN, "--tree", "posexpr"])
+            .is_err());
+    }
+
+    #[test]
+    fn test_shorts_tree() {
+        let (config, _) = Config::get_config(
+            generate_command().get_matches_from([names::TREEGREP_BIN, "-.lm"]),
+            true,
+        )
+        .ok()
+        .unwrap();
+        assert!(config.tree);
+        assert!(config.hidden);
+        assert!(config.menu);
+        assert!(generate_command()
+            .try_get_matches_from([names::TREEGREP_BIN, "posexpr", "-l"])
+            .is_err());
     }
 }

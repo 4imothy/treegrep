@@ -14,36 +14,84 @@ pub mod names {
 }
 
 // TODO Options to Support
-// excluding directories explicitly
-// change --files to just show the files that would be searched like rg
-// use --paths as what --files does now
-// use --paths to be to just show the paths
-
-// TODO I think I can set this up with just clap:
-// one of the exprs is needed only when --files is not present
-
-pub mod arg_strs {
-    pub const TARGET_POSITIONAL: &str = "target-positional";
-    pub const TARGET: &str = "target";
-    pub const EXPRESSION_POSITIONAL: &str = "regex expression-positional";
-    pub const EXPRESSION: &str = "regex expression";
-    pub const COLORS: &str = "color";
-    pub const COLORS_ALWAYS: &str = "always";
-    pub const COLORS_NEVER: &str = "never";
-    pub const SHOW_COUNT: &str = "count";
-    pub const HIDDEN: &str = "hidden";
-    pub const LINE_NUMBER: &str = "line-number";
-    pub const MENU: &str = "menu";
-    pub const FILES: &str = "files";
-    pub const MAX_DEPTH: &str = "max-depth";
-    pub const SEARCHER: &str = "searcher";
-    pub const LINKS: &str = "links";
-    pub const TRIM_LEFT: &str = "trim";
-    pub const PCRE2: &str = "pcre2";
-    pub const THREADS: &str = "threads";
-    pub const NO_IGNORE: &str = "no-ignore";
-    pub const MAX_LENGTH: &str = "max-length";
+// excluding directories explicitly --exclude=path which accepts multiple
+// then check if it hard to pass to rg though, so we should implement
+// same frontend as rg
+// `export FZF_DEFAULT_COMMAND="rg --files --hidden --follow --glob '!.git'"`
+// could just do the exclude thing and then do --glob '!{path given}'
+pub struct ArgInfo {
+    pub id: &'static str,
+    pub h: &'static str,
+    pub s: Option<char>,
 }
+
+impl ArgInfo {
+    const fn new(id: &'static str, h: &'static str, s: Option<char>) -> Self {
+        ArgInfo { id, h, s }
+    }
+}
+
+macro_rules! arg_info {
+    ($var_name:ident, $name:expr, $description:expr) => {
+        pub const $var_name: ArgInfo = ArgInfo::new($name, $description, None);
+    };
+    ($var_name:ident, $name:expr, $description:expr, $short:expr) => {
+        pub const $var_name: ArgInfo = ArgInfo::new($name, $description, Some($short));
+    };
+}
+
+arg_info!(
+    TREE,
+    "tree",
+    "display the files that would be search in tree format",
+    'l'
+);
+pub const TARGET_HELP: &str =
+    "specify the search target. If none provided, search the current directory.";
+arg_info!(TARGET_POSITIONAL, "positional target", TARGET_HELP);
+arg_info!(TARGET, "target", TARGET_HELP, 't');
+pub const EXPR_HELP: &str = "specify the regex expression";
+pub const EXPRESSION_GROUP_ID: &str = "expressions";
+arg_info!(EXPRESSION_POSITIONAL, "positional regexp", EXPR_HELP);
+arg_info!(EXPRESSION, "regexp", EXPR_HELP, 'e');
+pub const COLORS_ALWAYS: &str = "always";
+pub const COLORS_NEVER: &str = "never";
+arg_info!(COLORS, "color", "set whether to color output");
+arg_info!(
+    SHOW_COUNT,
+    "count",
+    "display number of files matched in directory and number of lines matched in a file if present",
+    'c'
+);
+arg_info!(HIDDEN, "hidden", "search hidden files", '.');
+arg_info!(
+    LINE_NUMBER,
+    "line-number",
+    "show line number of match if present",
+    'n'
+);
+arg_info!(MENU, "menu", MENU_HELP, 'm');
+arg_info!(FILES, "files", "show the paths that have matches", 'f');
+arg_info!(MAX_DEPTH, "max-depth", "the max depth to search");
+arg_info!(SEARCHER, "searcher", "executable to do the searching", 's');
+arg_info!(LINKS, "links", "show linked paths for symbolic links");
+arg_info!(
+    TRIM_LEFT,
+    "trim",
+    "trim whitespace at the beginning of lines"
+);
+arg_info!(PCRE2, "pcre2", "enable PCRE2 if the searcher supports it");
+arg_info!(
+    THREADS,
+    "threads",
+    "set the appropriate number of threads to use"
+);
+arg_info!(NO_IGNORE, "no-ignore", "don't use ignore files");
+arg_info!(
+    MAX_LENGTH,
+    "max-length",
+    "set the max length for a matched line"
+);
 
 const HELP: &str = "{name} {version}
 by {author}
@@ -56,130 +104,154 @@ by {author}
 
 const MENU_HELP: &str = "open results in a menu to be edited with $EDITOR
 navigate through the menu using the following commands:
-- move up/down: k/j, p/n, up arrow/down arrow
-- move up/down with a bigger jump: K/J, P/N
-- move up/down paths: {/}, [/]
-- move to the start/end: g/G, </>, home/end
-- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown";
+\t- move up/down: k/j, p/n, up arrow/down arrow
+\t- move up/down with a bigger jump: K/J, P/N
+\t- move up/down paths: {/}, [/]
+\t- move to the start/end: g/G, </>, home/end
+\t- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown";
 
 pub fn generate_command() -> Command {
     let mut command = Command::new(crate_name!())
+        .help_template(HELP.to_owned())
         .author(crate_authors!(", "))
         .about(crate_description!())
-        .help_template(HELP.to_owned())
         .version(crate_version!());
 
+    if std::env::args().any(|arg| {
+        arg == format!("--{}", TREE.id)
+            || (arg.starts_with('-')
+                && arg.chars().nth(1) != Some('-')
+                && arg.chars().skip(1).any(|c| c == TREE.s.unwrap()))
+    }) {
+        command = command.allow_missing_positional(true);
+    }
+
     command = add_expressions(command);
-    command = add_paths(command);
+    command = add_targets(command);
+
+    let arg = Arg::new(TREE.id)
+        .long(TREE.id)
+        .help("display the files that would be search in tree format")
+        .action(ArgAction::SetTrue)
+        .conflicts_with(EXPRESSION_GROUP_ID)
+        .short('l');
+    command = command.arg(arg);
+
     for opt in get_args() {
         command = command.arg(opt);
     }
     return command;
 }
 
-fn create_bool_arg(
-    long: &'static str,
-    short: Option<char>,
-    help: &'static str,
-    long_help: Option<&'static str>,
-) -> Arg {
-    let mut arg = Arg::new(long)
-        .long(long)
-        .help(help)
+fn bool_arg(info: ArgInfo, requires_expr: bool) -> Arg {
+    let mut arg = Arg::new(info.id)
+        .long(info.id)
+        .help(info.h)
         .action(ArgAction::SetTrue);
 
-    if let Some(s) = short {
+    if let Some(s) = info.s {
         arg = arg.short(s);
     }
 
-    if let Some(lh) = long_help {
-        arg = arg.long_help(lh);
+    if requires_expr {
+        arg = arg.requires(EXPRESSION_GROUP_ID);
+    }
+
+    arg
+}
+
+fn set_arg(info: &ArgInfo, requires_expr: bool) -> Arg {
+    let mut arg = Arg::new(info.id)
+        .long(info.id)
+        .help(info.h)
+        .action(ArgAction::Set);
+    if requires_expr {
+        arg = arg.requires(EXPRESSION_GROUP_ID);
     }
     arg
 }
 
-fn create_set_arg(long: &'static str, help: &'static str) -> Arg {
-    Arg::new(long).long(long).help(help).action(ArgAction::Set)
-}
-
 fn get_args() -> Vec<Arg> {
-    let color = Arg::new(arg_strs::COLORS)
-        .long(arg_strs::COLORS)
-        .help("set whether to color output")
+    let color = Arg::new(COLORS.id)
+        .long(COLORS.id)
+        .help(COLORS.h)
         .value_parser([
-            PossibleValue::new(arg_strs::COLORS_ALWAYS),
-            PossibleValue::new(arg_strs::COLORS_NEVER),
+            PossibleValue::new(COLORS_ALWAYS),
+            PossibleValue::new(COLORS_NEVER),
         ]);
-    let searcher = Arg::new(arg_strs::SEARCHER)
-        .long(arg_strs::SEARCHER)
-        .short('s')
+    let searcher = Arg::new(SEARCHER.id)
+        .long(SEARCHER.id)
+        .short(SEARCHER.s.unwrap())
         .help(format!(
-            "executable to do the searching, currently supports rg and {}",
+            "executable to do the searching, currently supports {} and {}",
+            names::RIPGREP_BIN,
             names::TREEGREP_BIN
         ))
+        .conflicts_with(TREE.id)
         .action(ArgAction::Set);
 
-    vec![
-        create_bool_arg(arg_strs::SHOW_COUNT, Some('c'), "display number of files matched in directory and number of lines matched in a file if present", None),
-        create_bool_arg(arg_strs::HIDDEN, Some('.'), "search hidden files", None),
-        create_bool_arg(arg_strs::LINE_NUMBER, Some('n'), "show line number of match if present", None),
-        create_bool_arg(arg_strs::MENU, Some('m'), MENU_HELP, None),
-        create_bool_arg(arg_strs::FILES, Some('f'), "show the paths that have matches", None),
-        create_bool_arg(arg_strs::LINKS, None, "show linked paths for symbolic links", None),
-        create_bool_arg(arg_strs::TRIM_LEFT, None, "trim whitespace at the beginning of lines", None),
-        create_bool_arg(arg_strs::PCRE2, None, "enable PCRE2 if the searcher supports it", None),
-        create_bool_arg(arg_strs::NO_IGNORE, None, "don't use ignore files", None),
-        create_set_arg(arg_strs::MAX_DEPTH, "the max depth to search"),
-        create_set_arg(arg_strs::THREADS, "set the appropriate number of threads to use"),
-        create_set_arg(arg_strs::MAX_LENGTH, "set the max length for a matched line"),
+    [
+        bool_arg(SHOW_COUNT, true),
+        bool_arg(HIDDEN, false),
+        bool_arg(LINE_NUMBER, false),
+        bool_arg(MENU, false),
+        bool_arg(FILES, true),
+        bool_arg(LINKS, false),
+        bool_arg(TRIM_LEFT, true),
+        bool_arg(PCRE2, true),
+        bool_arg(NO_IGNORE, false),
+        set_arg(&MAX_DEPTH, false),
+        set_arg(&THREADS, false),
+        set_arg(&MAX_LENGTH, true),
         color,
-        searcher
+        searcher,
     ]
+    .to_vec()
 }
 
 fn add_expressions(command: Command) -> Command {
-    let help = "specify the regex expression";
     command
         .arg(
-            Arg::new(arg_strs::EXPRESSION_POSITIONAL)
-                .help(help)
+            Arg::new(EXPRESSION_POSITIONAL.id)
+                .help(EXPRESSION_POSITIONAL.h)
+                .required_unless_present_any([TREE.id, EXPRESSION.id])
                 .index(1),
         )
         .arg(
-            Arg::new(arg_strs::EXPRESSION)
-                .short('e')
-                .long("regexp")
-                .help(help)
+            Arg::new(EXPRESSION.id)
+                .long(EXPRESSION.id)
+                .short(EXPRESSION.s.unwrap())
+                .help(EXPRESSION.h)
+                .required_unless_present_any([TREE.id, EXPRESSION_POSITIONAL.id])
                 .action(ArgAction::Append),
         )
         .group(
-            ArgGroup::new("expression_group")
-                .id("expressions")
-                .args([arg_strs::EXPRESSION_POSITIONAL, arg_strs::EXPRESSION])
-                .multiple(true)
-                .required(true),
+            ArgGroup::new(EXPRESSION_GROUP_ID)
+                .id(EXPRESSION_GROUP_ID)
+                .args([EXPRESSION_POSITIONAL.id, EXPRESSION.id])
+                .multiple(true),
         )
 }
 
-fn add_paths(command: Command) -> Command {
-    let help = "specify the search target. If none provided, search the current directory.";
+fn add_targets(command: Command) -> Command {
     command
         .arg(
-            Arg::new(arg_strs::TARGET_POSITIONAL)
-                .help(help)
+            Arg::new(TARGET_POSITIONAL.id)
+                .help(TARGET_POSITIONAL.h)
                 .value_hint(ValueHint::AnyPath)
                 .index(2),
         )
         .arg(
-            Arg::new(arg_strs::TARGET)
-                .short('t')
-                .long(arg_strs::TARGET)
-                .help(help)
+            Arg::new(TARGET.id)
+                .long(TARGET.id)
+                .short(TARGET.s.unwrap())
+                .help(TARGET.h)
                 .value_hint(ValueHint::AnyPath),
         )
         .group(
             ArgGroup::new("target_group")
                 .id("targets")
-                .args([arg_strs::TARGET_POSITIONAL, arg_strs::TARGET]),
+                .args([TARGET_POSITIONAL.id, TARGET.id])
+                .multiple(false),
         )
 }

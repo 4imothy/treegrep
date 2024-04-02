@@ -24,11 +24,7 @@ use std::process::Command;
 use writer::write_results;
 
 // TODO add notarizing mac to exec can be used without needing to open from finder
-// TODO do the --files to stop searching a file when a match is found or use the
-// --files-with-matches flag for ripgrep
 // TODO nvim plugin put it in the plugin folder and run cargo build --release and get the dir
-// TODO make the stdin, piping work with collecting the paths to search and then require the
-// pattern
 
 fn main() {
     let matches = Config::get_matches();
@@ -44,10 +40,10 @@ fn run(matches: ArgMatches, colors: bool) -> Result<(), Message> {
 
     let matches: Option<Matches>;
     let mut out: StdoutLock = stdout().lock();
-    if let Some(s) = searcher_path {
-        matches = get_matches_from_cmd(s, &config)?;
-    } else {
+    if config.tree || searcher_path.is_none() {
         matches = matcher::search(&config)?;
+    } else {
+        matches = get_matches_from_cmd(searcher_path.unwrap(), &config)?;
     }
 
     if matches.is_none() {
@@ -80,7 +76,7 @@ fn get_matches_from_cmd(
 
     if !output.status.success() && output.stderr.len() > 0 {
         return Err(bail!(
-            "{} had errors, {}",
+            "{} had errors:\n{}",
             cmd.get_program().to_string_lossy().to_string(),
             String::from_utf8_lossy(&output.stderr).to_string()
         ));

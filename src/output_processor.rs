@@ -18,12 +18,10 @@ pub fn process_results(results: Vec<u8>, config: &Config) -> Result<Option<Match
     let lines = results
         .split(|&byte| byte == formats::NEW_LINE as u8)
         .collect();
-    match config.exec {
+    match config.searcher {
         Searchers::RipGrep => process_json_lines(lines, config),
         Searchers::TreeGrep => {
-            return Err(bail!(
-                "tried to use external command when using the treegrep searcher {SUBMIT_ISSUE}"
-            ))
+            panic!("tried to use external command when using the treegrep searcher {SUBMIT_ISSUE}")
         }
     }
 }
@@ -142,6 +140,9 @@ pub fn process_json_lines(lines: Vec<&[u8]>, config: &Config) -> Result<Option<M
                 cur_file = Some(dirs.get_mut(d_id).unwrap().files.get_mut(f_id).unwrap());
             }
             "match" => {
+                if config.just_files {
+                    continue;
+                }
                 let mut matches = Vec::new();
                 for m in res["data"]["submatches"].as_array().unwrap() {
                     matches.push(Match::new(
@@ -168,6 +169,9 @@ pub fn process_json_lines(lines: Vec<&[u8]>, config: &Config) -> Result<Option<M
     if config.is_dir {
         Ok(wrap_dirs(dirs))
     } else {
-        Ok(wrap_file(dirs.get_mut(d_id).unwrap().files.pop()))
+        Ok(wrap_file(
+            dirs.get_mut(d_id).unwrap().files.pop(),
+            config.tree,
+        ))
     }
 }

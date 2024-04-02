@@ -22,11 +22,10 @@ pub fn search(config: &Config) -> Result<Option<Matches>, Message> {
     if config.is_dir {
         Ok(wrap_dirs(search_dir(&patterns, config)?))
     } else {
-        Ok(wrap_file(Some(search_file(
-            &config.path,
-            &patterns,
-            config,
-        )?)))
+        Ok(wrap_file(
+            Some(search_file(&config.path, &patterns, config)?),
+            config.tree,
+        ))
     }
 }
 
@@ -55,7 +54,7 @@ fn search_dir(patterns: &Vec<Regex>, config: &Config) -> Result<Vec<Directory>, 
                     }
                 } else if path.is_file() {
                     let file = search_file(&path, &patterns, config)?;
-                    if file.lines.len() > 0 {
+                    if file.lines.len() > 0 || config.tree {
                         if let Some(mut dir_path) = file.path.parent().map(|v| v.to_path_buf()) {
                             let mut prev_id: usize =
                                 *path_to_index.get(dir_path.as_os_str()).unwrap();
@@ -85,9 +84,11 @@ fn search_dir(patterns: &Vec<Regex>, config: &Config) -> Result<Vec<Directory>, 
 }
 
 fn search_file(pb: &PathBuf, patterns: &Vec<Regex>, config: &Config) -> Result<File, Message> {
-    let m_content_bytes: Option<Vec<u8>> = fs::read(pb).ok();
-
     let mut file = File::new(pb, config)?;
+    if config.tree {
+        return Ok(file);
+    }
+    let m_content_bytes: Option<Vec<u8>> = fs::read(pb).ok();
 
     let content_bytes: Vec<u8>;
     match m_content_bytes {
@@ -127,6 +128,9 @@ impl File {
             if was_match {
                 self.lines
                     .push(Line::style_line(line, matches, line_num + 1, config));
+                if config.just_files {
+                    return;
+                }
             }
         }
     }
