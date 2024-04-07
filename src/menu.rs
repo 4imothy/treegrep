@@ -176,6 +176,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                         menu.up(menu.small_jump)?
                     }
                     KeyCode::Char('J') | KeyCode::Char('N') => menu.down(menu.big_jump)?,
+                    KeyCode::Char('K') | KeyCode::Char('P') => menu.up(menu.big_jump)?,
                     KeyCode::Char('}') | KeyCode::Char(']') => menu.down_path()?,
                     KeyCode::Char('{') | KeyCode::Char('[') => menu.up_path()?,
                     KeyCode::Char('z') => {
