@@ -101,13 +101,6 @@ fn file() {
     check_results(tar_path, rg_results, tg_results);
 }
 
-#[cfg(windows)]
-const PLATFORM_SUFFIX: &str = "windows";
-#[cfg(target_os = "macos")]
-const PLATFORM_SUFFIX: &str = "macos";
-#[cfg(target_os = "linux")]
-const PLATFORM_SUFFIX: &str = "linux";
-
 #[test]
 fn links() {
     let tar_dir: PathBuf = target_dir();
@@ -124,20 +117,30 @@ fn links() {
     );
     dir.link_dir(&linked_dir, "link_to_dir");
 
-    let tar_path = tar_dir.join(format!("links_{}", PLATFORM_SUFFIX));
+    let tar_11 = tar_dir.join(format!("links_11"));
+    let tar_12 = tar_dir.join(format!("links_12"));
+    let tar_21 = tar_dir.join(format!("links_21"));
+    let tar_22 = tar_dir.join(format!("links_22"));
     let (_, results) = get_outputs(&dir.path, ".", Some("--links"));
 
-    if OVERWRITE {
-        let mut file = fs::File::create(tar_path).unwrap();
-        file.write_all(&results).unwrap();
-    } else {
-        let contents = get_target_contents(tar_path);
+    let contents_11 = get_target_contents(tar_11);
+    let contents_12 = get_target_contents(tar_12);
+    let contents_21 = get_target_contents(tar_21);
+    let contents_22 = get_target_contents(tar_22);
 
-        println!("file contents");
-        println!("{}", String::from_utf8_lossy(&contents));
-        println!("tg output");
-        println!("{}", String::from_utf8_lossy(&results));
+    println!("possible matches");
+    println!("links first");
+    println!("{}", String::from_utf8_lossy(&contents_11));
+    println!("dir link first file link second");
+    println!("{}", String::from_utf8_lossy(&contents_12));
+    println!("dir link second file link first");
+    println!("{}", String::from_utf8_lossy(&contents_21));
+    println!("links second");
+    println!("{}", String::from_utf8_lossy(&contents_22));
+    println!("tgrep output");
+    println!("{}", String::from_utf8_lossy(&results));
 
-        assert_eq!(contents, results);
-    }
+    assert!(vec![contents_11, contents_12, contents_21, contents_22]
+        .iter()
+        .any(|c| c == &results));
 }
