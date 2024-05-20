@@ -9,10 +9,12 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 pub struct Config {
+    pub cwd: PathBuf,
     pub path: PathBuf,
     pub tree: bool,
     pub is_dir: bool,
     pub patterns: Vec<String>,
+    pub globs: Vec<String>,
     pub searcher: Searchers,
     pub colors: bool,
     pub count: bool,
@@ -27,6 +29,15 @@ pub struct Config {
     pub threads: Option<usize>,
     pub max_length: Option<usize>,
     pub trim: bool,
+}
+
+pub fn canonicalize(p: PathBuf) -> Result<PathBuf, Message> {
+    dunce::canonicalize(&p).map_err(|_| {
+        bail!(
+            "failed to canonicalize path `{}`",
+            p.to_string_lossy().to_owned()
+        )
+    })
 }
 
 fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, Message> {
@@ -46,11 +57,8 @@ impl Config {
         generate_command().get_matches()
     }
 
-    pub fn get_colors(matches: &ArgMatches) -> bool {
-        matches
-            .get_one::<String>(args::COLORS.id)
-            .map(|s| s == args::COLORS_ALWAYS)
-            .unwrap_or(true)
+    pub fn use_color(matches: &ArgMatches) -> bool {
+        !matches.get_flag(args::NO_COLORS.id)
     }
 
     pub fn get_config(
@@ -66,6 +74,11 @@ impl Config {
                 patterns.push(expr.to_owned());
             }
         }
+
+        let globs: Vec<String> = matches
+            .get_many::<String>(args::GLOB.id)
+            .map(|exprs| exprs.map(String::to_owned).collect())
+            .unwrap_or_else(Vec::new);
 
         let tree: bool = matches.get_flag(args::TREE.id);
         let count: bool = matches.get_flag(args::SHOW_COUNT.id);
@@ -102,7 +115,12 @@ impl Config {
             .or_else(|| matches.get_one::<String>(args::TARGET.id))
             .map(|value| value.to_string());
 
-        let p = if let Some(target) = target {
+        let cwd = canonicalize(
+            std::env::current_dir()
+                .map_err(|_| bail!("failed to get current working directory"))?,
+        )?;
+
+        let path = if let Some(target) = target {
             let path = PathBuf::from(target);
             if !path.exists() {
                 return Err(bail!(
@@ -110,22 +128,16 @@ impl Config {
                     path.to_string_lossy().to_string()
                 ));
             }
-            path
+            canonicalize(path)?
         } else {
-            std::env::current_dir().map_err(|_| bail!("failed to get current working directory"))?
+            cwd.clone()
         };
-
-        let path = dunce::canonicalize(&p).map_err(|_| {
-            bail!(
-                "failed to canonicalize path `{}`",
-                p.to_string_lossy().to_owned()
-            )
-        })?;
 
         let is_dir = path.is_dir();
 
         Ok((
             Config {
+                cwd,
                 path,
                 tree,
                 is_dir,
@@ -142,6 +154,7 @@ impl Config {
                 max_depth,
                 threads,
                 trim,
+                globs,
                 ignore,
                 max_length,
             },
@@ -171,7 +184,6 @@ mod tests {
                 "--count",
                 "--links",
                 "--trim",
-                "--color=always",
                 "--menu",
                 "--files",
                 "--searcher=rg",
@@ -234,7 +246,6 @@ mod tests {
                 "--no-ignore",
                 "--hidden",
                 "--links",
-                "--color=always",
                 "--menu",
             ]),
             true,

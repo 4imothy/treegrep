@@ -23,12 +23,20 @@ use std::io::{stdout, StdoutLock};
 use std::process::Command;
 use writer::write_results;
 
-// TODO add notarizing mac to exec can be used without needing to open from finder
-// TODO nvim plugin put it in the plugin folder and run cargo build --release and get the dir
+// TODO TREEGREP_DEFAULT_FLAGS env var for things by default, can use clap matches from function
+// TODO option --curved for non-sharp tree characters, or an option which is assigned curved, none (just indent), straight (tmux uses single to mean this)
+// TODO on pressing h show a help message
+// TODO add notarizing mac so exec can be used without needing to open from finder
+// TODO support for searching PDFS maybe
+// TODO nvim plugin to open a popup window, select a match to open in $EDITOR
+// TODO tmux plugin to open a popup window, select a match to open in $EDITOR
+// TODO zellij plugin to open a popup window, select a match to open in $EDITOR
+
+// FIX in tmux treegrep doesn't change the name of the process, #W in the name
 
 fn main() {
     let matches = Config::get_matches();
-    let colors = Config::get_colors(&matches);
+    let colors = Config::use_color(&matches);
     run(matches, colors).unwrap_or_else(|e| {
         eprintln!("{} {}", formats::error_prefix(colors), e);
         std::process::exit(1);
@@ -39,7 +47,6 @@ fn run(matches: ArgMatches, colors: bool) -> Result<(), Message> {
     let (config, searcher_path) = Config::get_config(matches, colors)?;
 
     let matches: Option<Matches>;
-    let mut out: StdoutLock = stdout().lock();
     if config.tree || searcher_path.is_none() {
         matches = matcher::search(&config)?;
     } else {
@@ -50,6 +57,7 @@ fn run(matches: ArgMatches, colors: bool) -> Result<(), Message> {
         return Ok(());
     }
 
+    let mut out: StdoutLock = stdout().lock();
     if config.menu {
         Menu::enter(&mut out, matches.unwrap(), &config).map_err(|e| bail!("{}", e.to_string()))?;
     } else {

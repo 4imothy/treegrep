@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
-// TODO on pressing h show a help message
 use crate::config::Config;
 use crate::formats;
 use crate::match_system::{Directory, File, Matches};

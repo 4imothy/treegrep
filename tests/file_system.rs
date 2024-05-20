@@ -20,18 +20,18 @@ impl Dir {
         Dir { path }
     }
 
-    pub fn add_child(&self, name: &str) {
+    pub fn add_child(&self, name: &PathBuf) {
         let p = self.path.join(name);
         if !p.exists() {
             fs::create_dir(p).ok().unwrap();
         }
     }
 
-    pub fn create_file_str(&self, file_name: &str, content: &str) {
+    pub fn create_file_str(&self, file_name: &PathBuf, content: &str) {
         self.create_file_bytes(file_name, content.as_bytes());
     }
 
-    pub fn create_file_bytes(&self, file_name: &str, content: &[u8]) {
+    pub fn create_file_bytes(&self, file_name: &PathBuf, content: &[u8]) {
         let file_path = self.path.join(file_name);
         let mut file = fs::File::create(&file_path).expect("Failed to create file");
 

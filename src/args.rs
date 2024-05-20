@@ -13,12 +13,6 @@ pub mod names {
     pub const RIPGREP_BIN: &str = "rg";
 }
 
-// TODO Options to Support
-// excluding directories explicitly --exclude=path which accepts multiple
-// then check if it hard to pass to rg though, so we should implement
-// same frontend as rg
-// `export FZF_DEFAULT_COMMAND="rg --files --hidden --follow --glob '!.git'"`
-// could just do the exclude thing and then do --glob '!{path given}'
 pub struct ArgInfo {
     pub id: &'static str,
     pub h: &'static str,
@@ -54,9 +48,7 @@ pub const EXPR_HELP: &str = "specify the regex expression";
 pub const EXPRESSION_GROUP_ID: &str = "expressions";
 arg_info!(EXPRESSION_POSITIONAL, "positional regexp", EXPR_HELP);
 arg_info!(EXPRESSION, "regexp", EXPR_HELP, 'e');
-pub const COLORS_ALWAYS: &str = "always";
-pub const COLORS_NEVER: &str = "never";
-arg_info!(COLORS, "color", "set whether to color output");
+arg_info!(NO_COLORS, "no-color", "don't use colors if present");
 arg_info!(
     SHOW_COUNT,
     "count",
@@ -92,6 +84,11 @@ arg_info!(
     "max-length",
     "set the max length for a matched line"
 );
+arg_info!(
+    GLOB,
+    "glob",
+    "rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic"
+);
 
 const HELP: &str = "{name} {version}
 by {author}
@@ -117,30 +114,26 @@ pub fn generate_command() -> Command {
         .about(crate_description!())
         .version(crate_version!());
 
-    if std::env::args().any(|arg| {
-        arg == format!("--{}", TREE.id)
-            || (arg.starts_with('-')
-                && arg.chars().nth(1) != Some('-')
-                && arg.chars().skip(1).any(|c| c == TREE.s.unwrap()))
-    }) {
+    if tree_arg_present() {
         command = command.allow_missing_positional(true);
     }
 
     command = add_expressions(command);
     command = add_targets(command);
 
-    let arg = Arg::new(TREE.id)
-        .long(TREE.id)
-        .help("display the files that would be search in tree format")
-        .action(ArgAction::SetTrue)
-        .conflicts_with(EXPRESSION_GROUP_ID)
-        .short('l');
-    command = command.arg(arg);
-
     for opt in get_args() {
         command = command.arg(opt);
     }
     return command;
+}
+
+fn tree_arg_present() -> bool {
+    std::env::args().any(|arg| {
+        arg == format!("--{}", TREE.id)
+            || (arg.starts_with('-')
+                && arg.chars().nth(1) != Some('-')
+                && arg.chars().skip(1).any(|c| c == TREE.s.unwrap()))
+    })
 }
 
 fn bool_arg(info: ArgInfo, requires_expr: bool) -> Arg {
@@ -160,10 +153,11 @@ fn bool_arg(info: ArgInfo, requires_expr: bool) -> Arg {
     arg
 }
 
-fn set_arg(info: &ArgInfo, requires_expr: bool) -> Arg {
+fn usize_arg(info: &ArgInfo, requires_expr: bool) -> Arg {
     let mut arg = Arg::new(info.id)
         .long(info.id)
         .help(info.h)
+        .value_name("")
         .action(ArgAction::Set);
     if requires_expr {
         arg = arg.requires(EXPRESSION_GROUP_ID);
@@ -172,21 +166,30 @@ fn set_arg(info: &ArgInfo, requires_expr: bool) -> Arg {
 }
 
 fn get_args() -> Vec<Arg> {
-    let color = Arg::new(COLORS.id)
-        .long(COLORS.id)
-        .help(COLORS.h)
-        .value_parser([
-            PossibleValue::new(COLORS_ALWAYS),
-            PossibleValue::new(COLORS_NEVER),
-        ]);
+    let tree = Arg::new(TREE.id)
+        .long(TREE.id)
+        .help("display the files that would be search in tree format")
+        .action(ArgAction::SetTrue)
+        .conflicts_with(EXPRESSION_GROUP_ID)
+        .short('l');
+
+    let glob = Arg::new(GLOB.id)
+        .long(GLOB.id)
+        .help(GLOB.h)
+        .value_name("")
+        .action(ArgAction::Append);
+
     let searcher = Arg::new(SEARCHER.id)
         .long(SEARCHER.id)
         .short(SEARCHER.s.unwrap())
-        .help(format!(
-            "executable to do the searching, currently supports {} and {}",
-            names::RIPGREP_BIN,
-            names::TREEGREP_BIN
-        ))
+        .help(format!("executable to do the searching"))
+        .value_parser([
+            PossibleValue::new(names::RIPGREP_BIN).hide(false),
+            PossibleValue::new(names::TREEGREP_BIN).hide(false),
+            PossibleValue::new(names::RIPGREP).hide(true),
+            PossibleValue::new(names::TREEGREP).hide(true),
+        ])
+        .value_name("")
         .conflicts_with(TREE.id)
         .action(ArgAction::Set);
 
@@ -200,11 +203,13 @@ fn get_args() -> Vec<Arg> {
         bool_arg(TRIM_LEFT, true),
         bool_arg(PCRE2, true),
         bool_arg(NO_IGNORE, false),
-        set_arg(&MAX_DEPTH, false),
-        set_arg(&THREADS, false),
-        set_arg(&MAX_LENGTH, true),
-        color,
+        bool_arg(NO_COLORS, false),
+        usize_arg(&MAX_DEPTH, false),
+        usize_arg(&THREADS, false),
+        usize_arg(&MAX_LENGTH, true),
         searcher,
+        tree,
+        glob,
     ]
     .to_vec()
 }
@@ -222,6 +227,7 @@ fn add_expressions(command: Command) -> Command {
                 .long(EXPRESSION.id)
                 .short(EXPRESSION.s.unwrap())
                 .help(EXPRESSION.h)
+                .value_name("")
                 .required_unless_present_any([TREE.id, EXPRESSION_POSITIONAL.id])
                 .action(ArgAction::Append),
         )
@@ -246,6 +252,7 @@ fn add_targets(command: Command) -> Command {
                 .long(TARGET.id)
                 .short(TARGET.s.unwrap())
                 .help(TARGET.h)
+                .value_name("")
                 .value_hint(ValueHint::AnyPath),
         )
         .group(

@@ -1,0 +1,4 @@
+glob_inclusion
+└──included
+   └──one_file
+      └──should show

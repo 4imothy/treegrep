@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
+use core::panic;
 use std::env;
 use std::fs;
 use std::io::Write;
@@ -10,6 +11,9 @@ pub const OVERWRITE: bool = false;
 
 pub fn normalize_newlines(contents: &mut Vec<u8>) {
     let mut i = 0;
+    if contents.len() == 0 {
+        panic!("empty output can't be normalized");
+    }
     while i < contents.len() - 1 {
         if contents[i] == b'\r' && contents[i + 1] == b'\n' {
             contents[i] = b'\n';
@@ -58,40 +62,43 @@ pub fn get_outputs(path: &Path, expr: &str, extra_option: Option<&str>) -> (Vec<
         .unwrap()
         .join(format!("tgrep{}", env::consts::EXE_SUFFIX));
 
-    let mut rg_cmd;
-    let mut tg_cmd;
+    let mut tg_on_rg: Command;
+    let mut tg: Command;
     match cross_runner() {
         None => {
-            rg_cmd = Command::new(&cmd_path);
-            tg_cmd = Command::new(&cmd_path);
+            tg_on_rg = Command::new(&cmd_path);
+            tg = Command::new(&cmd_path);
         }
         Some(runner) => {
-            rg_cmd = Command::new(&runner);
-            rg_cmd.arg(&cmd_path);
-            tg_cmd = Command::new(&runner);
-            tg_cmd.arg(&cmd_path);
+            tg_on_rg = Command::new(&runner);
+            tg_on_rg.arg(&cmd_path);
+            tg = Command::new(&runner);
+            tg.arg(&cmd_path);
         }
     }
-    tg_cmd.arg("--color=never");
-    rg_cmd.arg("--color=never");
+
+    tg.arg("--no-color");
+    tg_on_rg.arg("--no-color");
     if let Some(o) = extra_option {
-        rg_cmd.arg(o);
-        tg_cmd.arg(o);
+        tg_on_rg.arg(o);
+        tg.arg(o);
     }
-    rg_cmd.arg(expr);
-    tg_cmd.arg(expr);
+    tg_on_rg.arg(expr);
+    tg.arg(expr);
 
-    rg_cmd.arg(path);
-    tg_cmd.arg(path);
+    tg_on_rg.arg(path);
+    tg.arg(path);
 
-    rg_cmd.arg("--searcher=rg");
-    tg_cmd.arg("--searcher=tgrep");
-    let rg_out = rg_cmd.output().ok().unwrap();
+    tg_on_rg.arg("--searcher=rg");
+
+    tg.arg("--searcher=tgrep");
+    let rg_out = tg_on_rg.output().ok().unwrap();
+
     if !rg_out.status.success() && rg_out.stderr.len() > 0 {
         panic!("cmd failed {}", String::from_utf8_lossy(&rg_out.stderr));
     }
 
-    let tg_out = tg_cmd.output().ok().unwrap();
+    let tg_out = tg.output().ok().unwrap();
     if !tg_out.status.success() && rg_out.stderr.len() > 0 {
         panic!("cmd failed {}", String::from_utf8_lossy(&rg_out.stderr));
     }
