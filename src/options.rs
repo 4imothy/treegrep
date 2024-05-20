@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: CC-BY-4.0
+
 use crate::config::Config;
 use crate::errors::Message;
+use std::path::Path;
 use std::process::Command;
 
 pub trait Options {
+    fn json(cmd: &mut Command);
     fn colors(cmd: &mut Command, want: bool) -> Result<(), Message>;
     fn line_num(cmd: &mut Command, want: bool) -> Result<(), Message>;
     fn pcre2(cmd: &mut Command, want: bool) -> Result<(), Message>;
@@ -12,9 +16,15 @@ pub trait Options {
     fn ignore(cmd: &mut Command, want: bool) -> Result<(), Message>;
     fn max_depth(cmd: &mut Command, md: Option<usize>) -> Result<(), Message>;
     fn threads(cmd: &mut Command, threads: Option<usize>) -> Result<(), Message>;
-    fn add_args(cmd: &mut Command, config: &Config) -> Result<(), Message>;
+    fn patterns(cmd: &mut Command, patterns: &Vec<String>);
+    fn path(cmd: &mut Command, path: &Path);
+    fn globs(cmd: &mut Command, globs: &Vec<String>);
 
     fn add_options(cmd: &mut Command, config: &Config) -> Result<(), Message> {
+        Self::json(cmd);
+        Self::patterns(cmd, &config.patterns);
+        Self::path(cmd, &config.path);
+        Self::globs(cmd, &config.globs);
         Self::colors(cmd, config.colors)?;
         Self::line_num(cmd, config.line_number)?;
         Self::pcre2(cmd, config.pcre2)?;
@@ -31,15 +41,24 @@ pub trait Options {
 pub struct Rg;
 
 impl Options for Rg {
-    fn add_args(cmd: &mut Command, config: &Config) -> Result<(), Message> {
+    fn json(cmd: &mut Command) {
         cmd.arg("--json");
-        Rg::add_options(cmd, config)?;
+    }
 
-        for p in &config.patterns {
+    fn globs(cmd: &mut Command, globs: &Vec<String>) {
+        for g in globs {
+            cmd.arg(format!("--glob={}", g));
+        }
+    }
+
+    fn patterns(cmd: &mut Command, patterns: &Vec<String>) {
+        for p in patterns {
             cmd.arg(format!("--regexp={}", p));
         }
-        cmd.arg(&config.path);
-        Ok(())
+    }
+
+    fn path(cmd: &mut Command, path: &Path) {
+        cmd.arg(path);
     }
 
     fn files(_cmd: &mut Command, want: bool) -> Result<(), Message> {

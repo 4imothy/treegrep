@@ -118,7 +118,7 @@ impl Searchers {
         let mut cmd = Command::new(starter);
 
         match config.searcher {
-            Searchers::RipGrep => Rg::add_args(&mut cmd, config)?,
+            Searchers::RipGrep => Rg::add_options(&mut cmd, config)?,
             Searchers::TreeGrep => panic!(
                 "tried to use external command when using the treegrep searcher {SUBMIT_ISSUE}"
             ),
@@ -175,12 +175,14 @@ mod tests {
         let (config, _) = Config::get_config(
             generate_command().get_matches_from([
                 names::TREEGREP_BIN,
+                "--regexp=pattern1",
+                "--regexp=pattern2",
+                "--glob=globbing",
+                "--glob=glob2",
                 "--line-number",
                 "--max-depth=5",
                 "--pcre2",
                 "--no-ignore",
-                "--regexp=pattern1",
-                "--regexp=pattern2",
                 "--hidden",
                 "--threads=8",
                 "--count",
@@ -192,10 +194,15 @@ mod tests {
         .ok()
         .unwrap();
 
-        assert!(Rg::add_args(&mut cmd, &config).is_ok());
+        assert!(Rg::add_options(&mut cmd, &config).is_ok());
 
         let expected_args = vec![
             "--json",
+            "--regexp=pattern1",
+            "--regexp=pattern2",
+            config.path.to_str().unwrap(),
+            "--glob=globbing",
+            "--glob=glob2",
             "--color=never",
             "--line-number",
             "--pcre2",
@@ -204,13 +211,11 @@ mod tests {
             "--threads=8",
             "--follow",
             "--no-ignore",
-            "--regexp=pattern1",
-            "--regexp=pattern2",
         ];
 
         assert_eq!(
             cmd.get_args()
-                .take(cmd.get_args().len() - 1)
+                .take(cmd.get_args().len())
                 .map(|s| s.to_str().unwrap())
                 .collect::<Vec<&str>>(),
             expected_args

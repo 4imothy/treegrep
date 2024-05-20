@@ -5,7 +5,7 @@ use crate::errors::{bail, Message};
 use crate::formats;
 use crate::match_system::{wrap_dirs, wrap_file, Directory, File, Line, Match, Matches};
 use bstr::ByteSlice;
-use ignore::WalkBuilder;
+use ignore::{overrides::OverrideBuilder, WalkBuilder};
 use regex::bytes::Regex;
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -30,6 +30,13 @@ pub fn search(config: &Config) -> Result<Option<Matches>, Message> {
 }
 
 fn search_dir(patterns: &Vec<Regex>, config: &Config) -> Result<Vec<Directory>, Message> {
+    let mut override_builder = OverrideBuilder::new(&config.cwd);
+    for glob in &config.globs {
+        override_builder.add(glob).map_err(|_| {
+            return bail!("glob {} is invalid", glob);
+        })?;
+    }
+
     let walker = WalkBuilder::new(&config.path)
         .hidden(!config.hidden)
         .max_depth(config.max_depth)
@@ -38,6 +45,12 @@ fn search_dir(patterns: &Vec<Regex>, config: &Config) -> Result<Vec<Directory>, 
         .git_global(config.ignore)
         .git_ignore(config.ignore)
         .git_exclude(config.ignore)
+        .require_git(false)
+        .overrides(
+            override_builder
+                .build()
+                .map_err(|_| return bail!("failed to build override builder with given globs"))?,
+        )
         .build();
 
     let mut path_to_index: HashMap<OsString, usize> = HashMap::new();
