@@ -4,8 +4,6 @@ on:
   push:
     paths:
       - '**.rs'
-    branches:
-      - main
 
 jobs:
   test:
