@@ -23,16 +23,16 @@ use std::io::{stdout, StdoutLock};
 use std::process::Command;
 use writer::write_results;
 
-// TODO TREEGREP_DEFAULT_FLAGS env var for things by default, can use clap matches from function
 // TODO option --curved for non-sharp tree characters, or an option which is assigned curved, none (just indent), straight (tmux uses single to mean this)
-// TODO on pressing h show a help message
+// TODO option to configure different colors
+// TODO on pressing h show a help message while in menu
 // TODO add notarizing mac so exec can be used without needing to open from finder
-// TODO support for searching PDFS maybe
+// TODO support for searching PDFs maybe
+// TODO --plugin option that starts the program with alternate screen which prompts the user for the flag
+// commands to enter
 // TODO nvim plugin to open a popup window, select a match to open in $EDITOR
 // TODO tmux plugin to open a popup window, select a match to open in $EDITOR
 // TODO zellij plugin to open a popup window, select a match to open in $EDITOR
-
-// FIX in tmux treegrep doesn't change the name of the process, #W in the name
 
 fn main() {
     let matches = Config::get_matches();

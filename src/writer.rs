@@ -91,7 +91,7 @@ impl File {
 
         for (i, line) in self.lines.iter().enumerate() {
             if i + 1 != len {
-                write!(out, "{}{}", prefix, BRANCH_HAS_NEXT,)?;
+                write!(out, "{}{}", prefix, BRANCH_HAS_NEXT)?;
             } else {
                 write!(out, "{}{}", prefix, BRANCH_END)?;
             }

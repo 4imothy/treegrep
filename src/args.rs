@@ -97,7 +97,7 @@ by {author}
 
 {usage}
 
-{all-args}";
+{all-args}{after-help}";
 
 const MENU_HELP: &str = "open results in a menu to be edited with $EDITOR
 navigate through the menu using the following commands:
@@ -107,9 +107,16 @@ navigate through the menu using the following commands:
 \t- move to the start/end: g/G, </>, home/end
 \t- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown";
 
+pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
+
 pub fn generate_command() -> Command {
     let mut command = Command::new(crate_name!())
         .help_template(HELP.to_owned())
+        .after_help(
+            "Any of the above can be set using the ".to_string()
+                + DEFAULT_OPTS_ENV_NAME
+                + " environment variable",
+        )
         .author(crate_authors!(", "))
         .about(crate_description!())
         .version(crate_version!());

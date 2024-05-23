@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
-// testing methed relies on paths being searched in the same order
-// which is not always the case so we
-// can't have a directory that has more than one file in it
+// testing methed relies on paths being searched in the same order which is not always the case so
+// we can't have a directory that has more than one file in it
 
 mod file_system;
 mod utils;

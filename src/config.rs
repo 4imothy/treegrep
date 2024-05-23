@@ -54,7 +54,19 @@ fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, M
 
 impl Config {
     pub fn get_matches() -> ArgMatches {
-        generate_command().get_matches()
+        let mut all_args: Vec<OsString> = std::env::var(args::DEFAULT_OPTS_ENV_NAME)
+            .ok()
+            .filter(|val| !val.is_empty())
+            .map(|val| val.split_whitespace().map(OsString::from).collect())
+            .unwrap_or_default();
+
+        let mut args_os = std::env::args_os();
+        if let Some(cmd) = args_os.next() {
+            all_args.insert(0, cmd);
+        }
+        all_args.extend(args_os);
+
+        generate_command().get_matches_from(all_args)
     }
 
     pub fn use_color(matches: &ArgMatches) -> bool {
@@ -168,32 +180,47 @@ mod tests {
     use super::*;
     use crate::args::names;
 
+    static EXAMPLE_LONG_OPTS: &[&str] = &[
+        "posexpr",
+        "--line-number",
+        "--max-depth=5",
+        "--max-length=20",
+        "--pcre2",
+        "--no-ignore",
+        "--hidden",
+        "--threads=8",
+        "--count",
+        "--links",
+        "--trim",
+        "--menu",
+        "--files",
+        "--searcher=rg",
+        "--regexp=pattern1",
+        "--regexp=pattern2",
+    ];
+
+    #[test]
+    fn test_default_opts() {
+        std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" "));
+        let (config, _) = Config::get_config(Config::get_matches(), true)
+            .ok()
+            .unwrap();
+        check_parsed_config_from_default_opts(config);
+    }
+
     #[test]
     fn test_longs() {
         let (config, _) = Config::get_config(
-            generate_command().get_matches_from([
-                names::TREEGREP_BIN,
-                "posexpr",
-                "--line-number",
-                "--max-depth=5",
-                "--max-length=20",
-                "--pcre2",
-                "--no-ignore",
-                "--hidden",
-                "--threads=8",
-                "--count",
-                "--links",
-                "--trim",
-                "--menu",
-                "--files",
-                "--searcher=rg",
-                "--regexp=pattern1",
-                "--regexp=pattern2",
-            ]),
+            generate_command()
+                .get_matches_from([&[names::TREEGREP_BIN], EXAMPLE_LONG_OPTS].concat()),
             true,
         )
         .ok()
         .unwrap();
+        check_parsed_config_from_default_opts(config);
+    }
+
+    fn check_parsed_config_from_default_opts(config: Config) {
         assert!(config.line_number);
         assert_eq!(config.max_depth, Some(5));
         assert_eq!(config.max_length, Some(20));
