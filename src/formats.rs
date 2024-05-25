@@ -18,10 +18,14 @@ pub const MENU_SELECTED: Color = Color::DarkGrey;
 pub const SELECTED_INDICATOR: &str = "-> ";
 pub const SELECTED_INDICATOR_CLEAR: &str = "   ";
 
-pub const BRANCH_HAS_NEXT: &str = "├──";
-pub const BRANCH_END: &str = "└──";
-pub const VER_LINE_SPACER: &str = "│  ";
-pub const SPACER: &str = "   ";
+pub const TREE_SPACER_LEN: usize = 3;
+pub const STRAIGHT_BL: &str = "└";
+pub const STRAIGHT_BR: &str = "┘";
+pub const STRAIGHT_TL: &str = "┌";
+pub const STRAIGHT_TR: &str = "┐";
+pub const HORIZONTAL: &str = "─";
+pub const VERTICAL: &str = "│";
+pub const TEE: &str = "├";
 
 pub const NEW_LINE: char = '\n';
 

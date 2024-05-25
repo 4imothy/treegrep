@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
 use crate::config::Config;
-use crate::formats::{self, BRANCH_END, BRANCH_HAS_NEXT, SPACER, VER_LINE_SPACER};
+use crate::formats;
 use crate::match_system::{Directory, File, Line, Matches};
 use crossterm::style::StyledContent;
 use std::ffi::OsString;
@@ -39,11 +39,11 @@ impl Directory {
             let dir = dirs.get(*child_id).unwrap();
             let new_prefix: String;
             if i != clen || flen > 0 {
-                write!(out, "{}{}", prefix, BRANCH_HAS_NEXT)?;
-                new_prefix = (prefix.clone() + VER_LINE_SPACER).clone();
+                write!(out, "{}{}", prefix, config.c.match_with_next)?;
+                new_prefix = (prefix.clone() + &config.c.spacer_vert).clone();
             } else {
-                write!(out, "{}{}", prefix, BRANCH_END)?;
-                new_prefix = (prefix.clone() + SPACER).clone();
+                write!(out, "{}{}", prefix, config.c.match_no_next)?;
+                new_prefix = (prefix.clone() + &config.c.spacer).clone();
             }
             dir.write(out, new_prefix, dirs, config, path_ids, cur_id)?;
         }
@@ -66,11 +66,11 @@ impl File {
     ) -> io::Result<()> {
         if config.is_dir {
             if parent_has_next {
-                write!(out, "{}{}", prefix, BRANCH_HAS_NEXT)?;
-                prefix += VER_LINE_SPACER;
+                write!(out, "{}{}", prefix, config.c.match_with_next)?;
+                prefix += &config.c.spacer_vert;
             } else {
-                write!(out, "{}{}", prefix, BRANCH_END)?;
-                prefix += SPACER;
+                write!(out, "{}{}", prefix, config.c.match_no_next)?;
+                prefix += &config.c.spacer;
             }
         }
         path_ids.as_mut().map(|p| p.push(*cur_id));
@@ -91,9 +91,9 @@ impl File {
 
         for (i, line) in self.lines.iter().enumerate() {
             if i + 1 != len {
-                write!(out, "{}{}", prefix, BRANCH_HAS_NEXT)?;
+                write!(out, "{}{}", prefix, config.c.match_with_next)?;
             } else {
-                write!(out, "{}{}", prefix, BRANCH_END)?;
+                write!(out, "{}{}", prefix, config.c.match_no_next)?;
             }
             line.write(out, config)?;
             *cur_id += 1;

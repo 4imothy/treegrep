@@ -23,9 +23,10 @@ use std::io::{stdout, StdoutLock};
 use std::process::Command;
 use writer::write_results;
 
+// TODO use once cell instead of passing config everywhere
 // TODO option --curved for non-sharp tree characters, or an option which is assigned curved, none (just indent), straight (tmux uses single to mean this)
+// TODO option for the TREE_SPACER_LEN
 // TODO option to configure different colors
-// TODO on pressing h show a help message while in menu
 // TODO add notarizing mac so exec can be used without needing to open from finder
 // TODO support for searching PDFs maybe
 // TODO --plugin option that starts the program with alternate screen which prompts the user for the flag

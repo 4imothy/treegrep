@@ -99,13 +99,13 @@ by {author}
 
 {all-args}{after-help}";
 
-const MENU_HELP: &str = "open results in a menu to be edited with $EDITOR
+pub const MENU_HELP: &str = "open results in a menu to be edited with $EDITOR
 navigate through the menu using the following commands:
-\t- move up/down: k/j, p/n, up arrow/down arrow
-\t- move up/down with a bigger jump: K/J, P/N
-\t- move up/down paths: {/}, [/]
-\t- move to the start/end: g/G, </>, home/end
-\t- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown";
+\u{0020}- move up/down: k/j, p/n, up arrow/down arrow
+\u{0020}- move up/down with a bigger jump: K/J, P/N
+\u{0020}- move up/down paths: {/}, [/]
+\u{0020}- move to the start/end: g/G, </>, home/end
+\u{0020}- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown";
 
 pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
 
