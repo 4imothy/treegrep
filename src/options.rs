@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
-use crate::config::Config;
+use crate::config;
 use crate::errors::Message;
 use std::path::Path;
 use std::process::Command;
@@ -20,7 +20,8 @@ pub trait Options {
     fn path(cmd: &mut Command, path: &Path);
     fn globs(cmd: &mut Command, globs: &Vec<String>);
 
-    fn add_options(cmd: &mut Command, config: &Config) -> Result<(), Message> {
+    fn add_options(cmd: &mut Command) -> Result<(), Message> {
+        let config = config();
         Self::json(cmd);
         Self::patterns(cmd, &config.patterns);
         Self::path(cmd, &config.path);

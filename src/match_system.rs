@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
-use crate::config::Config;
+use crate::config;
 use crate::errors::{bail, Message};
 use crate::formats::{bold, get_color, reset_bold_and_fg};
 use std::ffi::OsString;
@@ -47,11 +47,11 @@ pub struct Directory {
 }
 
 impl Directory {
-    pub fn new(path: &Path, config: &Config) -> Result<Self, Message> {
+    pub fn new(path: &Path) -> Result<Self, Message> {
         Ok(Directory {
             name: path_name(path)?,
             path: path.to_path_buf(),
-            linked: get_linked(path, config),
+            linked: get_linked(path),
             children: Vec::new(),
             files: Vec::new(),
             to_add: true,
@@ -67,18 +67,18 @@ pub struct File {
 }
 
 impl File {
-    pub fn new(path: &Path, config: &Config) -> Result<Self, Message> {
+    pub fn new(path: &Path) -> Result<Self, Message> {
         Ok(File {
             name: path_name(path)?,
-            linked: get_linked(path, config),
+            linked: get_linked(path),
             path: path.to_path_buf(),
             lines: Vec::new(),
         })
     }
 }
 
-fn get_linked(path: &Path, config: &Config) -> Option<OsString> {
-    if config.links {
+fn get_linked(path: &Path) -> Option<OsString> {
+    if config().links {
         if let Some(p_str) = path.as_os_str().to_str() {
             PathBuf::from(p_str)
                 .read_link()
@@ -143,24 +143,19 @@ impl Line {
         Line { contents, line_num }
     }
 
-    pub fn style_line(
-        mut contents: &[u8],
-        mut matches: Vec<Match>,
-        line_num: usize,
-        config: &Config,
-    ) -> Self {
+    pub fn style_line(mut contents: &[u8], mut matches: Vec<Match>, line_num: usize) -> Self {
         let cut;
-        if config.trim {
+        if config().trim {
             (contents, cut) = contents.trim_left();
         } else {
             cut = 0;
         }
-        if let Some(max_len) = config.max_length {
+        if let Some(max_len) = config().max_length {
             if max_len < contents.len() {
                 contents = &contents[0..max_len];
             }
         }
-        if !config.colors {
+        if !config().colors {
             return Line::new(Some(contents.to_vec()), Some(line_num));
         }
 

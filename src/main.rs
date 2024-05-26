@@ -21,19 +21,24 @@ use searchers::Searchers;
 use std::ffi::OsString;
 use std::io::{stdout, StdoutLock};
 use std::process::Command;
+use std::sync::OnceLock;
 use writer::write_results;
 
-// TODO use once cell instead of passing config everywhere
 // TODO option --curved for non-sharp tree characters, or an option which is assigned curved, none (just indent), straight (tmux uses single to mean this)
 // TODO option for the TREE_SPACER_LEN
 // TODO option to configure different colors
 // TODO add notarizing mac so exec can be used without needing to open from finder
 // TODO support for searching PDFs maybe
-// TODO --plugin option that starts the program with alternate screen which prompts the user for the flag
-// commands to enter
+// TODO --plugin option that starts the program with alternate screen which prompts the user for their args
 // TODO nvim plugin to open a popup window, select a match to open in $EDITOR
 // TODO tmux plugin to open a popup window, select a match to open in $EDITOR
 // TODO zellij plugin to open a popup window, select a match to open in $EDITOR
+
+static CONFIG: OnceLock<Config> = OnceLock::new();
+
+fn config() -> &'static Config {
+    CONFIG.get().unwrap()
+}
 
 fn main() {
     let matches = Config::get_matches();
@@ -45,13 +50,14 @@ fn main() {
 }
 
 fn run(matches: ArgMatches, colors: bool) -> Result<(), Message> {
-    let (config, searcher_path) = Config::get_config(matches, colors)?;
+    let (c, searcher_path) = Config::get_config(matches, colors)?;
+    CONFIG.set(c).ok().unwrap();
 
     let matches: Option<Matches>;
-    if config.tree || searcher_path.is_none() {
-        matches = matcher::search(&config)?;
+    if config().tree || searcher_path.is_none() {
+        matches = matcher::search()?;
     } else {
-        matches = get_matches_from_cmd(searcher_path.unwrap(), &config)?;
+        matches = get_matches_from_cmd(searcher_path.unwrap())?;
     }
 
     if matches.is_none() {
@@ -59,21 +65,17 @@ fn run(matches: ArgMatches, colors: bool) -> Result<(), Message> {
     }
 
     let mut out: StdoutLock = stdout().lock();
-    if config.menu {
-        Menu::enter(&mut out, matches.unwrap(), &config).map_err(|e| bail!("{}", e.to_string()))?;
+    if config().menu {
+        Menu::enter(&mut out, matches.unwrap()).map_err(|e| bail!("{}", e.to_string()))?;
     } else {
-        write_results(&mut out, &matches.unwrap(), &config, None)
-            .map_err(|e| bail!("{}", e.to_string()))?;
+        write_results(&mut out, &matches.unwrap(), None).map_err(|e| bail!("{}", e.to_string()))?;
     }
 
     Ok(())
 }
 
-fn get_matches_from_cmd(
-    searcher_path: OsString,
-    config: &Config,
-) -> Result<Option<Matches>, Message> {
-    let mut cmd: Command = Searchers::generate_command(config, searcher_path)?;
+fn get_matches_from_cmd(searcher_path: OsString) -> Result<Option<Matches>, Message> {
+    let mut cmd: Command = Searchers::generate_command(searcher_path)?;
 
     let output = cmd.output().map_err(|e| {
         bail!(
@@ -92,5 +94,5 @@ fn get_matches_from_cmd(
     }
     let results: Vec<u8> = output.stdout;
 
-    process_results(results, &config)
+    process_results(results)
 }

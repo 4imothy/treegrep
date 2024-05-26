@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
 use crate::args::MENU_HELP;
-use crate::config::Config;
+use crate::config;
 use crate::formats;
 use crate::match_system::{Directory, File, Matches};
 use crate::writer;
@@ -42,8 +42,8 @@ impl PathStore {
         self.past = false;
     }
 
-    pub fn bottom(&mut self, files: bool) {
-        let shift = if files { 1 } else { 0 };
+    pub fn bottom(&mut self) {
+        let shift = if config().just_files { 1 } else { 0 };
         self.prev = self.paths.len() - 1 - shift;
         self.next = self.paths.len() - shift;
         self.past = false;
@@ -100,14 +100,10 @@ pub struct Menu<'a, 'b> {
 }
 
 impl<'a, 'b> Menu<'a, 'b> {
-    fn new(
-        out: &'a mut StdoutLock<'b>,
-        searched: &'a Matches,
-        config: &Config,
-    ) -> io::Result<Menu<'a, 'b>> {
+    fn new(out: &'a mut StdoutLock<'b>, searched: &'a Matches) -> io::Result<Menu<'a, 'b>> {
         let mut buffer: Vec<u8> = Vec::new();
         let mut path_ids: Vec<usize> = Vec::new();
-        writer::write_results(&mut buffer, &searched, config, Some(&mut path_ids))?;
+        writer::write_results(&mut buffer, &searched, Some(&mut path_ids))?;
         let lines: Vec<String> = buffer
             .split(|&byte| byte == formats::NEW_LINE as u8)
             .map(|v| String::from_utf8_lossy(v).into())
@@ -122,7 +118,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             out,
             searched,
             lines,
-            colors: config.colors,
+            colors: config().colors,
             ps: PathStore::new(path_ids),
             height,
             width,
@@ -153,11 +149,11 @@ impl<'a, 'b> Menu<'a, 'b> {
         (scroll_offset, big_jump, small_jump)
     }
 
-    pub fn enter(out: &'a mut StdoutLock<'b>, matches: Matches, config: &Config) -> io::Result<()> {
-        let mut menu: Menu = Menu::new(out, &matches, config)?;
+    pub fn enter(out: &'a mut StdoutLock<'b>, matches: Matches) -> io::Result<()> {
+        let mut menu: Menu = Menu::new(out, &matches)?;
 
         menu.setup_term()?;
-        menu.draw(false, config)?;
+        menu.draw(false)?;
 
         loop {
             let event = event::read();
@@ -179,18 +175,14 @@ impl<'a, 'b> Menu<'a, 'b> {
                         KeyCode::Char('J') | KeyCode::Char('N') => menu.down(menu.big_jump)?,
                         KeyCode::Char('h') => {
                             if !menu.help_popup_open {
-                                menu.help_popup(config)?;
+                                menu.help_popup()?;
                             }
                         }
                         KeyCode::Char('K') | KeyCode::Char('P') => menu.up(menu.big_jump)?,
                         KeyCode::Char('}') | KeyCode::Char(']') => menu.down_path()?,
                         KeyCode::Char('{') | KeyCode::Char('[') => menu.up_path()?,
-                        KeyCode::Char('G') | KeyCode::Char('>') | KeyCode::End => {
-                            menu.bottom(config.just_files, config)?
-                        }
-                        KeyCode::Char('g') | KeyCode::Char('<') | KeyCode::Home => {
-                            menu.top(config)?
-                        }
+                        KeyCode::Char('G') | KeyCode::Char('>') | KeyCode::End => menu.bottom()?,
+                        KeyCode::Char('g') | KeyCode::Char('<') | KeyCode::Home => menu.top()?,
                         KeyCode::Char('f') | KeyCode::PageDown => {
                             if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
                                 menu.down(menu.page_jump())?;
@@ -202,9 +194,8 @@ impl<'a, 'b> Menu<'a, 'b> {
                             }
                         }
                         KeyCode::Enter => {
-                            let match_info =
-                                MatchInfo::find(menu.selected_id, &menu.searched, config);
-                            let path = config.path.join(match_info.path);
+                            let match_info = MatchInfo::find(menu.selected_id, &menu.searched);
+                            let path = config().path.join(match_info.path);
 
                             return menu.exit_and_open(
                                 path.as_os_str().to_os_string(),
@@ -218,7 +209,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                     KeyCode::Char('q') => {
                         if menu.help_popup_open {
                             menu.help_popup_open = false;
-                            menu.draw(false, config)?;
+                            menu.draw(false)?;
                         } else {
                             break;
                         }
@@ -226,7 +217,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                     KeyCode::Char('z') => {
                         if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
                             menu.suspend()?;
-                            menu.resume(config)?;
+                            menu.resume()?;
                         }
                     }
                     KeyCode::Char('c') => {
@@ -239,7 +230,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             } else if let Ok(Event::Resize(new_width, new_height)) = event {
                 if menu.height != new_height || menu.width != new_width {
                     menu.set_dims((new_width, new_height));
-                    menu.draw(true, config)?;
+                    menu.draw(true)?;
                 }
             }
         }
@@ -247,7 +238,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         menu.leave()
     }
 
-    fn draw(&mut self, resize: bool, config: &Config) -> io::Result<()> {
+    fn draw(&mut self, resize: bool) -> io::Result<()> {
         queue!(self.out, terminal::Clear(ClearType::All))?;
         if resize && self.selected_id > (self.height / 2) as usize {
             self.cursor_y = self.height / 2;
@@ -272,7 +263,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         }
         self.style_at_cursor()?;
         if self.help_popup_open {
-            self.help_popup(config)?;
+            self.help_popup()?;
         }
         self.out.flush()
     }
@@ -286,29 +277,29 @@ impl<'a, 'b> Menu<'a, 'b> {
         Ok(())
     }
 
-    fn resume(&mut self, config: &Config) -> io::Result<()> {
+    fn resume(&mut self) -> io::Result<()> {
         self.set_dims(terminal::size()?);
         self.setup_term()?;
-        self.draw(false, config)?;
+        self.draw(false)?;
         Ok(())
     }
 
-    fn bottom(&mut self, files: bool, config: &Config) -> io::Result<()> {
-        self.ps.bottom(files);
+    fn bottom(&mut self) -> io::Result<()> {
+        self.ps.bottom();
         self.selected_id = self.max_line_id();
         self.cursor_y = if self.max_line_id() < self.height as usize {
             self.max_line_id() as u16
         } else {
             self.height - self.scroll_offset
         };
-        self.draw(false, config)
+        self.draw(false)
     }
 
-    fn top(&mut self, config: &Config) -> io::Result<()> {
+    fn top(&mut self) -> io::Result<()> {
         self.ps.top();
         self.selected_id = 0;
         self.cursor_y = 0;
-        self.draw(false, config)
+        self.draw(false)
     }
 
     fn down(&mut self, dist: u16) -> io::Result<()> {
@@ -419,7 +410,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         terminal::enable_raw_mode()
     }
 
-    fn help_popup(&mut self, config: &Config) -> io::Result<()> {
+    fn help_popup(&mut self) -> io::Result<()> {
         let contents = MENU_HELP.to_string() + "\npress q to quit this popup";
         let lines: Vec<&str> = contents.lines().collect();
         let content_width = lines.iter().map(|line| line.len()).max().unwrap() as u16;
@@ -432,9 +423,9 @@ impl<'a, 'b> Menu<'a, 'b> {
             cursor::MoveTo(x, y),
             Print(format!(
                 "{}{}{}",
-                config.c.tl,
+                config().c.tl,
                 formats::HORIZONTAL.repeat(content_width as usize),
-                config.c.tr
+                config().c.tr
             ))
         )?;
 
@@ -457,9 +448,9 @@ impl<'a, 'b> Menu<'a, 'b> {
             cursor::MoveTo(x, y + height - 1),
             Print(format!(
                 "{}{}{}",
-                config.c.bl,
+                config().c.bl,
                 formats::HORIZONTAL.repeat(content_width as usize),
-                config.c.br
+                config().c.br
             ))
         )?;
         self.help_popup_open = true;
@@ -555,21 +546,15 @@ impl MatchInfo {
         MatchInfo { path, line_num }
     }
 
-    pub fn find(selected: usize, searched: &Matches, config: &Config) -> MatchInfo {
+    pub fn find(selected: usize, searched: &Matches) -> MatchInfo {
         let mut current: usize = 0;
         match searched {
             Matches::Dir(dirs) => {
-                return Self::search_dir(
-                    dirs.get(0).unwrap(),
-                    selected,
-                    &mut current,
-                    dirs,
-                    config,
-                )
-                .unwrap();
+                return Self::search_dir(dirs.get(0).unwrap(), selected, &mut current, dirs)
+                    .unwrap();
             }
             Matches::File(file) => {
-                return Self::search_file(file, selected, &mut current, config).unwrap();
+                return Self::search_file(file, selected, &mut current).unwrap();
             }
         }
     }
@@ -579,7 +564,6 @@ impl MatchInfo {
         selected: usize,
         current: &mut usize,
         dirs: &Vec<Directory>,
-        config: &Config,
     ) -> Option<Self> {
         let children = &dir.children;
         let files = &dir.files;
@@ -588,31 +572,25 @@ impl MatchInfo {
         }
         *current += 1;
         for child in children {
-            if let Some(sel) =
-                Self::search_dir(dirs.get(*child).unwrap(), selected, current, dirs, config)
+            if let Some(sel) = Self::search_dir(dirs.get(*child).unwrap(), selected, current, dirs)
             {
                 return Some(sel);
             }
         }
         for file in files {
-            if let Some(sel) = Self::search_file(file, selected, current, config) {
+            if let Some(sel) = Self::search_file(file, selected, current) {
                 return Some(sel);
             }
         }
         return None;
     }
 
-    fn search_file(
-        file: &File,
-        selected: usize,
-        current: &mut usize,
-        config: &Config,
-    ) -> Option<Self> {
+    fn search_file(file: &File, selected: usize, current: &mut usize) -> Option<Self> {
         if *current == selected {
             return Some(Self::new(file.path.clone().into_os_string(), None));
         }
         *current += 1;
-        if !config.just_files {
+        if !config().just_files {
             for line in file.lines.iter() {
                 if *current == selected {
                     return Some(Self::new(file.path.clone().into_os_string(), line.line_num));

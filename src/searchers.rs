@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
 use crate::args::names;
-use crate::config::Config;
+use crate::config;
 use crate::errors::{bail, Message, SUBMIT_ISSUE};
 use crate::options::{Options, Rg};
 use std::env;
@@ -114,11 +114,11 @@ impl Searchers {
         }
     }
 
-    pub fn generate_command(config: &Config, starter: OsString) -> Result<Command, Message> {
+    pub fn generate_command(starter: OsString) -> Result<Command, Message> {
         let mut cmd = Command::new(starter);
 
-        match config.searcher {
-            Searchers::RipGrep => Rg::add_options(&mut cmd, config)?,
+        match config().searcher {
+            Searchers::RipGrep => Rg::add_options(&mut cmd)?,
             Searchers::TreeGrep => panic!(
                 "tried to use external command when using the treegrep searcher {SUBMIT_ISSUE}"
             ),
@@ -168,11 +168,12 @@ mod tests {
     use super::*;
     use crate::args::{generate_command, names};
     use crate::config::Config;
+    use crate::CONFIG;
 
     #[test]
     fn test_options_add_args_rg() {
         let mut cmd = Command::new("rg");
-        let (config, _) = Config::get_config(
+        let (c, _) = Config::get_config(
             generate_command().get_matches_from([
                 names::TREEGREP_BIN,
                 "--regexp=pattern1",
@@ -193,14 +194,15 @@ mod tests {
         )
         .ok()
         .unwrap();
+        CONFIG.set(c).ok().unwrap();
 
-        assert!(Rg::add_options(&mut cmd, &config).is_ok());
+        assert!(Rg::add_options(&mut cmd).is_ok());
 
         let expected_args = vec![
             "--json",
             "--regexp=pattern1",
             "--regexp=pattern2",
-            config.path.to_str().unwrap(),
+            config().path.to_str().unwrap(),
             "--glob=globbing",
             "--glob=glob2",
             "--color=never",
