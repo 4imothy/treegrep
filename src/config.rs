@@ -10,10 +10,10 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 pub struct Characters {
-    pub bl: String,
-    pub br: String,
-    pub tl: String,
-    pub tr: String,
+    pub bl: char,
+    pub br: char,
+    pub tl: char,
+    pub tr: char,
     pub match_with_next: String,
     pub match_no_next: String,
     pub spacer_vert: String,
@@ -189,29 +189,29 @@ impl Config {
     }
 
     fn get_characters() -> Characters {
-        let bottom_left = formats::STRAIGHT_BL.to_string();
-        let bottom_right = formats::STRAIGHT_BR.to_string();
-        let top_left = formats::STRAIGHT_TL.to_string();
-        let top_right = formats::STRAIGHT_TR.to_string();
+        let bottom_left = formats::STRAIGHT_BL;
+        let bottom_right = formats::STRAIGHT_BR;
+        let top_left = formats::STRAIGHT_TL;
+        let top_right = formats::STRAIGHT_TR;
         Characters {
-            bl: bottom_left.clone(),
+            bl: bottom_left,
             br: bottom_right,
             tl: top_left,
             tr: top_right,
             match_with_next: format!(
                 "{}{}",
                 formats::TEE,
-                formats::HORIZONTAL.repeat(formats::TREE_SPACER_LEN - 1)
+                formats::repeat(formats::HORIZONTAL, formats::TREE_SPACER_LEN - 1),
             ),
             match_no_next: format!(
                 "{}{}",
                 bottom_left,
-                formats::HORIZONTAL.repeat(formats::TREE_SPACER_LEN - 1)
+                formats::repeat(formats::HORIZONTAL, formats::TREE_SPACER_LEN - 1),
             ),
             spacer_vert: format!(
                 "{}{}",
                 formats::VERTICAL,
-                " ".repeat(formats::TREE_SPACER_LEN - 1)
+                formats::repeat(' ', formats::TREE_SPACER_LEN - 1)
             ),
             spacer: " ".repeat(formats::TREE_SPACER_LEN),
         }

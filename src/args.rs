@@ -105,7 +105,8 @@ navigate through the menu using the following commands:
 \u{0020}- move up/down with a bigger jump: K/J, P/N
 \u{0020}- move up/down paths: {/}, [/]
 \u{0020}- move to the start/end: g/G, </>, home/end
-\u{0020}- move up/down a page: ctrl + b/ctrl + f, pageup/pagedown";
+\u{0020}- move up/down a page: b/f, pageup/pagedown
+\u{0020}- quit: q, ctrl + c";
 
 pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
 

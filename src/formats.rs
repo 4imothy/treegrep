@@ -3,6 +3,7 @@
 use crossterm::style::{
     Attribute, Color, ResetColor, SetAttribute, SetForegroundColor, StyledContent, Stylize,
 };
+use std::fmt::{self, Display};
 
 pub const RESET: SetAttribute = SetAttribute(Attribute::Reset);
 pub const RESET_COLOR: ResetColor = ResetColor;
@@ -19,15 +20,28 @@ pub const SELECTED_INDICATOR: &str = "-> ";
 pub const SELECTED_INDICATOR_CLEAR: &str = "   ";
 
 pub const TREE_SPACER_LEN: usize = 3;
-pub const STRAIGHT_BL: &str = "└";
-pub const STRAIGHT_BR: &str = "┘";
-pub const STRAIGHT_TL: &str = "┌";
-pub const STRAIGHT_TR: &str = "┐";
-pub const HORIZONTAL: &str = "─";
-pub const VERTICAL: &str = "│";
-pub const TEE: &str = "├";
+pub const STRAIGHT_BL: char = '└';
+pub const STRAIGHT_BR: char = '┘';
+pub const STRAIGHT_TL: char = '┌';
+pub const STRAIGHT_TR: char = '┐';
+pub const HORIZONTAL: char = '─';
+pub const VERTICAL: char = '│';
+pub const TEE: char = '├';
 
 pub const NEW_LINE: char = '\n';
+
+pub struct DisplayRepeater<T>(T, usize);
+impl<T: Display> Display for DisplayRepeater<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for _ in 0..self.1 {
+            self.0.fmt(f)?;
+        }
+        Ok(())
+    }
+}
+pub fn repeat<T>(item: T, times: usize) -> DisplayRepeater<T> {
+    DisplayRepeater(item, times)
+}
 
 pub fn error_prefix(colors: bool) -> String {
     let e_str = "error:";

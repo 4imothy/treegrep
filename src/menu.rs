@@ -19,55 +19,55 @@ use std::process::Command;
 const START_X: u16 = formats::SELECTED_INDICATOR.len() as u16;
 const START_Y: u16 = 0;
 
-struct PathStore {
+struct PathInfo {
     paths: Vec<usize>,
     prev: usize,
     next: usize,
-    past: bool,
+    passed: bool,
 }
 
-impl PathStore {
-    pub fn new(paths: Vec<usize>) -> PathStore {
-        PathStore {
+impl PathInfo {
+    pub fn new(paths: Vec<usize>) -> PathInfo {
+        PathInfo {
             paths,
             prev: 0,
             next: 1,
-            past: false,
+            passed: false,
         }
     }
 
     pub fn top(&mut self) {
         self.prev = 0;
         self.next = 1;
-        self.past = false;
+        self.passed = false;
     }
 
     pub fn bottom(&mut self) {
         let shift = if config().just_files { 1 } else { 0 };
         self.prev = self.paths.len() - 1 - shift;
         self.next = self.paths.len() - shift;
-        self.past = false;
+        self.passed = false;
     }
 
-    pub fn shift_down(&mut self, selected_id: usize) {
-        if self.past {
+    pub fn down(&mut self, selected_id: usize) {
+        if self.passed {
             self.prev += 1;
-            self.past = false;
+            self.passed = false;
         }
         if self.next != self.paths.len() && selected_id == *self.paths.get(self.next).unwrap() {
             self.next += 1;
-            self.past = true;
+            self.passed = true;
         }
     }
 
-    pub fn shift_up(&mut self, selected_id: usize) {
-        if self.past {
+    pub fn up(&mut self, selected_id: usize) {
+        if self.passed {
             self.next -= 1;
-            self.past = false;
+            self.passed = false;
         }
         if self.prev != 0 && selected_id == *self.paths.get(self.prev).unwrap() {
             self.prev -= 1;
-            self.past = true;
+            self.passed = true;
         }
     }
 
@@ -84,7 +84,7 @@ impl PathStore {
 }
 
 pub struct Menu<'a, 'b> {
-    ps: PathStore,
+    pi: PathInfo,
     selected_id: usize,
     cursor_y: u16,
     out: &'a mut StdoutLock<'b>,
@@ -119,7 +119,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             searched,
             lines,
             colors: config().colors,
-            ps: PathStore::new(path_ids),
+            pi: PathInfo::new(path_ids),
             height,
             width,
             scroll_offset,
@@ -184,14 +184,10 @@ impl<'a, 'b> Menu<'a, 'b> {
                         KeyCode::Char('G') | KeyCode::Char('>') | KeyCode::End => menu.bottom()?,
                         KeyCode::Char('g') | KeyCode::Char('<') | KeyCode::Home => menu.top()?,
                         KeyCode::Char('f') | KeyCode::PageDown => {
-                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                                menu.down(menu.page_jump())?;
-                            }
+                            menu.down(menu.page_jump())?;
                         }
                         KeyCode::Char('b') | KeyCode::PageUp => {
-                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                                menu.up(menu.page_jump())?;
-                            }
+                            menu.up(menu.page_jump())?;
                         }
                         KeyCode::Enter => {
                             let match_info = MatchInfo::find(menu.selected_id, &menu.searched);
@@ -285,7 +281,7 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn bottom(&mut self) -> io::Result<()> {
-        self.ps.bottom();
+        self.pi.bottom();
         self.selected_id = self.max_line_id();
         self.cursor_y = if self.max_line_id() < self.height as usize {
             self.max_line_id() as u16
@@ -296,7 +292,7 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn top(&mut self) -> io::Result<()> {
-        self.ps.top();
+        self.pi.top();
         self.selected_id = 0;
         self.cursor_y = 0;
         self.draw(false)
@@ -309,7 +305,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                 break;
             }
             self.selected_id += 1;
-            self.ps.shift_down(self.selected_id);
+            self.pi.down(self.selected_id);
             if self.cursor_y + self.scroll_offset != self.height {
                 self.cursor_y += 1;
             } else {
@@ -338,7 +334,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                 break;
             }
             self.selected_id -= 1;
-            self.ps.shift_up(self.selected_id);
+            self.pi.up(self.selected_id);
             if self.selected_id < self.scroll_offset as usize || self.cursor_y != self.scroll_offset
             {
                 self.cursor_y -= 1;
@@ -362,7 +358,7 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     pub fn down_path(&mut self) -> io::Result<()> {
-        let dist = self.ps.dist_down(self.selected_id);
+        let dist = self.pi.dist_down(self.selected_id);
         if dist != 0 {
             self.down(dist)?;
         }
@@ -370,7 +366,7 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn up_path(&mut self) -> io::Result<()> {
-        let dist = self.ps.dist_up(self.selected_id);
+        let dist = self.pi.dist_up(self.selected_id);
         if dist != 0 {
             self.up(dist)?;
         }
@@ -424,8 +420,8 @@ impl<'a, 'b> Menu<'a, 'b> {
             Print(format!(
                 "{}{}{}",
                 config().c.tl,
-                formats::HORIZONTAL.repeat(content_width as usize),
-                config().c.tr
+                formats::repeat(formats::HORIZONTAL, content_width as usize),
+                config().c.tr,
             ))
         )?;
 
@@ -449,8 +445,8 @@ impl<'a, 'b> Menu<'a, 'b> {
             Print(format!(
                 "{}{}{}",
                 config().c.bl,
-                formats::HORIZONTAL.repeat(content_width as usize),
-                config().c.br
+                formats::repeat(formats::HORIZONTAL, content_width as usize),
+                config().c.br,
             ))
         )?;
         self.help_popup_open = true;
