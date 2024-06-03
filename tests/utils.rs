@@ -32,7 +32,12 @@ pub fn get_target_contents(path: PathBuf) -> Vec<u8> {
     contents
 }
 
-pub fn check_results(tar_path: PathBuf, rg_results: Vec<u8>, tg_results: Vec<u8>) {
+fn check_results(
+    tar_path: PathBuf,
+    rg_results: &Vec<u8>,
+    tg_results: &Vec<u8>,
+    single_poss_tar: bool,
+) -> Option<(bool, bool)> {
     if OVERWRITE {
         let mut file = fs::File::create(tar_path).unwrap();
         file.write_all(&rg_results).unwrap();
@@ -48,9 +53,35 @@ pub fn check_results(tar_path: PathBuf, rg_results: Vec<u8>, tg_results: Vec<u8>
         println!("tg output");
         println!("{}", tg_str);
 
-        assert_eq!(contents, rg_results);
-        assert_eq!(contents, tg_results);
+        if single_poss_tar {
+            let pass = contents == *tg_results && contents == *rg_results;
+            assert!(pass);
+        } else {
+            return Some((*tg_results == contents, *rg_results == contents));
+        }
     }
+    None
+}
+
+pub fn assert_pass(tar_path: PathBuf, rg_results: Vec<u8>, tg_results: Vec<u8>) {
+    check_results(tar_path, &rg_results, &tg_results, true);
+}
+
+pub fn assert_pass_pool(tar_paths: Vec<PathBuf>, rg_results: Vec<u8>, tg_results: Vec<u8>) {
+    let mut tg_has_match = false;
+    let mut rg_has_match = false;
+    for tar_path in tar_paths {
+        if let Some((tg_match, rg_match)) = check_results(tar_path, &rg_results, &tg_results, false)
+        {
+            if !tg_has_match && tg_match {
+                tg_has_match = true;
+            }
+            if !rg_has_match && rg_match {
+                rg_has_match = true;
+            }
+        }
+    }
+    assert!(rg_has_match && tg_has_match)
 }
 
 pub fn get_outputs(path: &Path, expr: &str, extra_option: Option<&str>) -> (Vec<u8>, Vec<u8>) {
