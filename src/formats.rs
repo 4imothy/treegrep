@@ -19,14 +19,67 @@ pub const MENU_SELECTED: Color = Color::DarkGrey;
 pub const SELECTED_INDICATOR: &str = "-> ";
 pub const SELECTED_INDICATOR_CLEAR: &str = "   ";
 
-pub const TREE_SPACER_LEN: usize = 3;
-pub const STRAIGHT_BL: char = '└';
-pub const STRAIGHT_BR: char = '┘';
-pub const STRAIGHT_TL: char = '┌';
-pub const STRAIGHT_TR: char = '┐';
-pub const HORIZONTAL: char = '─';
-pub const VERTICAL: char = '│';
-pub const TEE: char = '├';
+pub const PREFIX_LEN_DEFAULT: usize = 3;
+
+pub struct Chars {
+    pub bl: char,
+    pub br: char,
+    pub tl: char,
+    pub tr: char,
+    pub h: char,
+    pub v: char,
+    pub tee: char,
+}
+
+pub const NONE: Chars = Chars {
+    bl: ' ',
+    br: ' ',
+    tl: ' ',
+    tr: ' ',
+    h: ' ',
+    v: ' ',
+    tee: ' ',
+};
+
+pub const SINGLE: Chars = Chars {
+    bl: '└',
+    br: '┘',
+    tl: '┌',
+    tr: '┐',
+    h: '─',
+    v: '│',
+    tee: '├',
+};
+
+pub const ROUNDED: Chars = Chars {
+    bl: '╰',
+    br: '╯',
+    tl: '╭',
+    tr: '╮',
+    h: '─',
+    v: '│',
+    tee: '├',
+};
+
+pub const HEAVY: Chars = Chars {
+    bl: '┗',
+    br: '┛',
+    tl: '┏',
+    tr: '┓',
+    h: '━',
+    v: '┃',
+    tee: '┣',
+};
+
+pub const DOUBLE: Chars = Chars {
+    bl: '╚',
+    br: '╝',
+    tl: '╔',
+    tr: '╗',
+    h: '═',
+    v: '║',
+    tee: '╠',
+};
 
 pub const NEW_LINE: char = '\n';
 

@@ -14,6 +14,8 @@ pub struct Characters {
     pub br: char,
     pub tl: char,
     pub tr: char,
+    pub v: char,
+    pub h: char,
     pub match_with_next: String,
     pub match_no_next: String,
     pub spacer_vert: String,
@@ -182,38 +184,36 @@ impl Config {
                 globs,
                 ignore,
                 max_length,
-                c: Config::get_characters(),
+                c: Config::get_characters(
+                    matches.get_one::<String>(args::BOX_CHARS.id),
+                    get_usize_option(&matches, args::PREFIX_LEN.id)?,
+                ),
             },
             searcher_path,
         ))
     }
 
-    fn get_characters() -> Characters {
-        let bottom_left = formats::STRAIGHT_BL;
-        let bottom_right = formats::STRAIGHT_BR;
-        let top_left = formats::STRAIGHT_TL;
-        let top_right = formats::STRAIGHT_TR;
+    fn get_characters(t: Option<&String>, pl: Option<usize>) -> Characters {
+        let chars = match t.map(|s| s.as_str()) {
+            Some("single") => formats::SINGLE,
+            Some("double") => formats::DOUBLE,
+            Some("heavy") => formats::HEAVY,
+            Some("rounded") => formats::ROUNDED,
+            Some("none") => formats::NONE,
+            _ => formats::SINGLE,
+        };
+        let spacer: usize = pl.unwrap_or(formats::PREFIX_LEN_DEFAULT);
         Characters {
-            bl: bottom_left,
-            br: bottom_right,
-            tl: top_left,
-            tr: top_right,
-            match_with_next: format!(
-                "{}{}",
-                formats::TEE,
-                formats::repeat(formats::HORIZONTAL, formats::TREE_SPACER_LEN - 1),
-            ),
-            match_no_next: format!(
-                "{}{}",
-                bottom_left,
-                formats::repeat(formats::HORIZONTAL, formats::TREE_SPACER_LEN - 1),
-            ),
-            spacer_vert: format!(
-                "{}{}",
-                formats::VERTICAL,
-                formats::repeat(' ', formats::TREE_SPACER_LEN - 1)
-            ),
-            spacer: " ".repeat(formats::TREE_SPACER_LEN),
+            bl: chars.bl,
+            br: chars.br,
+            tl: chars.tl,
+            tr: chars.tr,
+            v: chars.v,
+            h: chars.h,
+            match_with_next: format!("{}{}", chars.tee, formats::repeat(chars.h, spacer - 1),),
+            match_no_next: format!("{}{}", chars.bl, formats::repeat(chars.h, spacer - 1),),
+            spacer_vert: format!("{}{}", chars.v, formats::repeat(' ', spacer - 1)),
+            spacer: " ".repeat(spacer),
         }
     }
 }

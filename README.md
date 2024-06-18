@@ -73,8 +73,10 @@ Options:
       --no-color       don't use colors if present
       --max-depth <>   the max depth to search
       --threads <>     set the appropriate number of threads to use
+      --prefix-len <>  number of characters to show before a match
       --max-length <>  set the max length for a matched line
   -s, --searcher <>    executable to do the searching [possible values: rg, tgrep]
+      --box-chars <>   style of box characters to use [possible values: single, double, heavy, rounded, none]
   -l, --tree           display the files that would be search in tree format
       --glob <>        rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic
   -h, --help           Print help

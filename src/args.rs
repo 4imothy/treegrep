@@ -66,6 +66,12 @@ arg_info!(MENU, "menu", MENU_HELP, 'm');
 arg_info!(FILES, "files", "show the paths that have matches", 'f');
 arg_info!(MAX_DEPTH, "max-depth", "the max depth to search");
 arg_info!(SEARCHER, "searcher", "executable to do the searching", 's');
+arg_info!(BOX_CHARS, "box-chars", "style of box characters to use");
+arg_info!(
+    PREFIX_LEN,
+    "prefix-len",
+    "number of characters to show before a match"
+);
 arg_info!(LINKS, "links", "show linked paths for symbolic links");
 arg_info!(
     TRIM_LEFT,
@@ -190,7 +196,7 @@ fn get_args() -> Vec<Arg> {
     let searcher = Arg::new(SEARCHER.id)
         .long(SEARCHER.id)
         .short(SEARCHER.s.unwrap())
-        .help(format!("executable to do the searching"))
+        .help(SEARCHER.h)
         .value_parser([
             PossibleValue::new(names::RIPGREP_BIN).hide(false),
             PossibleValue::new(names::TREEGREP_BIN).hide(false),
@@ -201,6 +207,18 @@ fn get_args() -> Vec<Arg> {
         .conflicts_with(TREE.id)
         .action(ArgAction::Set);
 
+    let box_chars = Arg::new(BOX_CHARS.id)
+        .long(BOX_CHARS.id)
+        .help(BOX_CHARS.h)
+        .value_parser([
+            PossibleValue::new("single").hide(false),
+            PossibleValue::new("double").hide(false),
+            PossibleValue::new("heavy").hide(false),
+            PossibleValue::new("rounded").hide(false),
+            PossibleValue::new("none").hide(false),
+        ])
+        .value_name("")
+        .action(ArgAction::Set);
     [
         bool_arg(SHOW_COUNT, true),
         bool_arg(HIDDEN, false),
@@ -214,8 +232,10 @@ fn get_args() -> Vec<Arg> {
         bool_arg(NO_COLORS, false),
         usize_arg(&MAX_DEPTH, false),
         usize_arg(&THREADS, false),
+        usize_arg(&PREFIX_LEN, false),
         usize_arg(&MAX_LENGTH, true),
         searcher,
+        box_chars,
         tree,
         glob,
     ]

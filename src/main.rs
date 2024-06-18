@@ -24,8 +24,6 @@ use std::process::Command;
 use std::sync::OnceLock;
 use writer::write_results;
 
-// TODO option --curved for non-sharp tree characters, or an option which is assigned curved, none (just indent), straight (tmux uses single to mean this)
-// TODO option for the TREE_SPACER_LEN
 // TODO option to configure different colors
 // TODO add notarizing mac so exec can be used without needing to open from finder
 // TODO support for searching PDFs maybe

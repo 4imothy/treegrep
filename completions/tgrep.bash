@@ -19,7 +19,7 @@ _tgrep() {
 
     case "${cmd}" in
         tgrep)
-            opts="-e -t -c -. -n -m -f -s -l -h -V --regexp --target --count --hidden --line-number --menu --files --links --trim --pcre2 --no-ignore --no-color --max-depth --threads --max-length --searcher --tree --glob --help --version [positional regexp] [positional target]"
+            opts="-e -t -c -. -n -m -f -s -l -h -V --regexp --target --count --hidden --line-number --menu --files --links --trim --pcre2 --no-ignore --no-color --max-depth --threads --prefix-len --max-length --searcher --box-chars --tree --glob --help --version [positional regexp] [positional target]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -49,6 +49,10 @@ _tgrep() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
+                --prefix-len)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 --max-length)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
@@ -59,6 +63,10 @@ _tgrep() {
                     ;;
                 -s)
                     COMPREPLY=($(compgen -W "rg tgrep" -- "${cur}"))
+                    return 0
+                    ;;
+                --box-chars)
+                    COMPREPLY=($(compgen -W "single double heavy rounded none" -- "${cur}"))
                     return 0
                     ;;
                 --glob)

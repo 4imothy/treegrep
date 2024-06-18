@@ -434,7 +434,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             Print(format!(
                 "{}{}{}",
                 config().c.tl,
-                formats::repeat(formats::HORIZONTAL, content_width as usize),
+                formats::repeat(config().c.h, content_width as usize),
                 config().c.tr,
             ))
         )?;
@@ -445,9 +445,9 @@ impl<'a, 'b> Menu<'a, 'b> {
                 cursor::MoveTo(x, y + i as u16 + 1),
                 Print(format!(
                     "{}{:w$}{}",
-                    formats::VERTICAL,
+                    config().c.v,
                     line,
-                    formats::VERTICAL,
+                    config().c.v,
                     w = content_width as usize
                 ),),
             )?;
@@ -459,7 +459,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             Print(format!(
                 "{}{}{}",
                 config().c.bl,
-                formats::repeat(formats::HORIZONTAL, content_width as usize),
+                formats::repeat(config().c.h, content_width as usize),
                 config().c.br,
             ))
         )?;
