@@ -220,7 +220,7 @@ fn get_args() -> Vec<Arg> {
         .value_name("")
         .action(ArgAction::Set);
     [
-        bool_arg(SHOW_COUNT, true),
+        bool_arg(SHOW_COUNT, false),
         bool_arg(HIDDEN, false),
         bool_arg(LINE_NUMBER, false),
         bool_arg(MENU, false),

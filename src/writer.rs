@@ -124,7 +124,8 @@ fn write_name(
             write!(out, "{}", name)?;
         }
     }
-    if config().count {
+    let file_in_tree: bool = config().tree && count == 0;
+    if config().count && !file_in_tree {
         write!(out, ": {}", count)?;
     }
     writeln!(out)?;

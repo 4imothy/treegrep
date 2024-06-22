@@ -85,6 +85,7 @@ pub fn assert_pass_pool(tar_paths: Vec<PathBuf>, rg_results: Vec<u8>, tg_results
 }
 
 pub fn get_outputs(path: &Path, expr: &str, extra_option: Option<&str>) -> (Vec<u8>, Vec<u8>) {
+    env::set_var("TREEGREP_DEFAULT_OPTS", "");
     let cmd_path = env::current_exe()
         .unwrap()
         .parent()
