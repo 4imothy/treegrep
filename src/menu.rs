@@ -198,11 +198,6 @@ impl<'a, 'b> Menu<'a, 'b> {
                             menu.up(menu.small_jump)?
                         }
                         KeyCode::Char('J') | KeyCode::Char('N') => menu.down(menu.big_jump)?,
-                        KeyCode::Char('h') => {
-                            if !menu.help_popup_open {
-                                menu.help_popup()?;
-                            }
-                        }
                         KeyCode::Char('K') | KeyCode::Char('P') => menu.up(menu.big_jump)?,
                         KeyCode::Char('}') | KeyCode::Char(']') => menu.down_path()?,
                         KeyCode::Char('{') | KeyCode::Char('[') => menu.up_path()?,
@@ -213,6 +208,11 @@ impl<'a, 'b> Menu<'a, 'b> {
                         }
                         KeyCode::Char('b') | KeyCode::PageUp => {
                             menu.up_page()?;
+                        }
+                        KeyCode::Char('h') => {
+                            if !menu.help_popup_open {
+                                menu.help_popup()?;
+                            }
                         }
                         KeyCode::Enter => {
                             let match_info = MatchInfo::find(menu.selected_id, &menu.searched);

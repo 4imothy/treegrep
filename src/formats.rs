@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
+use crate::config;
 use crossterm::style::{
     Attribute, Color, ResetColor, SetAttribute, SetForegroundColor, StyledContent, Stylize,
 };
@@ -18,6 +19,7 @@ const MATCHED_COLORS: [SetForegroundColor; 3] = [GREEN_FG, MAGENTA_FG, RED_FG];
 pub const MENU_SELECTED: Color = Color::DarkGrey;
 pub const SELECTED_INDICATOR: &str = "-> ";
 pub const SELECTED_INDICATOR_CLEAR: &str = "   ";
+pub const LONG_BRANCH_FILE_SEPARATOR: &str = ", ";
 
 pub const PREFIX_LEN_DEFAULT: usize = 3;
 
@@ -96,12 +98,12 @@ pub fn repeat<T>(item: T, times: usize) -> DisplayRepeater<T> {
     DisplayRepeater(item, times)
 }
 
-pub fn error_prefix(colors: bool) -> String {
+pub fn error_prefix() -> String {
     let e_str = "error:";
-    if colors {
-        format!("{}{}{}{}", BOLD, RED_FG, e_str, RESET)
-    } else {
-        e_str.to_string()
+    match (config().colors, config().bold) {
+        (true, true) => format!("{}{}{}{}", BOLD, RED_FG, e_str, RESET),
+        (true, false) => format!("{}{}{}", RED_FG, e_str, RESET),
+        _ => e_str.to_string(),
     }
 }
 
@@ -114,11 +116,19 @@ pub fn bold() -> Vec<u8> {
 }
 
 pub fn dir_name(name: &str) -> StyledContent<&str> {
-    name.with(Color::Blue).attribute(Attribute::Bold)
+    let mut styled_name = name.with(Color::Blue);
+    if config().bold {
+        styled_name = styled_name.attribute(Attribute::Bold);
+    }
+    styled_name
 }
 
 pub fn file_name(name: &str) -> StyledContent<&str> {
-    name.with(Color::Cyan).attribute(Attribute::Bold)
+    let mut styled_name = name.with(Color::Cyan);
+    if config().bold {
+        styled_name = styled_name.attribute(Attribute::Bold);
+    }
+    styled_name
 }
 
 pub fn line_number(num: usize) -> StyledContent<String> {

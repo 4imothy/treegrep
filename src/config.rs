@@ -26,6 +26,8 @@ pub struct Config {
     pub cwd: PathBuf,
     pub path: PathBuf,
     pub tree: bool,
+    pub bold: bool,
+    pub long_branch: bool,
     pub is_dir: bool,
     pub patterns: Vec<String>,
     pub globs: Vec<String>,
@@ -84,14 +86,7 @@ impl Config {
         generate_command().get_matches_from(all_args)
     }
 
-    pub fn use_color(matches: &ArgMatches) -> bool {
-        !matches.get_flag(args::NO_COLORS.id)
-    }
-
-    pub fn get_config(
-        matches: ArgMatches,
-        colors: bool,
-    ) -> Result<(Self, Option<OsString>), Message> {
+    pub fn get_config(matches: ArgMatches) -> Result<(Self, Option<OsString>), Message> {
         let mut patterns: Vec<String> = Vec::new();
         if let Some(expr) = matches.get_one::<String>(args::EXPRESSION_POSITIONAL.id) {
             patterns.push(expr.to_owned());
@@ -108,8 +103,11 @@ impl Config {
             .unwrap_or_else(Vec::new);
 
         let tree: bool = matches.get_flag(args::TREE.id);
+        let long_branch: bool = matches.get_flag(args::LONG_BRANCHES.id);
+        let bold: bool = !matches.get_flag(args::NO_BOLD.id);
         let count: bool = matches.get_flag(args::SHOW_COUNT.id);
         let hidden: bool = matches.get_flag(args::HIDDEN.id);
+        let colors: bool = !matches.get_flag(args::NO_COLORS.id);
         let line_number: bool = matches.get_flag(args::LINE_NUMBER.id);
         let menu: bool = matches.get_flag(args::MENU.id);
         let just_files: bool = matches.get_flag(args::FILES.id);
@@ -137,9 +135,9 @@ impl Config {
             }
         }
 
-        let target: Option<String> = matches
-            .get_one::<String>(args::TARGET_POSITIONAL.id)
-            .or_else(|| matches.get_one::<String>(args::TARGET.id))
+        let path: Option<String> = matches
+            .get_one::<String>(args::PATH_POSITIONAL.id)
+            .or_else(|| matches.get_one::<String>(args::PATH.id))
             .map(|value| value.to_string());
 
         let cwd = canonicalize(
@@ -147,8 +145,8 @@ impl Config {
                 .map_err(|_| bail!("failed to get current working directory"))?,
         )?;
 
-        let path = if let Some(target) = target {
-            let path = PathBuf::from(target);
+        let path = if let Some(p) = path {
+            let path = PathBuf::from(p);
             if !path.exists() {
                 return Err(bail!(
                     "failed to find path `{}`",
@@ -167,7 +165,9 @@ impl Config {
                 cwd,
                 path,
                 tree,
+                long_branch,
                 is_dir,
+                bold,
                 searcher,
                 patterns,
                 line_number,
@@ -245,9 +245,7 @@ mod tests {
     #[test]
     fn test_default_opts() {
         std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" "));
-        let (config, _) = Config::get_config(Config::get_matches(), true)
-            .ok()
-            .unwrap();
+        let (config, _) = Config::get_config(Config::get_matches()).ok().unwrap();
         check_parsed_config_from_default_opts(config);
     }
 
@@ -256,7 +254,6 @@ mod tests {
         let (config, _) = Config::get_config(
             generate_command()
                 .get_matches_from([&[names::TREEGREP_BIN], EXAMPLE_LONG_OPTS].concat()),
-            true,
         )
         .ok()
         .unwrap();
@@ -286,16 +283,13 @@ mod tests {
 
     #[test]
     fn test_shorts() {
-        let (config, _) = Config::get_config(
-            generate_command().get_matches_from([
-                names::TREEGREP_BIN,
-                "posexpr",
-                "-n.cmf",
-                "-e=pattern1",
-                "-e=pattern2",
-            ]),
-            true,
-        )
+        let (config, _) = Config::get_config(generate_command().get_matches_from([
+            names::TREEGREP_BIN,
+            "posexpr",
+            "-n.cmf",
+            "-e=pattern1",
+            "-e=pattern2",
+        ]))
         .ok()
         .unwrap();
         assert!(config.line_number);
@@ -308,18 +302,15 @@ mod tests {
 
     #[test]
     fn test_longs_tree() {
-        let (config, _) = Config::get_config(
-            generate_command().get_matches_from([
-                names::TREEGREP_BIN,
-                "--tree",
-                "--max-depth=5",
-                "--no-ignore",
-                "--hidden",
-                "--links",
-                "--menu",
-            ]),
-            true,
-        )
+        let (config, _) = Config::get_config(generate_command().get_matches_from([
+            names::TREEGREP_BIN,
+            "--tree",
+            "--max-depth=5",
+            "--no-ignore",
+            "--hidden",
+            "--links",
+            "--menu",
+        ]))
         .ok()
         .unwrap();
         assert_eq!(config.max_depth, Some(5));
@@ -336,17 +327,15 @@ mod tests {
 
     #[test]
     fn test_shorts_tree() {
-        let (config, _) = Config::get_config(
-            generate_command().get_matches_from([names::TREEGREP_BIN, "-.lm"]),
-            true,
-        )
-        .ok()
-        .unwrap();
+        let (config, _) =
+            Config::get_config(generate_command().get_matches_from([names::TREEGREP_BIN, "-.tm"]))
+                .ok()
+                .unwrap();
         assert!(config.tree);
         assert!(config.hidden);
         assert!(config.menu);
         assert!(generate_command()
-            .try_get_matches_from([names::TREEGREP_BIN, "posexpr", "-l"])
+            .try_get_matches_from([names::TREEGREP_BIN, "posexpr", "-t"])
             .is_err());
     }
 }

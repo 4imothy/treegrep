@@ -138,9 +138,6 @@ pub fn process_json_lines(lines: Vec<&[u8]>) -> Result<Option<Matches>, Message>
                 cur_file = Some(dirs.get_mut(d_id).unwrap().files.get_mut(f_id).unwrap());
             }
             "match" => {
-                if config().just_files {
-                    continue;
-                }
                 let mut matches = Vec::new();
                 for m in res["data"]["submatches"].as_array().unwrap() {
                     matches.push(Match::new(

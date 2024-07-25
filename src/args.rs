@@ -34,36 +34,40 @@ macro_rules! arg_info {
     };
 }
 
+pub const EXPRESSION_GROUP_ID: &str = "expressions";
+pub const TARGET_GROUP_ID: &str = "targets";
+pub const HIDE_CONTENT_GROUP_ID: &str = "hide_contents";
+
 arg_info!(
     TREE,
     "tree",
     "display the files that would be search in tree format",
-    'l'
+    't'
 );
-pub const TARGET_HELP: &str =
-    "specify the search target. If none provided, search the current directory.";
-arg_info!(TARGET_POSITIONAL, "positional target", TARGET_HELP);
-arg_info!(TARGET, "target", TARGET_HELP, 't');
-pub const EXPR_HELP: &str = "specify the regex expression";
-pub const EXPRESSION_GROUP_ID: &str = "expressions";
+
+arg_info!(
+    LONG_BRANCHES,
+    "long-branch",
+    "multiple files from the same directory are shown on the same branch"
+);
+arg_info!(NO_BOLD, "no-bold", "don't bold anything");
+pub const PATH_HELP: &str = "the path to search. If not provided, search the current directory.";
+arg_info!(PATH_POSITIONAL, "positional target", PATH_HELP);
+arg_info!(PATH, "path", PATH_HELP, 'p');
+pub const EXPR_HELP: &str = "the regex expression";
 arg_info!(EXPRESSION_POSITIONAL, "positional regexp", EXPR_HELP);
 arg_info!(EXPRESSION, "regexp", EXPR_HELP, 'e');
-arg_info!(NO_COLORS, "no-color", "don't use colors if present");
+arg_info!(NO_COLORS, "no-color", "don't use colors");
 arg_info!(
     SHOW_COUNT,
     "count",
-    "display number of files matched in directory and number of lines matched in a file if present",
+    "display number of files matched in directory and number of lines matched in a file",
     'c'
 );
 arg_info!(HIDDEN, "hidden", "search hidden files", '.');
-arg_info!(
-    LINE_NUMBER,
-    "line-number",
-    "show line number of match if present",
-    'n'
-);
+arg_info!(LINE_NUMBER, "line-number", "show line number of match", 'n');
 arg_info!(MENU, "menu", MENU_HELP, 'm');
-arg_info!(FILES, "files", "show the paths that have matches", 'f');
+arg_info!(FILES, "files", "don't show matched contents", 'f');
 arg_info!(MAX_DEPTH, "max-depth", "the max depth to search");
 arg_info!(SEARCHER, "searcher", "executable to do the searching", 's');
 arg_info!(BOX_CHARS, "box-chars", "style of box characters to use");
@@ -132,6 +136,12 @@ pub fn generate_command() -> Command {
         command = command.allow_missing_positional(true);
     }
 
+    command = command.group(
+        ArgGroup::new(HIDE_CONTENT_GROUP_ID)
+            .id(HIDE_CONTENT_GROUP_ID)
+            .args([TREE.id, FILES.id]),
+    );
+
     command = add_expressions(command);
     command = add_targets(command);
 
@@ -179,13 +189,21 @@ fn usize_arg(info: &ArgInfo, requires_expr: bool) -> Arg {
     arg
 }
 
-fn get_args() -> Vec<Arg> {
+fn get_args<'a>() -> [Arg; 20] {
     let tree = Arg::new(TREE.id)
         .long(TREE.id)
-        .help("display the files that would be search in tree format")
+        .help(TREE.h)
         .action(ArgAction::SetTrue)
         .conflicts_with(EXPRESSION_GROUP_ID)
-        .short('l');
+        .short(TREE.s);
+
+    let long = Arg::new(LONG_BRANCHES.id)
+        .long(LONG_BRANCHES.id)
+        .help(LONG_BRANCHES.h)
+        .value_name("")
+        .requires(HIDE_CONTENT_GROUP_ID)
+        .conflicts_with(MENU.id)
+        .action(ArgAction::SetTrue);
 
     let glob = Arg::new(GLOB.id)
         .long(GLOB.id)
@@ -220,26 +238,27 @@ fn get_args() -> Vec<Arg> {
         .value_name("")
         .action(ArgAction::Set);
     [
-        bool_arg(SHOW_COUNT, false),
+        tree,
+        glob,
+        searcher,
+        usize_arg(&THREADS, false),
         bool_arg(HIDDEN, false),
         bool_arg(LINE_NUMBER, false),
-        bool_arg(MENU, false),
         bool_arg(FILES, true),
         bool_arg(LINKS, false),
         bool_arg(TRIM_LEFT, true),
         bool_arg(PCRE2, true),
         bool_arg(NO_IGNORE, false),
+        bool_arg(SHOW_COUNT, false),
         bool_arg(NO_COLORS, false),
+        bool_arg(NO_BOLD, false),
         usize_arg(&MAX_DEPTH, false),
-        usize_arg(&THREADS, false),
         usize_arg(&PREFIX_LEN, false),
         usize_arg(&MAX_LENGTH, true),
-        searcher,
         box_chars,
-        tree,
-        glob,
+        long,
+        bool_arg(MENU, false),
     ]
-    .to_vec()
 }
 
 fn add_expressions(command: Command) -> Command {
@@ -270,23 +289,23 @@ fn add_expressions(command: Command) -> Command {
 fn add_targets(command: Command) -> Command {
     command
         .arg(
-            Arg::new(TARGET_POSITIONAL.id)
-                .help(TARGET_POSITIONAL.h)
+            Arg::new(PATH_POSITIONAL.id)
+                .help(PATH_POSITIONAL.h)
                 .value_hint(ValueHint::AnyPath)
                 .index(2),
         )
         .arg(
-            Arg::new(TARGET.id)
-                .long(TARGET.id)
-                .short(TARGET.s.unwrap())
-                .help(TARGET.h)
+            Arg::new(PATH.id)
+                .long(PATH.id)
+                .short(PATH.s.unwrap())
+                .help(PATH.h)
                 .value_name("")
                 .value_hint(ValueHint::AnyPath),
         )
         .group(
-            ArgGroup::new("target_group")
-                .id("targets")
-                .args([TARGET_POSITIONAL.id, TARGET.id])
+            ArgGroup::new(TARGET_GROUP_ID)
+                .id(TARGET_GROUP_ID)
+                .args([PATH_POSITIONAL.id, PATH.id])
                 .multiple(false),
         )
 }

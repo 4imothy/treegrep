@@ -24,13 +24,17 @@ use std::process::Command;
 use std::sync::OnceLock;
 use writer::write_results;
 
+// TODO --plugin option that starts the program with alternate screen which prompts the user for their args
+// created a bar window of fixed width and store of the text which shifts the visible window as
+// users type beyond the window
 // TODO option to configure different colors
 // TODO add notarizing mac so exec can be used without needing to open from finder
 // TODO support for searching PDFs maybe
-// TODO --plugin option that starts the program with alternate screen which prompts the user for their args
 // TODO nvim plugin to open a popup window, select a match to open in $EDITOR
 // TODO tmux plugin to open a popup window, select a match to open in $EDITOR
 // TODO zellij plugin to open a popup window, select a match to open in $EDITOR
+// TODO for plugins would be useful to have a --repeat option so can easily search agoin for the
+// same thing
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
@@ -40,15 +44,14 @@ fn config() -> &'static Config {
 
 fn main() {
     let matches = Config::get_matches();
-    let colors = Config::use_color(&matches);
-    run(matches, colors).unwrap_or_else(|e| {
-        eprintln!("{} {}", formats::error_prefix(colors), e);
+    run(matches).unwrap_or_else(|e| {
+        eprintln!("{} {}", formats::error_prefix(), e);
         std::process::exit(1);
     });
 }
 
-fn run(matches: ArgMatches, colors: bool) -> Result<(), Message> {
-    let (c, searcher_path) = Config::get_config(matches, colors)?;
+fn run(matches: ArgMatches) -> Result<(), Message> {
+    let (c, searcher_path) = Config::get_config(matches)?;
     CONFIG.set(c).ok().unwrap();
 
     let matches: Option<Matches>;

@@ -180,9 +180,11 @@ impl Line {
             shift += styler.len();
             styled_line.splice(start..start, styler.into_iter());
             start = m.start + shift;
-            let bold = bold();
-            shift += bold.len();
-            styled_line.splice(start..start, bold.into_iter());
+            if config().bold {
+                let bold = bold();
+                shift += bold.len();
+                styled_line.splice(start..start, bold.into_iter());
+            }
             let end = m.end + shift;
             let reset = reset_bold_and_fg();
             shift += reset.len();

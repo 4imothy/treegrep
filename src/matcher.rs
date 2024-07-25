@@ -141,9 +141,6 @@ impl File {
             if was_match {
                 self.lines
                     .push(Line::style_line(line, matches, line_num + 1));
-                if config().just_files {
-                    return;
-                }
             }
         }
     }

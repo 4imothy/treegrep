@@ -173,25 +173,22 @@ mod tests {
     #[test]
     fn test_options_add_args_rg() {
         let mut cmd = Command::new("rg");
-        let (c, _) = Config::get_config(
-            generate_command().get_matches_from([
-                names::TREEGREP_BIN,
-                "--regexp=pattern1",
-                "--regexp=pattern2",
-                "--glob=globbing",
-                "--glob=glob2",
-                "--line-number",
-                "--max-depth=5",
-                "--pcre2",
-                "--no-ignore",
-                "--hidden",
-                "--threads=8",
-                "--count",
-                "--links",
-                "--trim",
-            ]),
-            true,
-        )
+        let (c, _) = Config::get_config(generate_command().get_matches_from([
+            names::TREEGREP_BIN,
+            "--regexp=pattern1",
+            "--regexp=pattern2",
+            "--glob=globbing",
+            "--glob=glob2",
+            "--line-number",
+            "--max-depth=5",
+            "--pcre2",
+            "--no-ignore",
+            "--hidden",
+            "--threads=8",
+            "--count",
+            "--links",
+            "--trim",
+        ]))
         .ok()
         .unwrap();
         CONFIG.set(c).ok().unwrap();

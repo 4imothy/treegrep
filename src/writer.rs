@@ -7,6 +7,8 @@ use crossterm::style::StyledContent;
 use std::ffi::OsString;
 use std::io::{self, Write};
 
+const LONG_BRANCH_FILES_PER_LINE: usize = 5;
+
 impl Directory {
     fn write(
         &self,
@@ -30,6 +32,7 @@ impl Directory {
                 &formats::dir_name,
                 out,
             )?;
+            writeln!(out)?;
         }
         let mut i: usize = 0;
         for child_id in children {
@@ -45,9 +48,58 @@ impl Directory {
             }
             dir.write(out, new_prefix, dirs, path_ids, cur_id)?;
         }
-        for (i, file) in files.iter().enumerate() {
-            file.write(out, prefix.clone(), i + 1 != flen, path_ids, cur_id)?;
+        if files.len() > 0 {
+            if config().long_branch {
+                self.long_branch_files(out, prefix, files)?;
+            } else {
+                for (i, file) in files.iter().enumerate() {
+                    file.write(out, prefix.clone(), i + 1 != flen, path_ids, cur_id)?;
+                }
+            }
         }
+        Ok(())
+    }
+
+    fn long_branch_files(
+        &self,
+        out: &mut impl Write,
+        prefix: String,
+        files: &Vec<File>,
+    ) -> io::Result<()> {
+        let mut first_long_branch = true;
+        let num_lines: usize =
+            (files.len() + LONG_BRANCH_FILES_PER_LINE - 1) / LONG_BRANCH_FILES_PER_LINE;
+        let mut line_id: usize = 0;
+
+        for (i, file) in files.iter().enumerate() {
+            if first_long_branch {
+                if num_lines == 1 {
+                    write!(out, "{}{}", prefix, config().c.match_no_next)?;
+                } else {
+                    write!(out, "{}{}", prefix, config().c.match_with_next)?;
+                }
+                first_long_branch = false;
+            } else if i % LONG_BRANCH_FILES_PER_LINE == 0 {
+                write!(out, "{}", formats::LONG_BRANCH_FILE_SEPARATOR)?;
+                writeln!(out)?;
+                line_id += 1;
+                if line_id + 1 == num_lines {
+                    write!(out, "{}{}", prefix, config().c.match_no_next)?;
+                } else {
+                    write!(out, "{}{}", prefix, config().c.match_with_next)?;
+                }
+            } else {
+                write!(out, "{}", formats::LONG_BRANCH_FILE_SEPARATOR)?;
+            }
+            write_name(
+                &file.name,
+                &file.linked,
+                file.lines.len(),
+                &formats::file_name,
+                out,
+            )?;
+        }
+        writeln!(out)?;
         Ok(())
     }
 }
@@ -79,6 +131,7 @@ impl File {
             &formats::file_name,
             out,
         )?;
+        writeln!(out)?;
 
         if config().just_files {
             return Ok(());
@@ -128,7 +181,6 @@ fn write_name(
     if config().count && !file_in_tree {
         write!(out, ": {}", count)?;
     }
-    writeln!(out)?;
 
     Ok(())
 }

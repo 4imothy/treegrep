@@ -48,15 +48,31 @@ A pattern matcher frontend or backend which displays results in a tree
 tgrep [OPTIONS] [positional regexp] [positional target]
 
 Arguments:
-  [positional regexp]  specify the regex expression
-  [positional target]  specify the search target. If none provided, search the current directory.
+  [positional regexp]  the regex expression
+  [positional target]  the path to search. If not provided, search the current directory.
 
 Options:
-  -e, --regexp <>      specify the regex expression
-  -t, --target <>      specify the search target. If none provided, search the current directory.
-  -c, --count          display number of files matched in directory and number of lines matched in a file if present
+  -e, --regexp <>      the regex expression
+  -p, --path <>        the path to search. If not provided, search the current directory.
+  -t, --tree           display the files that would be search in tree format
+      --glob <>        rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic
+  -s, --searcher <>    executable to do the searching [possible values: rg, tgrep]
+      --threads <>     set the appropriate number of threads to use
   -., --hidden         search hidden files
-  -n, --line-number    show line number of match if present
+  -n, --line-number    show line number of match
+  -f, --files          don't show matched contents
+      --links          show linked paths for symbolic links
+      --trim           trim whitespace at the beginning of lines
+      --pcre2          enable PCRE2 if the searcher supports it
+      --no-ignore      don't use ignore files
+  -c, --count          display number of files matched in directory and number of lines matched in a file
+      --no-color       don't use colors
+      --no-bold        don't bold anything
+      --max-depth <>   the max depth to search
+      --prefix-len <>  number of characters to show before a match
+      --max-length <>  set the max length for a matched line
+      --box-chars <>   style of box characters to use [possible values: single, double, heavy, rounded, none]
+      --long-branch    multiple files from the same directory are shown on the same branch
   -m, --menu           open results in a menu to be edited with $EDITOR
                        navigate through the menu using the following commands:
                         - move up/down: k/j, p/n, up arrow/down arrow
@@ -65,20 +81,6 @@ Options:
                         - move to the start/end: g/G, </>, home/end
                         - move up/down a page: b/f, pageup/pagedown
                         - quit: q, ctrl + c
-  -f, --files          show the paths that have matches
-      --links          show linked paths for symbolic links
-      --trim           trim whitespace at the beginning of lines
-      --pcre2          enable PCRE2 if the searcher supports it
-      --no-ignore      don't use ignore files
-      --no-color       don't use colors if present
-      --max-depth <>   the max depth to search
-      --threads <>     set the appropriate number of threads to use
-      --prefix-len <>  number of characters to show before a match
-      --max-length <>  set the max length for a matched line
-  -s, --searcher <>    executable to do the searching [possible values: rg, tgrep]
-      --box-chars <>   style of box characters to use [possible values: single, double, heavy, rounded, none]
-  -l, --tree           display the files that would be search in tree format
-      --glob <>        rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic
   -h, --help           Print help
   -V, --version        Print version
 
