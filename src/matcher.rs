@@ -139,8 +139,7 @@ impl File {
                 }
             }
             if was_match {
-                self.lines
-                    .push(Line::style_line(line, matches, line_num + 1));
+                self.lines.push(Line::styled(line, matches, line_num + 1));
             }
         }
     }

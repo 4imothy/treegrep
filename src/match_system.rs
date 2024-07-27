@@ -2,7 +2,7 @@
 
 use crate::config;
 use crate::errors::{bail, Message};
-use crate::formats::{bold, get_color, reset_bold_and_fg};
+use crate::formats;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
@@ -134,86 +134,16 @@ impl Match {
 }
 
 pub struct Line {
-    pub line_num: Option<usize>,
-    pub contents: Option<Vec<u8>>,
+    pub contents: Vec<u8>,
+    pub line_num: usize,
 }
 
 impl Line {
-    pub fn new(contents: Option<Vec<u8>>, line_num: Option<usize>) -> Self {
-        Line { contents, line_num }
-    }
-
-    pub fn style_line(mut contents: &[u8], mut matches: Vec<Match>, line_num: usize) -> Self {
-        let cut;
-        if config().trim {
-            (contents, cut) = contents.trim_left();
-        } else {
-            cut = 0;
+    pub fn styled(contents: &[u8], mut matches: Vec<Match>, line_num: usize) -> Self {
+        if matches.len() > 0 {
+            Match::remove_overlapping(&mut matches);
         }
-        if let Some(max_len) = config().max_length {
-            if max_len < contents.len() {
-                contents = &contents[0..max_len];
-            }
-        }
-        if !config().colors {
-            return Line::new(Some(contents.to_vec()), Some(line_num));
-        }
-
-        Match::remove_overlapping(&mut matches);
-
-        let mut styled_line = contents.to_vec();
-        let mut shift = 0;
-        for mut m in matches {
-            if m.start >= contents.len() {
-                break;
-            }
-            if m.end >= contents.len() {
-                m.end = contents.len();
-            }
-            if cut > m.start || cut > m.end || m.start == m.end {
-                continue;
-            }
-            m.start -= cut;
-            m.end -= cut;
-            let styler = get_color(m.pattern_id).to_string().into_bytes();
-            let mut start = m.start + shift;
-            shift += styler.len();
-            styled_line.splice(start..start, styler.into_iter());
-            start = m.start + shift;
-            if config().bold {
-                let bold = bold();
-                shift += bold.len();
-                styled_line.splice(start..start, bold.into_iter());
-            }
-            let end = m.end + shift;
-            let reset = reset_bold_and_fg();
-            shift += reset.len();
-            styled_line.splice(end..end, reset.into_iter());
-        }
-
-        Line::new(Some(styled_line), Some(line_num))
-    }
-}
-
-trait SliceExt {
-    fn trim_left(&self) -> (&Self, usize);
-}
-
-impl SliceExt for [u8] {
-    fn trim_left(&self) -> (&[u8], usize) {
-        fn is_space(b: u8) -> bool {
-            match b {
-                b'\t' | b'\n' | b'\x0B' | b'\x0C' | b'\r' | b' ' => true,
-                _ => false,
-            }
-        }
-
-        let start = self
-            .iter()
-            .take_while(|&&b| -> bool { is_space(b) })
-            .count();
-
-        (&self[start..], start)
+        formats::style_line(contents, matches, line_num)
     }
 }
 
@@ -308,15 +238,5 @@ mod tests {
 
         path = Path::new("/");
         assert_eq!(path_name(&path).ok(), None);
-    }
-
-    #[test]
-    fn test_trim_left() {
-        let bytes: &[u8] = b"    \t  Hello, World!";
-
-        let (trimmed, count) = bytes.trim_left();
-
-        assert_eq!(trimmed, b"Hello, World!");
-        assert_eq!(count, 7);
     }
 }

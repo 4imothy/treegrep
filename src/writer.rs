@@ -160,53 +160,37 @@ fn write_name(
     out: &mut impl Write,
 ) -> io::Result<()> {
     if let Some(l) = linked {
-        if config().colors {
-            write!(out, "{} -> ", format(&name))?;
-        } else {
-            write!(out, "{} -> ", name)?
-        }
-        if config().colors {
-            write!(out, "{}", format(&l.to_string_lossy()))?;
-        } else {
-            write!(out, "{}", l.to_string_lossy())?;
-        }
+        write!(out, "{} -> {}", format(&name), format(&l.to_string_lossy()))?;
     } else {
-        if config().colors {
-            write!(out, "{}", format(&name))?;
-        } else {
-            write!(out, "{}", name)?;
-        }
+        write!(out, "{}", format(&name))?;
     }
     let file_in_tree: bool = config().tree && count == 0;
     if config().count && !file_in_tree {
         write!(out, ": {}", count)?;
     }
+    write!(out, "{}", formats::resets())?;
 
     Ok(())
 }
 
 impl Line {
     pub fn write(&self, out: &mut impl Write) -> std::io::Result<()> {
-        let contents: &[u8] = self.contents.as_ref().unwrap();
+        let contents: &[u8] = self.contents.as_ref();
         let mut need_new_line = false;
         if !contents.ends_with(&[formats::NEW_LINE as u8]) {
             need_new_line = true;
         }
         let line_num = self.line_num;
-        if !config().colors {
-            if config().line_number {
-                write!(out, "{}: ", line_num.unwrap())?;
-            }
-            write!(out, "{}", String::from_utf8_lossy(&contents))?;
-        } else {
-            if config().line_number {
-                write!(out, "{}", formats::line_number(line_num.unwrap()))?;
-            } else if config().menu {
-                write!(out, "{}", formats::RESET_COLOR)?;
-            }
-            write!(out, "{}", String::from_utf8_lossy(&contents))?;
+        if config().line_number {
+            write!(out, "{} ", formats::line_number(line_num))?;
         }
 
+        write!(
+            out,
+            "{}{}",
+            formats::resets(),
+            String::from_utf8_lossy(&contents)
+        )?;
         if need_new_line {
             writeln!(out)?;
         }
