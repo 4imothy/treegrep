@@ -20,8 +20,8 @@ _tgrep() {
 '-p+[the path to search. If not provided, search the current directory.]::_files' \
 '--path=[the path to search. If not provided, search the current directory.]::_files' \
 '*--glob=[rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic]:: ' \
-'(-t --tree)-s+[executable to do the searching]::(rg tgrep)' \
-'(-t --tree)--searcher=[executable to do the searching]::(rg tgrep)' \
+'-s+[executable to do the searching]::(rg tgrep)' \
+'--searcher=[executable to do the searching]::(rg tgrep)' \
 '--threads=[set the appropriate number of threads to use]:: ' \
 '--max-depth=[the max depth to search]:: ' \
 '--prefix-len=[number of characters to show before a match]:: ' \

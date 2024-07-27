@@ -210,9 +210,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                             menu.up_page()?;
                         }
                         KeyCode::Char('h') => {
-                            if !menu.help_popup_open {
-                                menu.help_popup()?;
-                            }
+                            menu.help_popup()?;
                         }
                         KeyCode::Enter => {
                             let match_info = MatchInfo::find(menu.selected_id, &menu.searched);
@@ -617,7 +615,10 @@ impl MatchInfo {
         if !config().just_files {
             for line in file.lines.iter() {
                 if *current == selected {
-                    return Some(Self::new(file.path.clone().into_os_string(), line.line_num));
+                    return Some(Self::new(
+                        file.path.clone().into_os_string(),
+                        Some(line.line_num),
+                    ));
                 }
                 *current += 1;
             }

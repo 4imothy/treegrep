@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
 use crate::config;
+use crate::match_system::{Line, Match};
 use crossterm::style::{
-    Attribute, Color, ResetColor, SetAttribute, SetForegroundColor, StyledContent, Stylize,
+    style, Attribute, Color, ResetColor, SetAttribute, SetForegroundColor, StyledContent, Stylize,
 };
 use std::fmt::{self, Display};
 
-pub const RESET: SetAttribute = SetAttribute(Attribute::Reset);
-pub const RESET_COLOR: ResetColor = ResetColor;
-pub const NO_BOLD: SetAttribute = SetAttribute(Attribute::NormalIntensity);
-pub const BOLD: SetAttribute = SetAttribute(Attribute::Bold);
+const RESET: SetAttribute = SetAttribute(Attribute::Reset);
+const RESET_COLOR: ResetColor = ResetColor;
+const NO_BOLD: SetAttribute = SetAttribute(Attribute::NormalIntensity);
+const BOLD: SetAttribute = SetAttribute(Attribute::Bold);
 
 const RED_FG: SetForegroundColor = SetForegroundColor(Color::Red);
 const GREEN_FG: SetForegroundColor = SetForegroundColor(Color::Green);
@@ -107,36 +108,140 @@ pub fn error_prefix() -> String {
     }
 }
 
-pub fn reset_bold_and_fg() -> Vec<u8> {
-    (RESET_COLOR.to_string() + &NO_BOLD.to_string()).into_bytes()
+pub fn resets() -> String {
+    let mut result = String::new();
+
+    if config().colors {
+        result.push_str(&RESET_COLOR.to_string());
+    }
+
+    if config().bold {
+        result.push_str(&NO_BOLD.to_string());
+    }
+
+    result
 }
 
 pub fn bold() -> Vec<u8> {
     BOLD.to_string().into_bytes()
 }
 
-pub fn dir_name(name: &str) -> StyledContent<&str> {
-    let mut styled_name = name.with(Color::Blue);
-    if config().bold {
-        styled_name = styled_name.attribute(Attribute::Bold);
+fn style_str(orig: &str, color: Color, attr: Attribute) -> StyledContent<&str> {
+    let mut styled = style(orig);
+    if config().colors {
+        styled = styled.with(color);
     }
-    styled_name
+    if config().bold {
+        styled = styled.attribute(attr);
+    }
+    styled
+}
+
+pub fn dir_name(name: &str) -> StyledContent<&str> {
+    style_str(name, Color::Blue, Attribute::Bold)
 }
 
 pub fn file_name(name: &str) -> StyledContent<&str> {
-    let mut styled_name = name.with(Color::Cyan);
-    if config().bold {
-        styled_name = styled_name.attribute(Attribute::Bold);
-    }
-    styled_name
+    style_str(name, Color::Cyan, Attribute::Bold)
 }
 
 pub fn line_number(num: usize) -> StyledContent<String> {
-    format!("{}:", num)
-        .with(Color::Yellow)
-        .attribute(Attribute::Bold)
+    let mut styled_num = style(format!("{}:", num));
+    if config().colors {
+        styled_num = styled_num.with(Color::Yellow);
+    }
+    if config().bold {
+        styled_num = styled_num.attribute(Attribute::Bold);
+    }
+    styled_num
 }
 
 pub fn get_color(i: usize) -> SetForegroundColor {
     MATCHED_COLORS[i % MATCHED_COLORS.len()]
+}
+
+pub fn style_line(mut contents: &[u8], matches: Vec<Match>, line_num: usize) -> Line {
+    let cut;
+    if config().trim {
+        (contents, cut) = contents.trim_left();
+    } else {
+        cut = 0;
+    }
+    if let Some(max_len) = config().max_length {
+        if max_len < contents.len() {
+            contents = &contents[0..max_len];
+        }
+    }
+    let mut styled_line = contents.to_vec();
+    if config().colors {
+        let mut shift = 0;
+        for mut m in matches {
+            if m.start >= contents.len() {
+                break;
+            }
+            if m.end >= contents.len() {
+                m.end = contents.len();
+            }
+            if cut > m.start || cut > m.end || m.start == m.end {
+                continue;
+            }
+            m.start -= cut;
+            m.end -= cut;
+            let styler = get_color(m.pattern_id).to_string().into_bytes();
+            let mut start = m.start + shift;
+            shift += styler.len();
+            styled_line.splice(start..start, styler.into_iter());
+            start = m.start + shift;
+            if config().bold {
+                let bold = bold();
+                shift += bold.len();
+                styled_line.splice(start..start, bold.into_iter());
+            }
+            let end = m.end + shift;
+            let reset = resets();
+            shift += reset.len();
+            styled_line.splice(end..end, reset.bytes().into_iter());
+        }
+    }
+
+    Line {
+        contents: styled_line,
+        line_num,
+    }
+}
+
+trait SliceExt {
+    fn trim_left(&self) -> (&Self, usize);
+}
+
+impl SliceExt for [u8] {
+    fn trim_left(&self) -> (&[u8], usize) {
+        fn is_space(b: u8) -> bool {
+            match b {
+                b'\t' | b'\n' | b'\x0B' | b'\x0C' | b'\r' | b' ' => true,
+                _ => false,
+            }
+        }
+
+        let start = self
+            .iter()
+            .take_while(|&&b| -> bool { is_space(b) })
+            .count();
+
+        (&self[start..], start)
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trim_left() {
+        let bytes: &[u8] = b"    \t  Hello, World!";
+
+        let (trimmed, count) = bytes.trim_left();
+
+        assert_eq!(trimmed, b"Hello, World!");
+        assert_eq!(count, 7);
+    }
 }

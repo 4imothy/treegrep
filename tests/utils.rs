@@ -7,9 +7,9 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub const OVERWRITE: bool = false;
+const OVERWRITE: bool = false;
 
-pub fn normalize_newlines(contents: &mut Vec<u8>) {
+fn normalize_newlines(contents: &mut Vec<u8>) {
     let mut i = 0;
     if contents.len() == 0 {
         panic!("empty output can't be normalized");
@@ -24,7 +24,7 @@ pub fn normalize_newlines(contents: &mut Vec<u8>) {
     }
 }
 
-pub fn get_target_contents(path: PathBuf) -> Vec<u8> {
+fn get_target_contents(path: PathBuf) -> Vec<u8> {
     let mut contents: Vec<u8> = fs::read(&path).unwrap();
 
     normalize_newlines(&mut contents);
@@ -109,8 +109,9 @@ pub fn get_outputs(path: &Path, expr: &str, extra_option: Option<&str>) -> (Vec<
         }
     }
 
-    tg.arg("--no-color");
-    tg_on_rg.arg("--no-color");
+    let destlye_args = ["--no-color", "--no-bold"];
+    tg.args(destlye_args);
+    tg_on_rg.args(destlye_args);
     if let Some(o) = extra_option {
         tg_on_rg.arg(o);
         tg.arg(o);
@@ -134,14 +135,22 @@ pub fn get_outputs(path: &Path, expr: &str, extra_option: Option<&str>) -> (Vec<
     if !tg_out.status.success() && rg_out.stderr.len() > 0 {
         panic!("cmd failed {}", String::from_utf8_lossy(&rg_out.stderr));
     }
+    let mut rg_stdout: Vec<u8> = rg_out.stdout;
+    let rg_stderr: Vec<u8> = rg_out.stderr;
+    if !rg_stderr.is_empty() {
+        eprintln!("{}", String::from_utf8_lossy(&rg_stderr));
+    }
 
-    let mut rg_results: Vec<u8> = rg_out.stdout;
-    let mut tg_results: Vec<u8> = tg_out.stdout;
+    let mut tg_stdout: Vec<u8> = tg_out.stdout;
+    let tg_stderr: Vec<u8> = tg_out.stderr;
+    if !tg_stderr.is_empty() {
+        eprintln!("{}", String::from_utf8_lossy(&tg_stderr));
+    }
 
-    normalize_newlines(&mut rg_results);
-    normalize_newlines(&mut tg_results);
+    normalize_newlines(&mut rg_stdout);
+    normalize_newlines(&mut tg_stdout);
 
-    (rg_results, tg_results)
+    (rg_stdout, tg_stdout)
 }
 
 pub fn cross_runner() -> Option<String> {

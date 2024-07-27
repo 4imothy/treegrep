@@ -222,7 +222,6 @@ fn get_args<'a>() -> [Arg; 20] {
             PossibleValue::new(names::TREEGREP).hide(true),
         ])
         .value_name("")
-        .conflicts_with(TREE.id)
         .action(ArgAction::Set);
 
     let box_chars = Arg::new(BOX_CHARS.id)
