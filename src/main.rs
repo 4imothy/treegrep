@@ -4,12 +4,14 @@ mod args;
 mod config;
 mod errors;
 mod formats;
+mod log;
 mod match_system;
 mod matcher;
 mod menu;
 mod options;
 mod output_processor;
 mod searchers;
+mod term;
 mod writer;
 use clap::ArgMatches;
 use config::Config;
@@ -38,20 +40,26 @@ use writer::write_results;
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
+const LOG: bool = true;
+
 fn config() -> &'static Config {
     CONFIG.get().unwrap()
 }
 
 fn main() {
+    if LOG {
+        log::set_panic_hook();
+    }
     let matches = Config::get_matches();
-    run(matches).unwrap_or_else(|e| {
-        eprintln!("{} {}", formats::error_prefix(), e);
+    let (bold, colors) = Config::get_styling(&matches);
+    run(matches, bold, colors).unwrap_or_else(|e| {
+        eprintln!("{} {}", formats::error_prefix(bold, colors), e);
         std::process::exit(1);
     });
 }
 
-fn run(matches: ArgMatches) -> Result<(), Message> {
-    let (c, searcher_path) = Config::get_config(matches)?;
+fn run(matches: ArgMatches, bold: bool, colors: bool) -> Result<(), Message> {
+    let (c, searcher_path) = Config::get_config(matches, bold, colors)?;
     CONFIG.set(c).ok().unwrap();
 
     let matches: Option<Matches>;
@@ -67,7 +75,7 @@ fn run(matches: ArgMatches) -> Result<(), Message> {
 
     let mut out: StdoutLock = stdout().lock();
     if config().menu {
-        Menu::enter(&mut out, matches.unwrap()).map_err(|e| bail!("{}", e.to_string()))?;
+        Menu::enter(out, matches.unwrap()).map_err(|e| bail!("{}", e.to_string()))?;
     } else {
         write_results(&mut out, &matches.unwrap(), None).map_err(|e| bail!("{}", e.to_string()))?;
     }

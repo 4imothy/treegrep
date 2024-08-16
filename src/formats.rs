@@ -99,11 +99,12 @@ pub fn repeat<T>(item: T, times: usize) -> DisplayRepeater<T> {
     DisplayRepeater(item, times)
 }
 
-pub fn error_prefix() -> String {
+pub fn error_prefix(bold: bool, colors: bool) -> String {
     let e_str = "error:";
-    match (config().colors, config().bold) {
+    match (bold, colors) {
         (true, true) => format!("{}{}{}{}", BOLD, RED_FG, e_str, RESET),
-        (true, false) => format!("{}{}{}", RED_FG, e_str, RESET),
+        (true, false) => format!("{}{}{}", BOLD, e_str, RESET),
+        (false, true) => format!("{}{}{}", RED_FG, e_str, RESET),
         _ => e_str.to_string(),
     }
 }

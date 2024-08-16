@@ -116,12 +116,14 @@ navigate through the menu using the following commands:
 \u{0020}- move up/down paths: {/}, [/]
 \u{0020}- move to the start/end: g/G, </>, home/end
 \u{0020}- move up/down a page: b/f, pageup/pagedown
+\u{0020}- center cursor: z/l
 \u{0020}- quit: q, ctrl + c";
 
 pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
 
 pub fn generate_command() -> Command {
     let mut command = Command::new(crate_name!())
+        .no_binary_name(true)
         .help_template(HELP.to_owned())
         .after_help(
             "Any of the above can be set using the ".to_string()

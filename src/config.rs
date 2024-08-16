@@ -26,13 +26,13 @@ pub struct Config {
     pub cwd: PathBuf,
     pub path: PathBuf,
     pub tree: bool,
-    pub bold: bool,
     pub long_branch: bool,
+    pub bold: bool,
+    pub colors: bool,
     pub is_dir: bool,
     pub patterns: Vec<String>,
     pub globs: Vec<String>,
     pub searcher: Searchers,
-    pub colors: bool,
     pub count: bool,
     pub hidden: bool,
     pub line_number: bool,
@@ -70,23 +70,35 @@ fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, M
 }
 
 impl Config {
-    pub fn get_matches() -> ArgMatches {
-        let mut all_args: Vec<OsString> = std::env::var(args::DEFAULT_OPTS_ENV_NAME)
+    fn get_env_opts() -> Vec<OsString> {
+        std::env::var(args::DEFAULT_OPTS_ENV_NAME)
             .ok()
             .filter(|val| !val.is_empty())
             .map(|val| val.split_whitespace().map(OsString::from).collect())
-            .unwrap_or_default();
-
-        let mut args_os = std::env::args_os();
-        if let Some(cmd) = args_os.next() {
-            all_args.insert(0, cmd);
-        }
-        all_args.extend(args_os);
-
-        generate_command().get_matches_from(all_args)
+            .unwrap_or_default()
     }
 
-    pub fn get_config(matches: ArgMatches) -> Result<(Self, Option<OsString>), Message> {
+    pub fn get_matches_from(mut args: Vec<OsString>) -> ArgMatches {
+        args.extend(Config::get_env_opts());
+        generate_command().get_matches_from(args)
+    }
+
+    pub fn get_matches() -> ArgMatches {
+        Self::get_matches_from(std::env::args_os().skip(1).collect())
+    }
+
+    pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
+        (
+            !matches.get_flag(args::NO_BOLD.id),
+            !matches.get_flag(args::NO_COLORS.id),
+        )
+    }
+
+    pub fn get_config(
+        matches: ArgMatches,
+        bold: bool,
+        colors: bool,
+    ) -> Result<(Self, Option<OsString>), Message> {
         let mut patterns: Vec<String> = Vec::new();
         if let Some(expr) = matches.get_one::<String>(args::EXPRESSION_POSITIONAL.id) {
             patterns.push(expr.to_owned());
@@ -104,10 +116,8 @@ impl Config {
 
         let tree: bool = matches.get_flag(args::TREE.id);
         let long_branch: bool = matches.get_flag(args::LONG_BRANCHES.id);
-        let bold: bool = !matches.get_flag(args::NO_BOLD.id);
         let count: bool = matches.get_flag(args::SHOW_COUNT.id);
         let hidden: bool = matches.get_flag(args::HIDDEN.id);
-        let colors: bool = !matches.get_flag(args::NO_COLORS.id);
         let line_number: bool = matches.get_flag(args::LINE_NUMBER.id);
         let menu: bool = matches.get_flag(args::MENU.id);
         let just_files: bool = matches.get_flag(args::FILES.id);
@@ -221,7 +231,6 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::args::names;
 
     static EXAMPLE_LONG_OPTS: &[&str] = &[
         "posexpr",
@@ -242,25 +251,33 @@ mod tests {
         "--regexp=pattern2",
     ];
 
+    pub fn get_config_from<I, T>(args: I) -> Config
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<OsString> + Clone,
+    {
+        let matches = generate_command().get_matches_from(args);
+        let (bold, colors) = Config::get_styling(&matches);
+        let (config, _) = Config::get_config(matches, bold, colors).ok().unwrap();
+        config
+    }
+
     #[test]
     fn test_default_opts() {
         std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" "));
-        let (config, _) = Config::get_config(Config::get_matches()).ok().unwrap();
-        check_parsed_config_from_default_opts(config);
+        let matches = Config::get_matches();
+        let (bold, colors) = Config::get_styling(&matches);
+        let (config, _) = Config::get_config(matches, bold, colors).ok().unwrap();
+        check_parsed_config_from_example_opts(config);
     }
 
     #[test]
     fn test_longs() {
-        let (config, _) = Config::get_config(
-            generate_command()
-                .get_matches_from([&[names::TREEGREP_BIN], EXAMPLE_LONG_OPTS].concat()),
-        )
-        .ok()
-        .unwrap();
-        check_parsed_config_from_default_opts(config);
+        let config = get_config_from(EXAMPLE_LONG_OPTS);
+        check_parsed_config_from_example_opts(config);
     }
 
-    fn check_parsed_config_from_default_opts(config: Config) {
+    fn check_parsed_config_from_example_opts(config: Config) {
         assert!(config.line_number);
         assert_eq!(config.max_depth, Some(5));
         assert_eq!(config.max_length, Some(20));
@@ -283,15 +300,7 @@ mod tests {
 
     #[test]
     fn test_shorts() {
-        let (config, _) = Config::get_config(generate_command().get_matches_from([
-            names::TREEGREP_BIN,
-            "posexpr",
-            "-n.cmf",
-            "-e=pattern1",
-            "-e=pattern2",
-        ]))
-        .ok()
-        .unwrap();
+        let config = get_config_from(["posexpr", "-n.cmf", "-e=pattern1", "-e=pattern2"]);
         assert!(config.line_number);
         assert!(config.hidden);
         assert!(config.count);
@@ -302,17 +311,14 @@ mod tests {
 
     #[test]
     fn test_longs_tree() {
-        let (config, _) = Config::get_config(generate_command().get_matches_from([
-            names::TREEGREP_BIN,
+        let config = get_config_from([
             "--tree",
             "--max-depth=5",
             "--no-ignore",
             "--hidden",
             "--links",
             "--menu",
-        ]))
-        .ok()
-        .unwrap();
+        ]);
         assert_eq!(config.max_depth, Some(5));
         assert!(!config.ignore);
         assert!(config.hidden);
@@ -321,21 +327,18 @@ mod tests {
         assert!(config.colors);
         assert!(config.menu);
         assert!(generate_command()
-            .try_get_matches_from([names::TREEGREP_BIN, "--tree", "posexpr"])
+            .try_get_matches_from(["--tree", "posexpr"])
             .is_err());
     }
 
     #[test]
     fn test_shorts_tree() {
-        let (config, _) =
-            Config::get_config(generate_command().get_matches_from([names::TREEGREP_BIN, "-.tm"]))
-                .ok()
-                .unwrap();
+        let config = get_config_from(["-.tm"]);
         assert!(config.tree);
         assert!(config.hidden);
         assert!(config.menu);
         assert!(generate_command()
-            .try_get_matches_from([names::TREEGREP_BIN, "posexpr", "-t"])
+            .try_get_matches_from(["posexpr", "-t"])
             .is_err());
     }
 }
