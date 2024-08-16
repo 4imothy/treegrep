@@ -1,21 +1,28 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
 use crossterm::{
-    cursor, execute,
+    cursor, execute, style,
     terminal::{self, ClearType},
 };
 use std::io::{self, StdoutLock, Write};
+use std::panic;
 
 pub struct Term<'a> {
-    out: StdoutLock<'a>,
     pub height: u16,
     pub width: u16,
+    out: StdoutLock<'a>,
+    in_alternate_screen: bool,
 }
 
 impl<'a> Term<'a> {
     pub fn new(out: StdoutLock<'a>) -> io::Result<Term<'a>> {
         let (width, height) = terminal::size()?;
-        Ok(Term { out, height, width })
+        Ok(Term {
+            out,
+            height,
+            width,
+            in_alternate_screen: false,
+        })
     }
 
     pub fn set_dims(&mut self, dims: (u16, u16)) {
@@ -33,7 +40,34 @@ impl<'a> Term<'a> {
             terminal::EnterAlternateScreen,
             terminal::DisableLineWrap,
         )?;
+        self.in_alternate_screen = true;
+        let default_hook = panic::take_hook();
+        panic::set_hook(Box::new(move |info| {
+            Term::exit().ok();
+            default_hook(info);
+        }));
+
         terminal::enable_raw_mode()
+    }
+
+    fn exit() -> io::Result<()> {
+        terminal::disable_raw_mode()?;
+        execute!(
+            io::stderr(),
+            style::ResetColor,
+            cursor::SetCursorStyle::DefaultUserShape,
+            terminal::LeaveAlternateScreen,
+            terminal::EnableLineWrap,
+            cursor::Show,
+        )
+    }
+
+    pub fn give(&mut self) -> io::Result<()> {
+        self.flush()?;
+        Term::exit()?;
+        self.in_alternate_screen = false;
+        let _ = panic::take_hook();
+        Ok(())
     }
 }
 

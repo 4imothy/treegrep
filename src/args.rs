@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
 use clap::builder::PossibleValue;
-use clap::{
-    crate_authors, crate_description, crate_name, crate_version, Arg, ArgAction, ArgGroup, Command,
-    ValueHint,
-};
+use clap::{Arg, ArgAction, ArgGroup, Command, ValueHint};
+
+use self::names::TREEGREP_BIN;
 
 pub mod names {
     pub const TREEGREP: &str = "treegrep";
@@ -100,14 +99,20 @@ arg_info!(
     "rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic"
 );
 
-const HELP: &str = "{name} {version}
+const HELP: &str = concat!(
+    "{name} {version}
+
 by {author}
+
+Home page: ",
+    env!("CARGO_PKG_HOMEPAGE"),
+    "
 
 {about}
 
 {usage}
-
-{all-args}{after-help}";
+{all-args}{after-help}"
+);
 
 pub const MENU_HELP: &str = "open results in a menu to be edited with $EDITOR
 navigate through the menu using the following commands:
@@ -122,17 +127,19 @@ navigate through the menu using the following commands:
 pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
 
 pub fn generate_command() -> Command {
-    let mut command = Command::new(crate_name!())
+    let mut command = Command::new(env!("CARGO_PKG_NAME"))
         .no_binary_name(true)
+        .bin_name(TREEGREP_BIN)
         .help_template(HELP.to_owned())
         .after_help(
             "Any of the above can be set using the ".to_string()
                 + DEFAULT_OPTS_ENV_NAME
                 + " environment variable",
         )
-        .author(crate_authors!(", "))
-        .about(crate_description!())
-        .version(crate_version!());
+        .author(env!("CARGO_PKG_AUTHORS"))
+        .about(env!("CARGO_PKG_DESCRIPTION"))
+        .version(env!("CARGO_PKG_VERSION"));
+    // .author(env!("CARGO_PKG_HOMEPAGE"))
 
     if tree_arg_present() {
         command = command.allow_missing_positional(true);

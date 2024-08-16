@@ -31,7 +31,7 @@ path = "tests/tests.rs"
 
 [dependencies]
 crossterm = "0.27.0"
-clap = { version = "4.5.4", features = ["cargo"] }
+clap = "4.5.4"
 dunce = "1.0.4"
 bstr = "1.9.1"
 ignore = "0.4.22"
@@ -40,5 +40,5 @@ signal-hook = "0.3.17"
 serde_json = "1.0.117"
 
 [build-dependencies]
-clap = { version = "4.5.4", features = ["cargo"] }
+clap = "4.5.4"
 clap_complete = "4.5.1"

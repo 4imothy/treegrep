@@ -9,8 +9,8 @@ use crate::{
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent},
-    execute, queue,
-    style::{self, Print, SetBackgroundColor},
+    queue,
+    style::{Print, SetBackgroundColor},
     terminal,
 };
 use std::ffi::OsString;
@@ -552,16 +552,7 @@ impl<'a> Menu<'a> {
     }
 
     fn give_up_term(&mut self) -> io::Result<()> {
-        terminal::disable_raw_mode()?;
-        self.term.flush()?;
-        execute!(
-            io::stderr(),
-            style::ResetColor,
-            cursor::SetCursorStyle::DefaultUserShape,
-            terminal::LeaveAlternateScreen,
-            terminal::EnableLineWrap,
-            cursor::Show,
-        )
+        self.term.give()
     }
 
     #[cfg(windows)]

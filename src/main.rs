@@ -29,18 +29,21 @@ use writer::write_results;
 // TODO --plugin option that starts the program with alternate screen which prompts the user for their args
 // created a bar window of fixed width and store of the text which shifts the visible window as
 // users type beyond the window
+// TODO for plugins would be useful to have a --repeat option so can easily search agoin for the
+// same thing
 // TODO option to configure different colors
-// TODO add notarizing mac so exec can be used without needing to open from finder
 // TODO support for searching PDFs maybe
 // TODO nvim plugin to open a popup window, select a match to open in $EDITOR
 // TODO tmux plugin to open a popup window, select a match to open in $EDITOR
 // TODO zellij plugin to open a popup window, select a match to open in $EDITOR
-// TODO for plugins would be useful to have a --repeat option so can easily search agoin for the
-// same thing
+// TODO add notarizing mac so exec can be used without needing to open from finder
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
+#[cfg(debug_assertions)]
 const LOG: bool = true;
+#[cfg(not(debug_assertions))]
+const LOG: bool = false;
 
 fn config() -> &'static Config {
     CONFIG.get().unwrap()
