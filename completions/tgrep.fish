@@ -19,6 +19,6 @@ complete -c tgrep -s c -l count -d 'display number of files matched in directory
 complete -c tgrep -l no-color -d 'don\'t use colors'
 complete -c tgrep -l no-bold -d 'don\'t bold anything'
 complete -c tgrep -l long-branch -d 'multiple files from the same directory are shown on the same branch'
-complete -c tgrep -s m -l menu -d 'open results in a menu to be edited with $EDITOR navigate through the menu using the following commands:  - move up/down: k/j, p/n, up arrow/down arrow  - move up/down with a bigger jump: K/J, P/N  - move up/down paths: {/}, [/]  - move to the start/end: g/G, </>, home/end  - move up/down a page: b/f, pageup/pagedown  - quit: q, ctrl + c'
+complete -c tgrep -s m -l menu -d 'open results in a menu to be edited with $EDITOR navigate through the menu using the following commands:  - move up/down: k/j, p/n, up arrow/down arrow  - move up/down with a bigger jump: K/J, P/N  - move up/down paths: {/}, [/]  - move to the start/end: g/G, </>, home/end  - move up/down a page: b/f, pageup/pagedown  - center cursor: z/l  - quit: q, ctrl + c'
 complete -c tgrep -s h -l help -d 'Print help'
 complete -c tgrep -s V -l version -d 'Print version'

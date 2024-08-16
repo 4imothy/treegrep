@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: CC-BY-4.0
+
 use crossterm::{
     cursor, execute,
     terminal::{self, ClearType},

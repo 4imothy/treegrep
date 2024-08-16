@@ -45,7 +45,7 @@ by Timothy Cronin
 
 A pattern matcher frontend or backend which displays results in a tree
 
-tgrep [OPTIONS] [positional regexp] [positional target]
+treegrep [OPTIONS] [positional regexp] [positional target]
 
 Arguments:
   [positional regexp]  the regex expression
@@ -80,6 +80,7 @@ Options:
                         - move up/down paths: {/}, [/]
                         - move to the start/end: g/G, </>, home/end
                         - move up/down a page: b/f, pageup/pagedown
+                        - center cursor: z/l
                         - quit: q, ctrl + c
   -h, --help           Print help
   -V, --version        Print version

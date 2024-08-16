@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: CC-BY-4.0
 
 use crate::args::MENU_HELP;
-use crate::config;
-use crate::formats;
-use crate::match_system::{Directory, File, Matches};
-use crate::writer;
+use crate::{
+    config, formats,
+    match_system::{Directory, File, Matches},
+    term, writer,
+};
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent},
     execute, queue,
     style::{self, Print, SetBackgroundColor},
-    terminal::{self, ClearType},
+    terminal,
 };
 use std::ffi::OsString;
 use std::io::{self, StdoutLock, Write};
@@ -83,24 +84,51 @@ impl PathInfo {
     }
 }
 
-pub struct Menu<'a, 'b> {
+pub struct Menu<'a> {
     pi: PathInfo,
     selected_id: usize,
     cursor_y: u16,
-    out: &'a mut StdoutLock<'b>,
+    term: term::Term<'a>,
     searched: &'a Matches,
+    max_line_id: usize,
     lines: Vec<String>,
-    height: u16,
-    width: u16,
     colors: bool,
     scroll_offset: u16,
     big_jump: u16,
     small_jump: u16,
     help_popup_open: bool,
+    first_y: u16,
+    last_y: u16,
+    window: Window,
 }
 
-impl<'a, 'b> Menu<'a, 'b> {
-    fn new(out: &'a mut StdoutLock<'b>, searched: &'a Matches) -> io::Result<Menu<'a, 'b>> {
+struct Window {
+    first_id: usize,
+    last_id: usize,
+    max_id: usize,
+}
+
+impl Window {
+    pub fn set_first(&mut self, first: usize) {
+        self.first_id = first;
+    }
+    pub fn set_last(&mut self, last: usize) {
+        self.last_id = last;
+    }
+    pub fn up_shift_last(&mut self) {
+        self.last_id -= 1;
+    }
+    pub fn down_shift_first(&mut self) {
+        self.first_id += 1;
+    }
+
+    pub fn set(&mut self, first_id: usize, last_id: usize) {
+        (self.first_id, self.last_id) = (first_id, last_id);
+    }
+}
+
+impl<'a> Menu<'a> {
+    fn new(out: StdoutLock<'a>, searched: &'a Matches) -> io::Result<Menu<'a>> {
         let mut buffer: Vec<u8> = Vec::new();
         let mut path_ids: Vec<usize> = Vec::new();
         writer::write_results(&mut buffer, &searched, Some(&mut path_ids))?;
@@ -109,19 +137,28 @@ impl<'a, 'b> Menu<'a, 'b> {
             .map(|v| String::from_utf8_lossy(v).into())
             .collect();
 
-        let (width, height) = terminal::size()?;
-        let (scroll_offset, big_jump, small_jump) = Menu::scroll_info(height);
+        let mut term = term::Term::new(out)?;
+        term.claim()?;
+
+        let (scroll_offset, big_jump, small_jump) = Menu::scroll_info(term.height);
+        let max_line_id = lines.len() - 2;
 
         Ok(Menu {
             selected_id: 0,
             cursor_y: 0,
-            out,
+            first_y: 0,
+            last_y: 0,
+            term,
             searched,
+            max_line_id,
+            window: Window {
+                first_id: 0,
+                last_id: 0,
+                max_id: max_line_id,
+            },
             lines,
             colors: config().colors,
             pi: PathInfo::new(path_ids),
-            height,
-            width,
             scroll_offset,
             big_jump,
             small_jump,
@@ -129,20 +166,28 @@ impl<'a, 'b> Menu<'a, 'b> {
         })
     }
 
-    fn page_jump_len(&self) -> u16 {
-        self.height
+    fn height(&self) -> u16 {
+        self.term.height
     }
 
-    fn lines_below_cursor(&self) -> usize {
-        (self.height - self.cursor_y - 1) as usize
+    fn max_cursor_y(&self) -> u16 {
+        self.height() - 1
+    }
+
+    fn width(&self) -> u16 {
+        self.term.width
     }
 
     fn down_page(&mut self) -> io::Result<()> {
-        if self.selected_id + self.lines_below_cursor() as usize >= self.max_line_id() {
+        let dist;
+        if self.max_cursor_y() as usize > self.max_line_id {
+            dist = self.max_line_id - self.selected_id;
+        } else {
+            dist = (self.height() as usize).min(self.max_line_id as usize - self.selected_id);
+        }
+        if dist == 0 {
             return Ok(());
         }
-        let dist = (self.page_jump_len() as usize)
-            .min(self.max_line_id() as usize - self.selected_id - self.lines_below_cursor());
         for i in 1..=dist {
             self.pi.down(self.selected_id + i as usize);
         }
@@ -151,20 +196,20 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn up_page(&mut self) -> io::Result<()> {
-        if self.cursor_y as usize == self.selected_id {
+        let dist;
+        if self.max_cursor_y() as usize > self.max_line_id {
+            dist = self.selected_id
+        } else {
+            dist = (self.height() as usize).min(self.selected_id);
+        }
+        if dist == 0 {
             return Ok(());
         }
-        let dist = (self.page_jump_len() as usize).min(self.selected_id - self.cursor_y as usize);
         for i in 1..=dist {
             self.pi.up(self.selected_id - i as usize);
         }
-        self.selected_id = self.selected_id - dist as usize;
+        self.selected_id -= dist as usize;
         self.draw()
-    }
-
-    fn set_dims(&mut self, dims: (u16, u16)) {
-        (self.width, self.height) = dims;
-        (self.scroll_offset, self.big_jump, self.small_jump) = Menu::scroll_info(self.height);
     }
 
     fn scroll_info(num_rows: u16) -> (u16, u16, u16) {
@@ -174,10 +219,9 @@ impl<'a, 'b> Menu<'a, 'b> {
         (scroll_offset, big_jump, small_jump)
     }
 
-    pub fn enter(out: &'a mut StdoutLock<'b>, matches: Matches) -> io::Result<()> {
+    pub fn enter(out: StdoutLock, matches: Matches) -> io::Result<()> {
         let mut menu: Menu = Menu::new(out, &matches)?;
 
-        menu.claim_term()?;
         menu.draw()?;
 
         loop {
@@ -203,15 +247,10 @@ impl<'a, 'b> Menu<'a, 'b> {
                         KeyCode::Char('{') | KeyCode::Char('[') => menu.up_path()?,
                         KeyCode::Char('G') | KeyCode::Char('>') | KeyCode::End => menu.bottom()?,
                         KeyCode::Char('g') | KeyCode::Char('<') | KeyCode::Home => menu.top()?,
-                        KeyCode::Char('f') | KeyCode::PageDown => {
-                            menu.down_page()?;
-                        }
-                        KeyCode::Char('b') | KeyCode::PageUp => {
-                            menu.up_page()?;
-                        }
-                        KeyCode::Char('h') => {
-                            menu.help_popup()?;
-                        }
+                        KeyCode::Char('f') | KeyCode::PageDown => menu.down_page()?,
+                        KeyCode::Char('b') | KeyCode::PageUp => menu.up_page()?,
+                        KeyCode::Char('h') => menu.help_popup()?,
+                        KeyCode::Char('z') | KeyCode::Char('l') => menu.center_cursor()?,
                         KeyCode::Enter => {
                             let match_info = MatchInfo::find(menu.selected_id, &menu.searched);
                             let path = config().path.join(match_info.path);
@@ -247,7 +286,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                     _ => {}
                 }
             } else if let Ok(Event::Resize(new_width, new_height)) = event {
-                if menu.height != new_height || menu.width != new_width {
+                if menu.term.height != new_height || menu.term.width != new_width {
                     menu.resize(new_height, new_width)?;
                 }
             }
@@ -255,39 +294,120 @@ impl<'a, 'b> Menu<'a, 'b> {
         menu.give_up_term()
     }
 
-    fn resize(&mut self, new_height: u16, new_width: u16) -> io::Result<()> {
-        self.set_dims((new_width, new_height));
-        if self.selected_id > (self.height / 2) as usize {
-            self.cursor_y = self.height / 2;
-        }
-        self.draw()
-    }
-
     fn draw(&mut self) -> io::Result<()> {
-        queue!(self.out, terminal::Clear(ClearType::All))?;
+        self.term.clear()?;
+
         let skip: usize = if self.selected_id > self.cursor_y as usize {
             self.selected_id - self.cursor_y as usize
         } else {
             0
         };
-        for (i, line) in self
-            .lines
-            .iter()
-            .skip(skip as usize)
-            .take(self.height as usize)
-            .enumerate()
-        {
-            queue!(
-                self.out,
-                cursor::MoveTo(START_X, START_Y + i as u16),
-                Print(line)
-            )?;
+
+        let count_print_above_cursor: usize = if self.selected_id > self.cursor_y as usize {
+            self.cursor_y as usize
+        } else {
+            self.selected_id
+        };
+        let take: usize = count_print_above_cursor + (self.height() - self.cursor_y) as usize;
+        self.window.set(skip, skip + take - 1);
+        let start_cursor = START_Y + self.cursor_y - count_print_above_cursor as u16;
+        for (i, line) in self.lines.iter().skip(skip).take(take).enumerate() {
+            let cursor = start_cursor + i as u16;
+            if i + skip == 0 {
+                self.first_y = cursor;
+            }
+            if i + skip == self.window.max_id {
+                self.last_y = cursor;
+            }
+            queue!(self.term, cursor::MoveTo(START_X, cursor), Print(line))?;
         }
-        self.style_at_cursor()?;
+        self.draw_selected()?;
         if self.help_popup_open {
             self.help_popup()?;
         }
-        self.out.flush()
+        self.term.flush()
+    }
+
+    fn down(&mut self, try_dist: u16) -> io::Result<()> {
+        self.destyle_selected()?;
+        let dist: usize = (try_dist as usize).min(self.max_line_id - self.selected_id);
+        let max_cursor_y = self.max_cursor_y();
+
+        for _ in 0..dist {
+            self.selected_id += 1;
+            self.pi.down(self.selected_id);
+            if self.cursor_y + self.scroll_offset < self.max_cursor_y() || self.bot_visible() {
+                self.cursor_y += 1;
+            } else {
+                if self.top_visible() && self.first_y == 0 {
+                    self.window.down_shift_first();
+                }
+                if self.first_y > 0 {
+                    self.first_y -= 1;
+                }
+                let id = self.selected_id + self.scroll_offset as usize;
+                self.window.set_last(id);
+                queue!(
+                    self.term,
+                    terminal::ScrollUp(1),
+                    cursor::MoveTo(START_X, max_cursor_y),
+                    Print(self.lines.get(id).unwrap())
+                )?;
+            }
+        }
+        self.draw_selected()?;
+        self.term.flush()
+    }
+
+    fn up(&mut self, try_dist: u16) -> io::Result<()> {
+        self.destyle_selected()?;
+        let dist: usize = (try_dist as usize).min(self.selected_id);
+        for _ in 0..dist {
+            self.selected_id -= 1;
+            self.pi.up(self.selected_id);
+            if self.cursor_y > self.scroll_offset || self.top_visible() {
+                self.cursor_y -= 1;
+            } else {
+                if self.bot_visible() && self.last_y == self.max_cursor_y() {
+                    self.window.up_shift_last();
+                }
+                let id = self.selected_id - self.cursor_y as usize;
+                self.window.set_first(id);
+                if self.last_y < self.max_cursor_y() {
+                    self.last_y += 1;
+                }
+                queue!(
+                    self.term,
+                    terminal::ScrollDown(1),
+                    cursor::MoveTo(START_X, START_Y),
+                    Print(
+                        self.lines
+                            .get(self.selected_id - self.cursor_y as usize)
+                            .unwrap()
+                    )
+                )?;
+            }
+        }
+        self.draw_selected()?;
+        self.term.flush()
+    }
+
+    fn center_cursor(&mut self) -> io::Result<()> {
+        let mid = self.height() / 2;
+        if self.cursor_y != mid {
+            self.cursor_y = mid;
+            self.draw()?;
+        }
+        Ok(())
+    }
+
+    fn resize(&mut self, new_height: u16, new_width: u16) -> io::Result<()> {
+        self.term.set_dims((new_width, new_height));
+        if self.selected_id > (self.height() / 2) as usize {
+            self.center_cursor()
+        } else {
+            self.draw()
+        }
     }
 
     fn suspend(&mut self) -> io::Result<()> {
@@ -300,19 +420,24 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn resume(&mut self) -> io::Result<()> {
-        self.set_dims(terminal::size()?);
-        self.claim_term()?;
+        self.term.set_dims(terminal::size()?);
+        (self.scroll_offset, self.big_jump, self.small_jump) = Menu::scroll_info(self.height());
+        self.term.claim()?;
         self.draw()?;
         Ok(())
     }
 
     fn bottom(&mut self) -> io::Result<()> {
-        if self.selected_id == self.max_line_id() {
+        if self.selected_id == self.max_line_id {
             return Ok(());
         }
         self.pi.bottom();
-        self.selected_id = self.max_line_id();
-        self.cursor_y = (self.height - 1).min(self.max_line_id() as u16);
+        self.selected_id = self.max_line_id;
+        if self.window.last_id >= self.window.max_id {
+            self.cursor_y = self.last_y as u16;
+        } else {
+            self.cursor_y = self.max_cursor_y();
+        }
         self.draw()
     }
 
@@ -322,61 +447,20 @@ impl<'a, 'b> Menu<'a, 'b> {
         }
         self.pi.top();
         self.selected_id = 0;
-        self.cursor_y = 0;
+        if self.window.first_id == 0 {
+            self.cursor_y = self.first_y as u16;
+        } else {
+            self.cursor_y = 0;
+        }
         self.draw()
     }
 
-    fn down(&mut self, try_dist: u16) -> io::Result<()> {
-        self.destyle_at_cursor()?;
-        let dist: usize = (try_dist as usize).min(self.max_line_id() - self.selected_id);
-        for _ in 0..dist {
-            self.selected_id += 1;
-            self.pi.down(self.selected_id);
-            if self.cursor_y < self.height - self.scroll_offset - 1
-                || self.selected_id + self.scroll_offset as usize > self.max_line_id()
-            {
-                self.cursor_y += 1;
-            } else {
-                queue!(
-                    self.out,
-                    terminal::ScrollUp(1),
-                    cursor::MoveTo(START_X, self.height),
-                    Print(
-                        self.lines
-                            .get(self.selected_id + self.scroll_offset as usize)
-                            .unwrap()
-                    )
-                )?;
-            }
-        }
-        self.style_at_cursor()?;
-        self.out.flush()
+    fn top_visible(&self) -> bool {
+        self.window.first_id == 0
     }
 
-    fn up(&mut self, try_dist: u16) -> io::Result<()> {
-        self.destyle_at_cursor()?;
-        let dist: usize = (try_dist as usize).min(self.selected_id);
-        for _ in 0..dist {
-            self.selected_id -= 1;
-            self.pi.up(self.selected_id);
-            if self.cursor_y > self.scroll_offset || self.selected_id < self.scroll_offset as usize
-            {
-                self.cursor_y -= 1;
-            } else {
-                queue!(
-                    self.out,
-                    terminal::ScrollDown(1),
-                    cursor::MoveTo(START_X, START_Y),
-                    Print(
-                        self.lines
-                            .get(self.selected_id - self.cursor_y as usize)
-                            .unwrap()
-                    )
-                )?;
-            }
-        }
-        self.style_at_cursor()?;
-        self.out.flush()
+    fn bot_visible(&self) -> bool {
+        self.window.last_id == self.max_line_id
     }
 
     pub fn down_path(&mut self) -> io::Result<()> {
@@ -395,12 +479,12 @@ impl<'a, 'b> Menu<'a, 'b> {
         Ok(())
     }
 
-    fn style_at_cursor(&mut self) -> io::Result<()> {
+    fn draw_selected(&mut self) -> io::Result<()> {
         if self.colors {
-            queue!(self.out, SetBackgroundColor(formats::MENU_SELECTED))?;
+            queue!(self.term, SetBackgroundColor(formats::MENU_SELECTED))?;
         }
         queue!(
-            self.out,
+            self.term,
             cursor::MoveTo(0, self.cursor_y),
             Print(formats::SELECTED_INDICATOR),
             cursor::MoveTo(START_X, self.cursor_y),
@@ -408,9 +492,9 @@ impl<'a, 'b> Menu<'a, 'b> {
         )
     }
 
-    fn destyle_at_cursor(&mut self) -> io::Result<()> {
+    fn destyle_selected(&mut self) -> io::Result<()> {
         queue!(
-            self.out,
+            self.term,
             cursor::MoveTo(0, self.cursor_y),
             Print(formats::SELECTED_INDICATOR_CLEAR),
             cursor::MoveTo(START_X, self.cursor_y),
@@ -423,11 +507,11 @@ impl<'a, 'b> Menu<'a, 'b> {
         let lines: Vec<&str> = contents.lines().collect();
         let content_width = lines.iter().map(|line| line.len()).max().unwrap() as u16;
         let height = lines.len() as u16 + 2;
-        let x = self.width.saturating_sub(content_width) / 2;
-        let y = self.height.saturating_sub(height) / 2;
+        let x = self.width().saturating_sub(content_width) / 2;
+        let y = self.height().saturating_sub(height) / 2;
 
         queue!(
-            self.out,
+            self.term,
             cursor::MoveTo(x, y),
             Print(format!(
                 "{}{}{}",
@@ -439,7 +523,7 @@ impl<'a, 'b> Menu<'a, 'b> {
 
         for (i, line) in lines.iter().enumerate() {
             queue!(
-                self.out,
+                self.term,
                 cursor::MoveTo(x, y + i as u16 + 1),
                 Print(format!(
                     "{}{:w$}{}",
@@ -452,7 +536,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         }
 
         queue!(
-            self.out,
+            self.term,
             cursor::MoveTo(x, y + height - 1),
             Print(format!(
                 "{}{}{}",
@@ -462,24 +546,14 @@ impl<'a, 'b> Menu<'a, 'b> {
             ))
         )?;
         self.help_popup_open = true;
-        self.out.flush()?;
+        self.term.flush()?;
 
         Ok(())
     }
 
-    fn claim_term(&mut self) -> io::Result<()> {
-        execute!(
-            self.out,
-            cursor::Hide,
-            terminal::EnterAlternateScreen,
-            terminal::DisableLineWrap,
-        )?;
-        terminal::enable_raw_mode()
-    }
-
     fn give_up_term(&mut self) -> io::Result<()> {
         terminal::disable_raw_mode()?;
-        self.out.flush()?;
+        self.term.flush()?;
         execute!(
             io::stderr(),
             style::ResetColor,
@@ -488,10 +562,6 @@ impl<'a, 'b> Menu<'a, 'b> {
             terminal::EnableLineWrap,
             cursor::Show,
         )
-    }
-
-    fn max_line_id(&self) -> usize {
-        self.lines.len() - 2
     }
 
     #[cfg(windows)]
