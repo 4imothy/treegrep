@@ -18,7 +18,6 @@ const MAGENTA_FG: SetForegroundColor = SetForegroundColor(Color::Magenta);
 const MATCHED_COLORS: [SetForegroundColor; 3] = [GREEN_FG, MAGENTA_FG, RED_FG];
 
 pub const MENU_SELECTED: Color = Color::DarkGrey;
-pub const SELECTED_INDICATOR: &str = "-> ";
 pub const SELECTED_INDICATOR_CLEAR: &str = "   ";
 pub const LONG_BRANCH_FILE_SEPARATOR: &str = ", ";
 
@@ -32,6 +31,7 @@ pub struct Chars {
     pub h: char,
     pub v: char,
     pub tee: char,
+    pub selected_indicator: &'static str,
 }
 
 pub const NONE: Chars = Chars {
@@ -42,6 +42,18 @@ pub const NONE: Chars = Chars {
     h: ' ',
     v: ' ',
     tee: ' ',
+    selected_indicator: "   ",
+};
+
+pub const ASCII: Chars = Chars {
+    bl: '+',
+    br: '+',
+    tl: '+',
+    tr: '+',
+    h: '-',
+    v: '|',
+    tee: '+',
+    selected_indicator: "-> ",
 };
 
 pub const SINGLE: Chars = Chars {
@@ -52,6 +64,7 @@ pub const SINGLE: Chars = Chars {
     h: '─',
     v: '│',
     tee: '├',
+    selected_indicator: "─❱ ",
 };
 
 pub const ROUNDED: Chars = Chars {
@@ -62,6 +75,7 @@ pub const ROUNDED: Chars = Chars {
     h: '─',
     v: '│',
     tee: '├',
+    selected_indicator: "─❱ ",
 };
 
 pub const HEAVY: Chars = Chars {
@@ -72,6 +86,7 @@ pub const HEAVY: Chars = Chars {
     h: '━',
     v: '┃',
     tee: '┣',
+    selected_indicator: "━❱ ",
 };
 
 pub const DOUBLE: Chars = Chars {
@@ -82,6 +97,7 @@ pub const DOUBLE: Chars = Chars {
     h: '═',
     v: '║',
     tee: '╠',
+    selected_indicator: "═❱ ",
 };
 
 pub const NEW_LINE: char = '\n';

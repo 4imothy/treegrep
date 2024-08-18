@@ -36,6 +36,7 @@ macro_rules! arg_info {
 pub const EXPRESSION_GROUP_ID: &str = "expressions";
 pub const TARGET_GROUP_ID: &str = "targets";
 pub const HIDE_CONTENT_GROUP_ID: &str = "hide_contents";
+pub const CHAR_STYLE_OPTIONS: [&str; 6] = ["ascii", "single", "double", "heavy", "rounded", "none"];
 
 arg_info!(
     TREE,
@@ -69,7 +70,7 @@ arg_info!(MENU, "menu", MENU_HELP, 'm');
 arg_info!(FILES, "files", "don't show matched contents", 'f');
 arg_info!(MAX_DEPTH, "max-depth", "the max depth to search");
 arg_info!(SEARCHER, "searcher", "executable to do the searching", 's');
-arg_info!(BOX_CHARS, "box-chars", "style of box characters to use");
+arg_info!(CHAR_STYLE, "char-style", "style of characters to use");
 arg_info!(
     PREFIX_LEN,
     "prefix-len",
@@ -131,6 +132,7 @@ pub fn generate_command() -> Command {
         .no_binary_name(true)
         .bin_name(TREEGREP_BIN)
         .help_template(HELP.to_owned())
+        .args_override_self(true)
         .after_help(
             "Any of the above can be set using the ".to_string()
                 + DEFAULT_OPTS_ENV_NAME
@@ -139,7 +141,6 @@ pub fn generate_command() -> Command {
         .author(env!("CARGO_PKG_AUTHORS"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .version(env!("CARGO_PKG_VERSION"));
-    // .author(env!("CARGO_PKG_HOMEPAGE"))
 
     if tree_arg_present() {
         command = command.allow_missing_positional(true);
@@ -233,16 +234,15 @@ fn get_args<'a>() -> [Arg; 20] {
         .value_name("")
         .action(ArgAction::Set);
 
-    let box_chars = Arg::new(BOX_CHARS.id)
-        .long(BOX_CHARS.id)
-        .help(BOX_CHARS.h)
-        .value_parser([
-            PossibleValue::new("single").hide(false),
-            PossibleValue::new("double").hide(false),
-            PossibleValue::new("heavy").hide(false),
-            PossibleValue::new("rounded").hide(false),
-            PossibleValue::new("none").hide(false),
-        ])
+    let char_style = Arg::new(CHAR_STYLE.id)
+        .long(CHAR_STYLE.id)
+        .help(CHAR_STYLE.h)
+        .value_parser(
+            CHAR_STYLE_OPTIONS
+                .iter()
+                .map(|&s| PossibleValue::new(s).hide(false))
+                .collect::<Vec<_>>(),
+        )
         .value_name("")
         .action(ArgAction::Set);
     [
@@ -263,7 +263,7 @@ fn get_args<'a>() -> [Arg; 20] {
         usize_arg(&MAX_DEPTH, false),
         usize_arg(&PREFIX_LEN, false),
         usize_arg(&MAX_LENGTH, true),
-        box_chars,
+        char_style,
         long,
         bool_arg(MENU, false),
     ]

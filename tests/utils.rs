@@ -122,11 +122,13 @@ pub fn get_outputs(path: &Path, expr: &str, extra_option: Option<&str>) -> (Vec<
     tg_on_rg.arg(path);
     tg.arg(path);
 
+    tg.arg("--searcher=tgrep");
     tg_on_rg.arg("--searcher=rg");
 
-    tg.arg("--searcher=tgrep");
     let rg_out = tg_on_rg.output().ok().unwrap();
 
+    println!("{:?}", tg_on_rg);
+    println!("{:?}", rg_out);
     if !rg_out.status.success() && rg_out.stderr.len() > 0 {
         panic!("cmd failed {}", String::from_utf8_lossy(&rg_out.stderr));
     }

@@ -1,12 +1,12 @@
 complete -c tgrep -s e -l regexp -d 'the regex expression' -r
 complete -c tgrep -s p -l path -d 'the path to search. If not provided, search the current directory.' -r -F
 complete -c tgrep -l glob -d 'rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic' -r
-complete -c tgrep -s s -l searcher -d 'executable to do the searching' -r -f -a "{rg	'',tgrep	''}"
+complete -c tgrep -s s -l searcher -d 'executable to do the searching' -r -f -a "{rg\t'',tgrep\t''}"
 complete -c tgrep -l threads -d 'set the appropriate number of threads to use' -r
 complete -c tgrep -l max-depth -d 'the max depth to search' -r
 complete -c tgrep -l prefix-len -d 'number of characters to show before a match' -r
 complete -c tgrep -l max-length -d 'set the max length for a matched line' -r
-complete -c tgrep -l box-chars -d 'style of box characters to use' -r -f -a "{single	'',double	'',heavy	'',rounded	'',none	''}"
+complete -c tgrep -l char-style -d 'style of characters to use' -r -f -a "{ascii\t'',single\t'',double\t'',heavy\t'',rounded\t'',none\t''}"
 complete -c tgrep -s t -l tree -d 'display the files that would be search in tree format'
 complete -c tgrep -s . -l hidden -d 'search hidden files'
 complete -c tgrep -s n -l line-number -d 'show line number of match'

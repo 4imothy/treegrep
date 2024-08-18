@@ -26,6 +26,8 @@ use std::process::Command;
 use std::sync::OnceLock;
 use writer::write_results;
 
+// TODO for commands that don't work with menu (--tree --long-branch) would be nice to still view
+// those in the menu but have some error when trying to press enter
 // TODO --plugin option that starts the program with alternate screen which prompts the user for their args
 // created a bar window of fixed width and store of the text which shifts the visible window as
 // users type beyond the window

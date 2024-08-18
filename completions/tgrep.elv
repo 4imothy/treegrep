@@ -29,7 +29,7 @@ set edit:completion:arg-completer[tgrep] = {|@words|
             cand --max-depth 'the max depth to search'
             cand --prefix-len 'number of characters to show before a match'
             cand --max-length 'set the max length for a matched line'
-            cand --box-chars 'style of box characters to use'
+            cand --char-style 'style of characters to use'
             cand -t 'display the files that would be search in tree format'
             cand --tree 'display the files that would be search in tree format'
             cand -. 'search hidden files'

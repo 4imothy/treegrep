@@ -20,6 +20,7 @@ pub struct Characters {
     pub match_no_next: String,
     pub spacer_vert: String,
     pub spacer: String,
+    pub selected_indicator: &'static str,
 }
 
 pub struct Config {
@@ -70,17 +71,23 @@ fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, M
 }
 
 impl Config {
-    fn get_env_opts() -> Vec<OsString> {
-        std::env::var(args::DEFAULT_OPTS_ENV_NAME)
-            .ok()
-            .filter(|val| !val.is_empty())
-            .map(|val| val.split_whitespace().map(OsString::from).collect())
-            .unwrap_or_default()
-    }
+    pub fn get_matches_from(args: Vec<OsString>) -> ArgMatches {
+        let mut full_args = args;
+        if let Some(env_args) = std::env::var_os(args::DEFAULT_OPTS_ENV_NAME) {
+            if !env_args.is_empty() {
+                full_args.splice(
+                    0..0,
+                    env_args
+                        .into_string()
+                        .unwrap_or_default()
+                        .split_whitespace()
+                        .map(OsString::from)
+                        .collect::<Vec<_>>(),
+                );
+            }
+        }
 
-    pub fn get_matches_from(mut args: Vec<OsString>) -> ArgMatches {
-        args.extend(Config::get_env_opts());
-        generate_command().get_matches_from(args)
+        generate_command().get_matches_from(full_args)
     }
 
     pub fn get_matches() -> ArgMatches {
@@ -195,7 +202,7 @@ impl Config {
                 ignore,
                 max_length,
                 c: Config::get_characters(
-                    matches.get_one::<String>(args::BOX_CHARS.id),
+                    matches.get_one::<String>(args::CHAR_STYLE.id),
                     get_usize_option(&matches, args::PREFIX_LEN.id)?,
                 ),
             },
@@ -205,12 +212,17 @@ impl Config {
 
     fn get_characters(t: Option<&String>, pl: Option<usize>) -> Characters {
         let chars = match t.map(|s| s.as_str()) {
-            Some("single") => formats::SINGLE,
+            Some("single") | None => formats::SINGLE,
+            Some("ascii") => formats::ASCII,
             Some("double") => formats::DOUBLE,
             Some("heavy") => formats::HEAVY,
             Some("rounded") => formats::ROUNDED,
             Some("none") => formats::NONE,
-            _ => formats::SINGLE,
+            _ => panic!(
+                "{} option {} not implemented",
+                args::CHAR_STYLE.id,
+                t.unwrap()
+            ),
         };
         let spacer: usize = pl.unwrap_or(formats::PREFIX_LEN_DEFAULT);
         Characters {
@@ -220,6 +232,7 @@ impl Config {
             tr: chars.tr,
             v: chars.v,
             h: chars.h,
+            selected_indicator: chars.selected_indicator,
             match_with_next: format!("{}{}", chars.tee, formats::repeat(chars.h, spacer - 1),),
             match_no_next: format!("{}{}", chars.bl, formats::repeat(chars.h, spacer - 1),),
             spacer_vert: format!("{}{}", chars.v, formats::repeat(' ', spacer - 1)),

@@ -17,7 +17,7 @@ use std::ffi::OsString;
 use std::io::{self, StdoutLock, Write};
 use std::process::Command;
 
-const START_X: u16 = formats::SELECTED_INDICATOR.len() as u16;
+const START_X: u16 = formats::SELECTED_INDICATOR_CLEAR.len() as u16;
 const START_Y: u16 = 0;
 
 struct PathInfo {
@@ -486,7 +486,7 @@ impl<'a> Menu<'a> {
         queue!(
             self.term,
             cursor::MoveTo(0, self.cursor_y),
-            Print(formats::SELECTED_INDICATOR),
+            Print(config().c.selected_indicator),
             cursor::MoveTo(START_X, self.cursor_y),
             Print(self.lines.get(self.selected_id).unwrap())
         )
