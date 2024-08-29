@@ -308,7 +308,8 @@ impl<'a> Menu<'a> {
         } else {
             self.selected_id
         };
-        let take: usize = count_print_above_cursor + (self.height() - self.cursor_y) as usize;
+        let take: usize = (count_print_above_cursor + (self.height() - self.cursor_y) as usize)
+            .min(self.max_line_id + 1);
         self.window.set(skip, skip + take - 1);
         let start_cursor = START_Y + self.cursor_y - count_print_above_cursor as u16;
         for (i, line) in self.lines.iter().skip(skip).take(take).enumerate() {
