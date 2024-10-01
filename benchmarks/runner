@@ -25,12 +25,12 @@ def run_cmd(cmd):
     return execution_time
 
 
-def run_benchmarks(bins):
+def run_benchmarks(commands):
     results = {}
-    for name, cmd in bins.items():
+    for name, cmd in commands.items():
         execution_time = run_cmd(cmd)
 
-    for name, cmd in bins.items():
+    for name, cmd in commands.items():
         print(f"Running {str(cmd)[1:-1]}")
         execution_time = run_cmd(cmd)
         results[name] = execution_time
@@ -66,16 +66,16 @@ def get_commands(to_search):
             'rg': ['rg', *patterns, to_search],
             'grep': ['grep', *patterns, "-R", to_search],
             'tgrep_with_rg': ['tgrep', *patterns, "--searcher=rg",
-                              "--target", to_search],
+                              "--path", to_search],
             'tgrep_with_tgrep': ['tgrep', *patterns,
-                                 "--searcher=tgrep", "--target", to_search],
+                                 "--searcher=tgrep", "--path", to_search],
         }
     return commands
 
 def get_files_commands(to_search):
     commands = {
             'rg': ['rg', '--files', to_search],
-            'tgrep': ['tgrep', '--tree', '--target', to_search]
+            'tgrep': ['tgrep', '--tree', '--path', to_search]
         }
     return commands
 
