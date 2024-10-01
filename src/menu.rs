@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: CC-BY-4.0
+// SPDX-License-Identifier: MIT
 
 use crate::args::MENU_HELP;
 use crate::{

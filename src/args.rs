@@ -1,9 +1,8 @@
-// SPDX-License-Identifier: CC-BY-4.0
+// SPDX-License-Identifier: MIT
 
 use clap::builder::PossibleValue;
 use clap::{Arg, ArgAction, ArgGroup, Command, ValueHint};
-
-use self::names::TREEGREP_BIN;
+use clap_complete;
 
 pub mod names {
     pub const TREEGREP: &str = "treegrep";
@@ -99,13 +98,18 @@ arg_info!(
     "glob",
     "rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic"
 );
+arg_info!(
+    COMPLETIONS,
+    "completions",
+    "generate completions for given shell"
+);
 
 const HELP: &str = concat!(
     "{name} {version}
 
 by {author}
 
-Home page: ",
+home page: ",
     env!("CARGO_PKG_HOMEPAGE"),
     "
 
@@ -130,11 +134,11 @@ pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
 pub fn generate_command() -> Command {
     let mut command = Command::new(env!("CARGO_PKG_NAME"))
         .no_binary_name(true)
-        .bin_name(TREEGREP_BIN)
+        .bin_name(names::TREEGREP_BIN)
         .help_template(HELP.to_owned())
         .args_override_self(true)
         .after_help(
-            "Any of the above can be set using the ".to_string()
+            "any of the above can be set using the ".to_string()
                 + DEFAULT_OPTS_ENV_NAME
                 + " environment variable",
         )
@@ -155,6 +159,16 @@ pub fn generate_command() -> Command {
     command = add_expressions(command);
     command = add_targets(command);
 
+    command = command.arg(
+        Arg::new(COMPLETIONS.id)
+            .long(COMPLETIONS.id)
+            .help(COMPLETIONS.h)
+            .action(ArgAction::Set)
+            .value_name("shell")
+            .value_parser(clap::value_parser!(clap_complete::Shell))
+            .exclusive(true),
+    );
+
     for opt in get_args() {
         command = command.arg(opt);
     }
@@ -167,6 +181,14 @@ fn tree_arg_present() -> bool {
             || (arg.starts_with('-')
                 && arg.chars().nth(1) != Some('-')
                 && arg.chars().skip(1).any(|c| c == TREE.s.unwrap()))
+    })
+}
+
+pub fn completions_arg_present() -> bool {
+    std::env::args().any(|arg| {
+        arg == format!("--{}", COMPLETIONS.id)
+            || arg == format!("--{}", COMPLETIONS.id)
+            || arg.starts_with(&format!("--{}=", COMPLETIONS.id))
     })
 }
 

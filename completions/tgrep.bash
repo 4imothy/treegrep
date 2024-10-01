@@ -19,7 +19,7 @@ _tgrep() {
 
     case "${cmd}" in
         tgrep)
-            opts="-e -p -t -s -. -n -f -c -m -h -V --regexp --path --tree --glob --searcher --threads --hidden --line-number --files --links --trim --pcre2 --no-ignore --count --no-color --no-bold --max-depth --prefix-len --max-length --char-style --long-branch --menu --help --version [positional regexp] [positional target]"
+            opts="-e -p -t -s -. -n -f -c -m -h -V --regexp --path --completions --tree --glob --searcher --threads --hidden --line-number --files --links --trim --pcre2 --no-ignore --count --no-color --no-bold --max-depth --prefix-len --max-length --char-style --long-branch --menu --help --version [positional regexp] [positional target]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -39,6 +39,10 @@ _tgrep() {
                     ;;
                 -p)
                     COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --completions)
+                    COMPREPLY=($(compgen -W "bash elvish fish powershell zsh" -- "${cur}"))
                     return 0
                     ;;
                 --glob)

@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: CC-BY-4.0
+// SPDX-License-Identifier: MIT
 
 use crate::config;
-use crate::errors::{bail, Message};
+use crate::errors::{mes, Message};
 use crate::formats;
 use crate::match_system::{wrap_dirs, wrap_file, Directory, File, Line, Match, Matches};
 use bstr::ByteSlice;
@@ -16,7 +16,7 @@ pub fn search() -> Result<Option<Matches>, Message> {
     let mut patterns: Vec<Regex> = Vec::new();
     for expr in &config().patterns {
         patterns.push(Regex::new(expr).map_err(|_| {
-            return bail!("regex expression `{}` is invalid", expr.to_string());
+            return mes!("regex expression `{}` is invalid", expr.to_string());
         })?);
     }
     if config().is_dir {
@@ -33,7 +33,7 @@ fn search_dir(patterns: &Vec<Regex>) -> Result<Vec<Directory>, Message> {
     let mut override_builder = OverrideBuilder::new(&config().cwd);
     for glob in &config().globs {
         override_builder.add(glob).map_err(|_| {
-            return bail!("glob {} is invalid", glob);
+            return mes!("glob {} is invalid", glob);
         })?;
     }
 
@@ -49,7 +49,7 @@ fn search_dir(patterns: &Vec<Regex>) -> Result<Vec<Directory>, Message> {
         .overrides(
             override_builder
                 .build()
-                .map_err(|_| return bail!("failed to build override builder with given globs"))?,
+                .map_err(|_| return mes!("failed to build override builder with given globs"))?,
         )
         .build();
 

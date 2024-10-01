@@ -25,6 +25,7 @@ Register-ArgumentCompleter -Native -CommandName 'tgrep' -ScriptBlock {
             [CompletionResult]::new('--regexp', '--regexp', [CompletionResultType]::ParameterName, 'the regex expression')
             [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'the path to search. If not provided, search the current directory.')
             [CompletionResult]::new('--path', '--path', [CompletionResultType]::ParameterName, 'the path to search. If not provided, search the current directory.')
+            [CompletionResult]::new('--completions', '--completions', [CompletionResultType]::ParameterName, 'generate completions for given shell')
             [CompletionResult]::new('--glob', '--glob', [CompletionResultType]::ParameterName, 'rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic')
             [CompletionResult]::new('-s', '-s', [CompletionResultType]::ParameterName, 'executable to do the searching')
             [CompletionResult]::new('--searcher', '--searcher', [CompletionResultType]::ParameterName, 'executable to do the searching')

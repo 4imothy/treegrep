@@ -19,6 +19,7 @@ _tgrep() {
 '*--regexp=[the regex expression]:: ' \
 '-p+[the path to search. If not provided, search the current directory.]::_files' \
 '--path=[the path to search. If not provided, search the current directory.]::_files' \
+'--completions=[generate completions for given shell]:shell:(bash elvish fish powershell zsh)' \
 '*--glob=[rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic]:: ' \
 '-s+[executable to do the searching]::(rg tgrep)' \
 '--searcher=[executable to do the searching]::(rg tgrep)' \

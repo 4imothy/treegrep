@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: CC-BY-4.0
+// SPDX-License-Identifier: MIT
 
 use clap::ValueEnum;
 use clap_complete::{generate_to, Shell};
@@ -10,21 +10,17 @@ use std::path::Path;
 include!("src/args.rs");
 
 fn main() -> Result<(), Error> {
-    let project_root = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-
-    let completions_dir_path = Path::new(&project_root).join("completions");
-    if !completions_dir_path.exists() {
-        match create_dir_all(&completions_dir_path) {
-            Ok(()) => {}
-            Err(e) => {
-                panic!("{}", e.to_string());
-            }
+    if !(cfg!(debug_assertions)) {
+        let project_root = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let completions_dir_path = Path::new(&project_root).join("completions");
+        if !completions_dir_path.exists() {
+            create_dir_all(&completions_dir_path).unwrap_or_else(|e| panic!("{}", e));
         }
-    }
 
-    let mut cmd = generate_command();
-    for &shell in Shell::value_variants() {
-        generate_to(shell, &mut cmd, names::TREEGREP_BIN, &completions_dir_path)?;
+        let mut cmd = generate_command();
+        for &shell in Shell::value_variants() {
+            generate_to(shell, &mut cmd, names::TREEGREP_BIN, &completions_dir_path)?;
+        }
     }
 
     Ok(())

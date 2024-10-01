@@ -1,5 +1,6 @@
 complete -c tgrep -s e -l regexp -d 'the regex expression' -r
 complete -c tgrep -s p -l path -d 'the path to search. If not provided, search the current directory.' -r -F
+complete -c tgrep -l completions -d 'generate completions for given shell' -r -f -a "{bash\t'',elvish\t'',fish\t'',powershell\t'',zsh\t''}"
 complete -c tgrep -l glob -d 'rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic' -r
 complete -c tgrep -s s -l searcher -d 'executable to do the searching' -r -f -a "{rg\t'',tgrep\t''}"
 complete -c tgrep -l threads -d 'set the appropriate number of threads to use' -r

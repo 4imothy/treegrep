@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: CC-BY-4.0
+// SPDX-License-Identifier: MIT
 
 use std::error::Error;
 use std::fmt;
@@ -9,7 +9,7 @@ pub struct Message {
     pub mes: String,
 }
 
-macro_rules! bail {
+macro_rules! mes {
     ($($arg:tt)*) => {{
         Message {
             mes: format!($($arg)*),
@@ -17,7 +17,7 @@ macro_rules! bail {
     }};
 }
 
-pub(crate) use bail;
+pub(crate) use mes;
 
 impl Error for Message {}
 

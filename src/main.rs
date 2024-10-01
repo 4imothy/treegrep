@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: CC-BY-4.0
+// SPDX-License-Identifier: MIT
 
 mod args;
 mod config;
@@ -14,8 +14,9 @@ mod searchers;
 mod term;
 mod writer;
 use clap::ArgMatches;
+use clap_complete::{aot::Shell, generate};
 use config::Config;
-use errors::{bail, Message};
+use errors::{mes, Message};
 use match_system::Matches;
 use menu::Menu;
 use output_processor::process_results;
@@ -66,6 +67,9 @@ fn main() {
 }
 
 fn run(matches: ArgMatches, bold: bool, colors: bool) -> Result<(), Message> {
+    if gen_completions_if_needed(&matches)? {
+        return Ok(());
+    }
     let (c, searcher_path) = Config::get_config(matches, bold, colors)?;
     CONFIG.set(c).ok().unwrap();
 
@@ -82,9 +86,9 @@ fn run(matches: ArgMatches, bold: bool, colors: bool) -> Result<(), Message> {
 
     let mut out: StdoutLock = stdout().lock();
     if config().menu {
-        Menu::enter(out, matches.unwrap()).map_err(|e| bail!("{}", e.to_string()))?;
+        Menu::enter(out, matches.unwrap()).map_err(|e| mes!("{}", e.to_string()))?;
     } else {
-        write_results(&mut out, &matches.unwrap(), None).map_err(|e| bail!("{}", e.to_string()))?;
+        write_results(&mut out, &matches.unwrap(), None).map_err(|e| mes!("{}", e.to_string()))?;
     }
 
     Ok(())
@@ -94,7 +98,7 @@ fn get_matches_from_cmd(searcher_path: OsString) -> Result<Option<Matches>, Mess
     let mut cmd: Command = Searchers::generate_command(searcher_path)?;
 
     let output = cmd.output().map_err(|e| {
-        bail!(
+        mes!(
             "searcher `{}` didn't run message, `{}`",
             cmd.get_program().to_string_lossy().to_string(),
             e.to_string()
@@ -102,7 +106,7 @@ fn get_matches_from_cmd(searcher_path: OsString) -> Result<Option<Matches>, Mess
     })?;
 
     if !output.status.success() && output.stderr.len() > 0 {
-        return Err(bail!(
+        return Err(mes!(
             "{} had errors:\n{}",
             cmd.get_program().to_string_lossy().to_string(),
             String::from_utf8_lossy(&output.stderr).to_string()
@@ -111,4 +115,26 @@ fn get_matches_from_cmd(searcher_path: OsString) -> Result<Option<Matches>, Mess
     let results: Vec<u8> = output.stdout;
 
     process_results(results)
+}
+
+fn gen_completions_if_needed(matches: &ArgMatches) -> Result<bool, Message> {
+    if let Some(shell) = matches.get_one::<Shell>(args::COMPLETIONS.id) {
+        let mut cmd = args::generate_command();
+        let mut fd = std::io::stdout();
+        match shell {
+            Shell::Bash => generate(Shell::Bash, &mut cmd, args::names::TREEGREP_BIN, &mut fd),
+            Shell::Zsh => generate(Shell::Zsh, &mut cmd, args::names::TREEGREP_BIN, &mut fd),
+            Shell::Elvish => generate(Shell::Bash, &mut cmd, args::names::TREEGREP_BIN, &mut fd),
+            Shell::PowerShell => generate(
+                Shell::PowerShell,
+                &mut cmd,
+                args::names::TREEGREP_BIN,
+                &mut fd,
+            ),
+            Shell::Fish => generate(Shell::Fish, &mut cmd, args::names::TREEGREP_BIN, &mut fd),
+            _ => return Err(mes!("cannot generate completions for {shell}")),
+        }
+        return Ok(true);
+    }
+    return Ok(false);
 }

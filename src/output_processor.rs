@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: CC-BY-4.0
+// SPDX-License-Identifier: MIT
 
 use crate::config;
-use crate::errors::{bail, Message, SUBMIT_ISSUE};
+use crate::errors::{mes, Message, SUBMIT_ISSUE};
 use crate::formats;
 use crate::match_system::{wrap_dirs, wrap_file, Directory, File, Line, Match, Matches};
 use crate::Searchers;
@@ -36,7 +36,7 @@ impl File {
         let file = File::new(&f_path)?;
 
         f_path.parent().map_or(
-            Err(bail!(
+            Err(mes!(
                 "failed to get parent to path `{}`",
                 f_path.as_os_str().to_string_lossy()
             )),
@@ -121,7 +121,7 @@ pub fn process_json_lines(lines: Vec<&[u8]>) -> Result<Option<Matches>, Message>
             continue;
         }
         let res: Value = serde_json::from_slice(line).map_err(|e| {
-            bail!(
+            mes!(
                 "error message `{}` for line `{}`",
                 e.to_string(),
                 String::from_utf8_lossy(line)

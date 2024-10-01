@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: CC-BY-4.0
+// SPDX-License-Identifier: MIT
 
 use crate::args::names;
 use crate::config;
-use crate::errors::{bail, Message, SUBMIT_ISSUE};
+use crate::errors::{mes, Message, SUBMIT_ISSUE};
 use crate::options::{Options, Rg};
 use std::env;
 #[cfg(target_os = "windows")]
@@ -77,7 +77,7 @@ fn bin_name(chosen: Option<&String>) -> Result<Option<ShortName>, Message> {
         {
             Ok(Some(ShortName(names::RIPGREP_BIN.to_owned())))
         }
-        Some(s) => Err(bail!(
+        Some(s) => Err(mes!(
             "searcher `{}` is invalid, tried `{}`",
             s,
             Searchers::all_to_str().join(", ")
@@ -93,7 +93,7 @@ impl Searchers {
                 names::TREEGREP_BIN => Ok((Searchers::TreeGrep, None)),
                 _ => match get_exe_path(&c) {
                     Some(path) => Ok((Searchers::from_str(&c), Some(path))),
-                    _ => Err(bail!("failed to find searcher `{}`", c.to_owned())),
+                    _ => Err(mes!("failed to find searcher `{}`", c.to_owned())),
                 },
             },
             None => {

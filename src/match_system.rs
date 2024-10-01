@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: CC-BY-4.0
+// SPDX-License-Identifier: MIT
 
 use crate::config;
-use crate::errors::{bail, Message};
+use crate::errors::{mes, Message};
 use crate::formats;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -19,13 +19,13 @@ pub fn wrap_file(file: Option<File>, tree: bool) -> Option<Matches> {
 }
 
 fn path_name(path: &Path) -> Result<String, Message> {
-    let name = path.file_name().ok_or(bail!(
+    let name = path.file_name().ok_or(mes!(
         "failed to get name of `{}`",
         path.as_os_str().to_string_lossy()
     ))?;
 
     name.to_os_string().into_string().map_err(|_| {
-        bail!(
+        mes!(
             "failed to get name of `{}`",
             path.as_os_str().to_string_lossy()
         )

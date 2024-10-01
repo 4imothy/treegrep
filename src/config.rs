@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: CC-BY-4.0
+// SPDX-License-Identifier: MIT
 
 use crate::args::{self, generate_command};
-use crate::errors::{bail, Message};
+use crate::errors::{mes, Message};
 use crate::formats;
 use crate::searchers::Searchers;
 use clap::ArgMatches;
@@ -51,7 +51,7 @@ pub struct Config {
 
 pub fn canonicalize(p: PathBuf) -> Result<PathBuf, Message> {
     dunce::canonicalize(&p).map_err(|_| {
-        bail!(
+        mes!(
             "failed to canonicalize path `{}`",
             p.to_string_lossy().to_owned()
         )
@@ -61,7 +61,7 @@ pub fn canonicalize(p: PathBuf) -> Result<PathBuf, Message> {
 fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, Message> {
     matches.get_one::<String>(name).map_or(Ok(None), |s| {
         s.parse::<usize>().map(Some).map_err(|_| {
-            bail!(
+            mes!(
                 "failed to parse `{}` to a usize for option `{}`",
                 s.to_string(),
                 name.to_string()
@@ -73,17 +73,19 @@ fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, M
 impl Config {
     pub fn get_matches_from(args: Vec<OsString>) -> ArgMatches {
         let mut full_args = args;
-        if let Some(env_args) = std::env::var_os(args::DEFAULT_OPTS_ENV_NAME) {
-            if !env_args.is_empty() {
-                full_args.splice(
-                    0..0,
-                    env_args
-                        .into_string()
-                        .unwrap_or_default()
-                        .split_whitespace()
-                        .map(OsString::from)
-                        .collect::<Vec<_>>(),
-                );
+        if !args::completions_arg_present() {
+            if let Some(env_args) = std::env::var_os(args::DEFAULT_OPTS_ENV_NAME) {
+                if !env_args.is_empty() {
+                    full_args.splice(
+                        0..0,
+                        env_args
+                            .into_string()
+                            .unwrap_or_default()
+                            .split_whitespace()
+                            .map(OsString::from)
+                            .collect::<Vec<_>>(),
+                    );
+                }
             }
         }
 
@@ -142,13 +144,13 @@ impl Config {
 
         if let Searchers::TreeGrep = searcher {
             if threads.map_or(false, |t| t > 1) {
-                return Err(bail!("treegrep searcher does not support multithreading"));
+                return Err(mes!("treegrep searcher does not support multithreading"));
             }
         }
 
         if let Searchers::TreeGrep = searcher {
             if pcre2 {
-                return Err(bail!("treegrep searcher does not support pcre2"));
+                return Err(mes!("treegrep searcher does not support pcre2"));
             }
         }
 
@@ -158,14 +160,13 @@ impl Config {
             .map(|value| value.to_string());
 
         let cwd = canonicalize(
-            std::env::current_dir()
-                .map_err(|_| bail!("failed to get current working directory"))?,
+            std::env::current_dir().map_err(|_| mes!("failed to get current working directory"))?,
         )?;
 
         let path = if let Some(p) = path {
             let path = PathBuf::from(p);
             if !path.exists() {
-                return Err(bail!(
+                return Err(mes!(
                     "failed to find path `{}`",
                     path.to_string_lossy().to_string()
                 ));
