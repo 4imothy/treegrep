@@ -556,8 +556,8 @@ impl<'a> Menu<'a> {
         self.term.give()
     }
 
-    #[cfg(windows)]
-    fn exit_and_open(&mut self, path: OsString, _line_num: Option<usize>) -> io::Result<()> {
+    #[cfg(target_os = "windows")]
+    fn exit_and_open(&mut self, mut path: OsString, line_num: Option<usize>) -> io::Result<()> {
         Command::new("cmd")
             .arg("/C")
             .arg("start")
@@ -566,15 +566,18 @@ impl<'a> Menu<'a> {
         self.give_up_term()
     }
 
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     fn exit_and_open(&mut self, mut path: OsString, line_num: Option<usize>) -> io::Result<()> {
-        let opener = match std::env::var("EDITOR") {
-            Ok(val) if !val.is_empty() => val,
-            _ => match std::env::consts::OS {
-                "macos" => "open".to_string(),
-                _ => "xdg-open".to_string(),
-            },
-        };
+        let opener = std::env::var("EDITOR")
+            .ok()
+            .filter(|val| !val.is_empty())
+            .unwrap_or_else(|| {
+                if cfg!(target_os = "macos") {
+                    "open".to_string()
+                } else {
+                    "xdg-open".to_string()
+                }
+            });
 
         let mut command: Command = Command::new(&opener);
         match opener.as_str() {
@@ -612,9 +615,9 @@ impl<'a> Menu<'a> {
                 command.arg(path);
             }
         }
-        use std::os::unix::process::CommandExt;
         self.give_up_term()?;
 
+        use std::os::unix::process::CommandExt;
         command.exec();
         Ok(())
     }

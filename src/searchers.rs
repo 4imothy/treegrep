@@ -5,10 +5,7 @@ use crate::config;
 use crate::errors::{mes, Message, SUBMIT_ISSUE};
 use crate::options::{Options, Rg};
 use std::env;
-#[cfg(target_os = "windows")]
-use std::env::consts::EXE_SUFFIX;
 use std::ffi::OsString;
-use std::fs;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::process::Command;
@@ -30,22 +27,21 @@ impl Deref for ShortName {
     }
 }
 
-#[cfg(target_os = "windows")]
-fn get_exe_path_with_extension(bin: &ShortName, ext: &str, mut p: PathBuf) -> Option<OsString> {
-    p.push(format!("{}{}", &bin.0, ext));
-    fs::metadata(&p).ok().map(|_| p.into_os_string())
-}
-
 fn get_exe_path(bin: &ShortName) -> Option<OsString> {
     env::var("PATH").ok().and_then(|path| {
         env::split_paths(&path).find_map(|p| {
-            let mut p_buf = PathBuf::from(p);
-            #[cfg(target_os = "windows")]
-            if let Some(p) = get_exe_path_with_extension(bin, EXE_SUFFIX, p_buf.clone()) {
-                return Some(p);
+            let mut candidate = PathBuf::from(p);
+            candidate.push(&bin.0);
+            if candidate.exists() {
+                return Some(candidate.into_os_string());
             }
-            p_buf.push(&bin.0);
-            fs::metadata(&p_buf).ok().map(|_| p_buf.into_os_string())
+            if cfg!(target_os = "windows") {
+                candidate.set_extension(&env::consts::EXE_SUFFIX[1..]);
+                if candidate.exists() {
+                    return Some(candidate.into_os_string());
+                }
+            }
+            None
         })
     })
 }
@@ -63,17 +59,17 @@ fn bin_name(chosen: Option<&String>) -> Result<Option<ShortName>, Message> {
         Some(s) if s == &names::RIPGREP_BIN || s == &names::RIPGREP => {
             Ok(Some(ShortName(names::RIPGREP_BIN.to_owned())))
         }
-        #[cfg(target_os = "windows")]
         Some(s)
-            if s == &(names::TREEGREP_BIN.to_owned() + &EXE_SUFFIX)
-                || s == &(names::TREEGREP.to_owned() + &EXE_SUFFIX) =>
+            if cfg!(target_os = "windows")
+                && (s == &(names::TREEGREP_BIN.to_owned() + &env::consts::EXE_SUFFIX)
+                    || s == &(names::TREEGREP.to_owned() + &env::consts::EXE_SUFFIX)) =>
         {
             Ok(Some(ShortName(names::TREEGREP_BIN.to_owned())))
         }
-        #[cfg(target_os = "windows")]
         Some(s)
-            if s == &(names::RIPGREP_BIN.to_owned() + &EXE_SUFFIX)
-                || s == &(names::RIPGREP.to_owned() + &EXE_SUFFIX) =>
+            if cfg!(target_os = "windows")
+                && (s == &(names::RIPGREP_BIN.to_owned() + &env::consts::EXE_SUFFIX)
+                    || s == &(names::RIPGREP.to_owned() + &env::consts::EXE_SUFFIX)) =>
         {
             Ok(Some(ShortName(names::RIPGREP_BIN.to_owned())))
         }
@@ -155,8 +151,9 @@ impl Searchers {
                 let s = e.to_str();
                 let mut vec = Vec::new();
                 vec.push(s.to_string());
-                #[cfg(target_os = "windows")]
-                vec.push(format!("{}{}", s, EXE_SUFFIX));
+                if cfg!(target_os = "windows") {
+                    vec.push(format!("{}{}", s, env::consts::EXE_SUFFIX));
+                }
                 vec
             })
             .collect()
@@ -227,9 +224,10 @@ mod tests {
     #[test]
     fn test_all_to_str() {
         let res = Searchers::all_to_str();
-        #[cfg(target_os = "windows")]
-        assert_eq!(res, vec!["rg", "rg.exe", "tgrep", "tgrep.exe"]);
-        #[cfg(not(target_os = "windows"))]
-        assert_eq!(res, vec!["rg", "tgrep"]);
+        if cfg!(target_os = "windows") {
+            assert_eq!(res, vec!["rg", "rg.exe", "tgrep", "tgrep.exe"]);
+        } else {
+            assert_eq!(res, vec!["rg", "tgrep"]);
+        }
     }
 }
