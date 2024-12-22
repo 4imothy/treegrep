@@ -96,7 +96,7 @@ pub struct Menu<'a> {
     scroll_offset: u16,
     big_jump: u16,
     small_jump: u16,
-    help_popup_open: bool,
+    popup_open: bool,
     first_y: u16,
     last_y: u16,
     window: Window,
@@ -162,7 +162,7 @@ impl<'a> Menu<'a> {
             scroll_offset,
             big_jump,
             small_jump,
-            help_popup_open: false,
+            popup_open: false,
         })
     }
 
@@ -233,7 +233,7 @@ impl<'a> Menu<'a> {
                 ..
             })) = event
             {
-                if !menu.help_popup_open {
+                if !menu.popup_open {
                     match code {
                         KeyCode::Char('j') | KeyCode::Char('n') | KeyCode::Down => {
                             menu.down(menu.small_jump)?
@@ -249,24 +249,29 @@ impl<'a> Menu<'a> {
                         KeyCode::Char('g') | KeyCode::Char('<') | KeyCode::Home => menu.top()?,
                         KeyCode::Char('f') | KeyCode::PageDown => menu.down_page()?,
                         KeyCode::Char('b') | KeyCode::PageUp => menu.up_page()?,
-                        KeyCode::Char('h') => menu.help_popup()?,
+                        KeyCode::Char('h') => {
+                            menu.popup(MENU_HELP.to_string() + "\npress q to quit this popup")?
+                        }
                         KeyCode::Char('z') | KeyCode::Char('l') => menu.center_cursor()?,
                         KeyCode::Enter => {
                             let match_info = MatchInfo::find(menu.selected_id, &menu.searched);
                             let path = config().path.join(match_info.path);
-
-                            return menu.exit_and_open(
-                                path.as_os_str().to_os_string(),
-                                match_info.line_num,
-                            );
+                            if config().long_branch {
+                                menu.popup("failed to open due to configuration".to_string())?;
+                            } else {
+                                return menu.exit_and_open(
+                                    path.as_os_str().to_os_string(),
+                                    match_info.line_num,
+                                );
+                            }
                         }
                         _ => {}
                     }
                 }
                 match code {
                     KeyCode::Char('q') => {
-                        if menu.help_popup_open {
-                            menu.help_popup_open = false;
+                        if menu.popup_open {
+                            menu.popup_open = false;
                             menu.draw()?;
                         } else {
                             break;
@@ -323,9 +328,7 @@ impl<'a> Menu<'a> {
             queue!(self.term, cursor::MoveTo(START_X, cursor), Print(line))?;
         }
         self.draw_selected()?;
-        if self.help_popup_open {
-            self.help_popup()?;
-        }
+        self.popup_open = false;
         self.term.flush()
     }
 
@@ -465,6 +468,9 @@ impl<'a> Menu<'a> {
     }
 
     pub fn down_path(&mut self) -> io::Result<()> {
+        if config().long_branch {
+            return self.down(1);
+        }
         let dist = self.pi.dist_down(self.selected_id);
         if dist != 0 {
             self.down(dist)?;
@@ -473,6 +479,9 @@ impl<'a> Menu<'a> {
     }
 
     fn up_path(&mut self) -> io::Result<()> {
+        if config().long_branch {
+            return self.up(1);
+        }
         let dist = self.pi.dist_up(self.selected_id);
         if dist != 0 {
             self.up(dist)?;
@@ -503,8 +512,7 @@ impl<'a> Menu<'a> {
         )
     }
 
-    fn help_popup(&mut self) -> io::Result<()> {
-        let contents = MENU_HELP.to_string() + "\npress q to quit this popup";
+    fn popup(&mut self, contents: String) -> io::Result<()> {
         let lines: Vec<&str> = contents.lines().collect();
         let content_width = lines.iter().map(|line| line.len()).max().unwrap() as u16;
         let height = lines.len() as u16 + 2;
@@ -546,7 +554,7 @@ impl<'a> Menu<'a> {
                 config().c.br,
             ))
         )?;
-        self.help_popup_open = true;
+        self.popup_open = true;
         self.term.flush()?;
 
         Ok(())

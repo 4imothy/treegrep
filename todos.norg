@@ -6,10 +6,11 @@
 * Features
 ** Options
    - search for a file by name and print out its tree
-   - for commands that don't work with menu (--tree --long-branch) would be nice to still view those in the menu but have some error when trying to press enter
    - Support for PDFs
 ** Config
    - different colors
+** Menu
+   - Searching for text within the results
 * Plugin
   - starts the program with alternate screen which prompts the user for their
     args

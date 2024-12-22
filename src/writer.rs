@@ -71,12 +71,25 @@ impl Directory {
             (files.len() + LONG_BRANCH_FILES_PER_LINE - 1) / LONG_BRANCH_FILES_PER_LINE;
         let mut line_id: usize = 0;
 
+        let before_no_next = format!(
+            "{}{}{}",
+            prefix,
+            config().c.match_no_next,
+            formats::resets()
+        );
+        let before_next = format!(
+            "{}{}{}",
+            prefix,
+            config().c.match_with_next,
+            formats::resets()
+        );
+
         for (i, file) in files.iter().enumerate() {
             if first_long_branch {
                 if num_lines == 1 {
-                    write!(out, "{}{}", prefix, config().c.match_no_next)?;
+                    write!(out, "{}", before_no_next)?;
                 } else {
-                    write!(out, "{}{}", prefix, config().c.match_with_next)?;
+                    write!(out, "{}", before_next)?;
                 }
                 first_long_branch = false;
             } else if i % LONG_BRANCH_FILES_PER_LINE == 0 {
@@ -84,9 +97,9 @@ impl Directory {
                 writeln!(out)?;
                 line_id += 1;
                 if line_id + 1 == num_lines {
-                    write!(out, "{}{}", prefix, config().c.match_no_next)?;
+                    write!(out, "{}", before_no_next)?;
                 } else {
-                    write!(out, "{}{}", prefix, config().c.match_with_next)?;
+                    write!(out, "{}", before_next)?;
                 }
             } else {
                 write!(out, "{}", formats::LONG_BRANCH_FILE_SEPARATOR)?;

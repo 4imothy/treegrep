@@ -234,7 +234,6 @@ fn get_args<'a>() -> [Arg; 20] {
         .help(LONG_BRANCHES.h)
         .value_name("")
         .requires(HIDE_CONTENT_GROUP_ID)
-        .conflicts_with(MENU.id)
         .action(ArgAction::SetTrue);
 
     let glob = Arg::new(GLOB.id)
