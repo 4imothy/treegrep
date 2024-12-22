@@ -1,8 +1,3 @@
-* Performance
-  - builtin multithreading
-** Concat Lines Longer than Terminal While in Menu
-   - need length of the styling added around matched sections
-   - need metric of terminal width and added styling to be same (bytes, chars)
 * Features
 ** Options
    - search for a file by name and print out its tree
@@ -11,6 +6,13 @@
    - different colors
 ** Menu
    - Searching for text within the results
+
+* Performance
+  - builtin multithreading
+** Concat Lines Longer than Terminal While in Menu
+   - need length of the styling added around matched sections
+   - need metric of terminal width and added styling to be same (bytes, chars)
+
 * Plugin
   - starts the program with alternate screen which prompts the user for their
     args
@@ -23,5 +25,6 @@
    - open a popup window, select a match to open in $EDITOR
 
 * Distribution
+  - make a workflow that autoupdates the help output section of the readme, can
+    try just doing shell or make a python script to run
   - notarizing on mac
-

@@ -81,7 +81,7 @@ arg_info!(
     "trim",
     "trim whitespace at the beginning of lines"
 );
-arg_info!(PCRE2, "pcre2", "enable PCRE2 if the searcher supports it");
+arg_info!(PCRE2, "pcre2", "enable PCRE2");
 arg_info!(
     THREADS,
     "threads",

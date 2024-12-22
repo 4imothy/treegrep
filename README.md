@@ -46,7 +46,7 @@ by Timothy Cronin
 
 home page: https://github.com/4imothy/treegrep
 
-A pattern matcher frontend or backend which displays results in a tree
+pattern matcher frontend or backend which displays results in a tree
 
 tgrep [OPTIONS] [positional regexp] [positional target]
 Arguments:
@@ -66,7 +66,7 @@ Options:
   -f, --files                don't show matched contents
       --links                show linked paths for symbolic links
       --trim                 trim whitespace at the beginning of lines
-      --pcre2                enable PCRE2 if the searcher supports it
+      --pcre2                enable PCRE2
       --no-ignore            don't use ignore files
   -c, --count                display number of files matched in directory and number of lines matched in a file
       --no-color             don't use colors
