@@ -1,0 +1,29 @@
+* Errors
+  - when doing long-branch shows others as required not just --tree
+
+* Performance
+  - builtin multithreading
+** Concat Lines Longer than Terminal While in Menu
+   - need length of the styling added around matched sections
+   - need metric of terminal width and added styling to be same (bytes, chars)
+* Features
+** Options
+   - search for a file by name and print out its tree
+   - for commands that don't work with menu (--tree --long-branch) would be nice to still view those in the menu but have some error when trying to press enter
+   - Support for PDFs
+** Config
+   - different colors
+* Plugin
+  - starts the program with alternate screen which prompts the user for their
+    args
+  - would be useful to have a --repeat option so can easily repeat search
+** /NVIM/
+   - open a popup window, select a match to open in $EDITOR
+** /TMUX/
+   - open a popup window, select a match to open in $EDITOR
+** /Zellij/
+   - open a popup window, select a match to open in $EDITOR
+
+* Distribution
+  - notarizing on mac
+

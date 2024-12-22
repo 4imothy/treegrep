@@ -27,28 +27,9 @@ use std::process::Command;
 use std::sync::OnceLock;
 use writer::write_results;
 
-// TODO menu with very long lines is slow so concat printing to the width of terminal
-// TODO for commands that don't work with menu (--tree --long-branch) would be nice to still view
-// those in the menu but have some error when trying to press enter
-// TODO --plugin option that starts the program with alternate screen which prompts the user for their args
-// created a bar window of fixed width and store of the text which shifts the visible window as
-// users type beyond the window
-// TODO for plugins would be useful to have a --repeat option so can easily search agoin for the
-// same thing
-// TODO option to configure different colors
-// TODO support for searching PDFs maybe
-// TODO nvim plugin to open a popup window, select a match to open in $EDITOR
-// TODO tmux plugin to open a popup window, select a match to open in $EDITOR
-// TODO zellij plugin to open a popup window, select a match to open in $EDITOR
-// TODO builtin multithreading
-// TODO add notarizing mac so exec can be used without needing to open from finder
-
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
-#[cfg(debug_assertions)]
-const LOG: bool = true;
-#[cfg(not(debug_assertions))]
-const LOG: bool = false;
+const LOG: bool = cfg!(debug_assertions);
 
 fn config() -> &'static Config {
     CONFIG.get().unwrap()
