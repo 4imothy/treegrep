@@ -41,7 +41,7 @@ set edit:completion:arg-completer[tgrep] = {|@words|
             cand --files 'don''t show matched contents'
             cand --links 'show linked paths for symbolic links'
             cand --trim 'trim whitespace at the beginning of lines'
-            cand --pcre2 'enable PCRE2 if the searcher supports it'
+            cand --pcre2 'enable PCRE2'
             cand --no-ignore 'don''t use ignore files'
             cand -c 'display number of files matched in directory and number of lines matched in a file'
             cand --count 'display number of files matched in directory and number of lines matched in a file'

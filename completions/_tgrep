@@ -38,13 +38,13 @@ _tgrep() {
 '--files[don'\''t show matched contents]' \
 '--links[show linked paths for symbolic links]' \
 '--trim[trim whitespace at the beginning of lines]' \
-'--pcre2[enable PCRE2 if the searcher supports it]' \
+'--pcre2[enable PCRE2]' \
 '--no-ignore[don'\''t use ignore files]' \
 '-c[display number of files matched in directory and number of lines matched in a file]' \
 '--count[display number of files matched in directory and number of lines matched in a file]' \
 '--no-color[don'\''t use colors]' \
 '--no-bold[don'\''t bold anything]' \
-'(-m --menu)--long-branch[multiple files from the same directory are shown on the same branch]' \
+'--long-branch[multiple files from the same directory are shown on the same branch]' \
 '-m[open results in a menu to be edited with \$EDITOR navigate through the menu using the following commands\:  - move up/down\: k/j, p/n, up arrow/down arrow  - move up/down with a bigger jump\: K/J, P/N  - move up/down paths\: {/}, \[/\]  - move to the start/end\: g/G, </>, home/end  - move up/down a page\: b/f, pageup/pagedown  - center cursor\: z/l  - quit\: q, ctrl + c]' \
 '--menu[open results in a menu to be edited with \$EDITOR navigate through the menu using the following commands\:  - move up/down\: k/j, p/n, up arrow/down arrow  - move up/down with a bigger jump\: K/J, P/N  - move up/down paths\: {/}, \[/\]  - move to the start/end\: g/G, </>, home/end  - move up/down a page\: b/f, pageup/pagedown  - center cursor\: z/l  - quit\: q, ctrl + c]' \
 '-h[Print help]' \
