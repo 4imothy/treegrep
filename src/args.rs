@@ -296,7 +296,7 @@ fn add_expressions(command: Command) -> Command {
         .arg(
             Arg::new(EXPRESSION_POSITIONAL.id)
                 .help(EXPRESSION_POSITIONAL.h)
-                .required_unless_present_any([TREE.id, EXPRESSION.id])
+                .required_unless_present_any([TREE.id, LONG_BRANCHES.id, EXPRESSION.id])
                 .index(1),
         )
         .arg(
@@ -305,7 +305,7 @@ fn add_expressions(command: Command) -> Command {
                 .short(EXPRESSION.s.unwrap())
                 .help(EXPRESSION.h)
                 .value_name("")
-                .required_unless_present_any([TREE.id, EXPRESSION_POSITIONAL.id])
+                .required_unless_present_any([TREE.id, LONG_BRANCHES.id, EXPRESSION_POSITIONAL.id])
                 .action(ArgAction::Append),
         )
         .group(

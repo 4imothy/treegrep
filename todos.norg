@@ -1,6 +1,3 @@
-* Errors
-  - when doing long-branch shows others as required not just --tree
-
 * Performance
   - builtin multithreading
 ** Concat Lines Longer than Terminal While in Menu
