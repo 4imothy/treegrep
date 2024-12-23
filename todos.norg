@@ -1,7 +1,6 @@
 * Features
 ** Options
-   - search for a file by name and print out its tree
-   - Support for PDFs
+   - support for PDFs
 ** Config
    - different colors
 ** Menu
