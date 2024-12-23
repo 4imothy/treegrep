@@ -25,6 +25,4 @@
    - open a popup window, select a match to open in $EDITOR
 
 * Distribution
-  - make a workflow that autoupdates the help output section of the readme, can
-    try just doing shell or make a python script to run
   - notarizing on mac

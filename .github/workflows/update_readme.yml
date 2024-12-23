@@ -1,0 +1,36 @@
+name: Update ReadMe
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: update-readme
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - run: |
+          sed -i '/### \*--help\* Output/q' README.md
+          help_output=$(cargo run -- --help)
+
+          {
+            echo -e "\`\`\`"
+            echo "$help_output"
+            echo -e "\`\`\`"
+          } >> README.md
+          if git diff --exit-code README.md > /dev/null; then
+            echo "No changes in README"
+          else
+            git config user.name "GitHub Actions"
+            git config user.email "actions@github.com"
+            git add README.md
+            git commit -m "update help output"
+            git push
+          fi
