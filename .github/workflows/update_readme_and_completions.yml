@@ -48,7 +48,7 @@ jobs:
             changes=true
           fi
 
-          if [ "$changes_made" = true ]; then
+          if [ "$changes" = true ]; then
             git push
           else
             echo "No changes to push"
