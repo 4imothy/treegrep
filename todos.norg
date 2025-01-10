@@ -8,9 +8,6 @@
 
 * Performance
   - builtin multithreading
-** Concat Lines Longer than Terminal While in Menu
-   - need length of the styling added around matched sections
-   - need metric of terminal width and added styling to be same (bytes, chars)
 
 * Plugin
   - starts the program with alternate screen which prompts the user for their

@@ -44,7 +44,7 @@ pub struct Config {
     pub pcre2: bool,
     pub max_depth: Option<usize>,
     pub threads: Option<usize>,
-    pub max_length: Option<usize>,
+    pub max_length: usize,
     pub trim: bool,
     pub c: Characters,
 }
@@ -68,6 +68,10 @@ fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, M
             )
         })
     })
+}
+
+fn get_usize_option_with_default(matches: &ArgMatches, name: &str) -> Result<usize, Message> {
+    Ok(get_usize_option(matches, name)?.unwrap())
 }
 
 impl Config {
@@ -137,7 +141,7 @@ impl Config {
 
         let max_depth: Option<usize> = get_usize_option(&matches, args::MAX_DEPTH.id)?;
         let threads: Option<usize> = get_usize_option(&matches, args::THREADS.id)?;
-        let max_length: Option<usize> = get_usize_option(&matches, args::MAX_LENGTH.id)?;
+        let max_length: usize = get_usize_option_with_default(&matches, args::MAX_LENGTH.id)?;
 
         let (searcher, searcher_path) =
             Searchers::get_searcher(matches.get_one::<String>(args::SEARCHER.id))?;
@@ -204,14 +208,14 @@ impl Config {
                 max_length,
                 c: Config::get_characters(
                     matches.get_one::<String>(args::CHAR_STYLE.id),
-                    get_usize_option(&matches, args::PREFIX_LEN.id)?,
+                    get_usize_option_with_default(&matches, args::PREFIX_LEN.id)?,
                 ),
             },
             searcher_path,
         ))
     }
 
-    fn get_characters(t: Option<&String>, pl: Option<usize>) -> Characters {
+    fn get_characters(t: Option<&String>, spacer: usize) -> Characters {
         let chars = match t.map(|s| s.as_str()) {
             Some("single") | None => formats::SINGLE,
             Some("ascii") => formats::ASCII,
@@ -225,7 +229,6 @@ impl Config {
                 t.unwrap()
             ),
         };
-        let spacer: usize = pl.unwrap_or(formats::PREFIX_LEN_DEFAULT);
         Characters {
             bl: chars.bl,
             br: chars.br,
@@ -245,6 +248,7 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::args;
 
     static EXAMPLE_LONG_OPTS: &[&str] = &[
         "posexpr",
@@ -277,12 +281,21 @@ mod tests {
     }
 
     #[test]
-    fn test_default_opts() {
+    fn test_env_opts() {
         std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" "));
         let matches = Config::get_matches();
         let (bold, colors) = Config::get_styling(&matches);
         let (config, _) = Config::get_config(matches, bold, colors).ok().unwrap();
         check_parsed_config_from_example_opts(config);
+    }
+
+    #[test]
+    fn test_default_opts() {
+        let config = get_config_from(["expression"]);
+        assert!(config.max_length == args::DEFAULT_MAX_LENGTH.parse::<usize>().ok().unwrap());
+        assert!(
+            config.c.spacer == " ".repeat(args::DEFAULT_PREFIX_LEN.parse::<usize>().ok().unwrap())
+        );
     }
 
     #[test]
@@ -294,7 +307,7 @@ mod tests {
     fn check_parsed_config_from_example_opts(config: Config) {
         assert!(config.line_number);
         assert_eq!(config.max_depth, Some(5));
-        assert_eq!(config.max_length, Some(20));
+        assert_eq!(config.max_length, 20);
         assert!(config.pcre2);
         assert!(!config.ignore);
         assert!(config.hidden);

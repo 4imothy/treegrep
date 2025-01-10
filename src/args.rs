@@ -4,6 +4,9 @@ use clap::builder::PossibleValue;
 use clap::{Arg, ArgAction, ArgGroup, Command, ValueHint};
 use clap_complete;
 
+pub const DEFAULT_PREFIX_LEN: &str = "3";
+pub const DEFAULT_MAX_LENGTH: &str = "1000";
+
 pub mod names {
     pub const TREEGREP: &str = "treegrep";
     pub const TREEGREP_BIN: &str = "tgrep";
@@ -209,12 +212,15 @@ fn bool_arg(info: ArgInfo, requires_expr: bool) -> Arg {
     arg
 }
 
-fn usize_arg(info: &ArgInfo, requires_expr: bool) -> Arg {
+fn usize_arg(info: &ArgInfo, requires_expr: bool, default_value: Option<&'static str>) -> Arg {
     let mut arg = Arg::new(info.id)
         .long(info.id)
         .help(info.h)
         .value_name("")
         .action(ArgAction::Set);
+    if let Some(dv) = default_value {
+        arg = arg.default_value(dv);
+    }
     if requires_expr {
         arg = arg.requires(EXPRESSION_GROUP_ID);
     }
@@ -270,7 +276,7 @@ fn get_args<'a>() -> [Arg; 20] {
         tree,
         glob,
         searcher,
-        usize_arg(&THREADS, false),
+        usize_arg(&THREADS, false, None),
         bool_arg(HIDDEN, false),
         bool_arg(LINE_NUMBER, false),
         bool_arg(FILES, true),
@@ -281,9 +287,9 @@ fn get_args<'a>() -> [Arg; 20] {
         bool_arg(SHOW_COUNT, false),
         bool_arg(NO_COLORS, false),
         bool_arg(NO_BOLD, false),
-        usize_arg(&MAX_DEPTH, false),
-        usize_arg(&PREFIX_LEN, false),
-        usize_arg(&MAX_LENGTH, true),
+        usize_arg(&MAX_DEPTH, false, None),
+        usize_arg(&PREFIX_LEN, false, Some(DEFAULT_PREFIX_LEN)),
+        usize_arg(&MAX_LENGTH, true, Some(DEFAULT_MAX_LENGTH)),
         char_style,
         long,
         bool_arg(MENU, false),

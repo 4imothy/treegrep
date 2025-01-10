@@ -139,11 +139,14 @@ pub struct Line {
 }
 
 impl Line {
-    pub fn styled(contents: &[u8], mut matches: Vec<Match>, line_num: usize) -> Self {
+    pub fn new(contents: &[u8], mut matches: Vec<Match>, line_num: usize) -> Self {
         if matches.len() > 0 {
             Match::remove_overlapping(&mut matches);
         }
-        formats::style_line(contents, matches, line_num)
+        Line {
+            contents: formats::style_line(contents, matches).to_vec(),
+            line_num,
+        }
     }
 }
 
