@@ -147,7 +147,7 @@ impl<'a> Menu<'a> {
 
         Ok(Menu {
             selected_id: 0,
-            cursor_y: 0,
+            cursor_y: START_Y,
             first_y: 0,
             last_y: 0,
             term,
@@ -254,7 +254,12 @@ impl<'a> Menu<'a> {
                         KeyCode::Char('h') => {
                             menu.popup(MENU_HELP.to_string() + "\npress q to quit this popup")?
                         }
-                        KeyCode::Char('z') | KeyCode::Char('l') => menu.center_cursor()?,
+                        KeyCode::Char('z')
+                            if !modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            menu.center_cursor()?
+                        }
+                        KeyCode::Char('l') => menu.center_cursor()?,
                         KeyCode::Enter => {
                             let match_info = MatchInfo::find(menu.selected_id, &menu.searched);
                             let path = config().path.join(match_info.path);
@@ -426,10 +431,15 @@ impl<'a> Menu<'a> {
     }
 
     fn resume(&mut self) -> io::Result<()> {
+        let orig_height = self.height();
         self.term.set_dims(terminal::size()?);
         (self.scroll_offset, self.big_jump, self.small_jump) = Menu::scroll_info(self.height());
         self.term.claim()?;
-        self.draw()?;
+        if self.height() != orig_height {
+            self.center_cursor()?;
+        } else {
+            self.draw()?;
+        }
         Ok(())
     }
 
