@@ -6,6 +6,7 @@ use clap_complete;
 
 pub const DEFAULT_PREFIX_LEN: &str = "3";
 pub const DEFAULT_MAX_LENGTH: &str = "1000";
+pub const DEFAULT_LONG_BRANCH_EACH: &str = "5";
 
 pub mod names {
     pub const TREEGREP: &str = "treegrep";
@@ -51,6 +52,11 @@ arg_info!(
     LONG_BRANCHES,
     "long-branch",
     "multiple files from the same directory are shown on the same branch"
+);
+arg_info!(
+    LONG_BRANCHES_EACH,
+    "long-branch-each",
+    "number of files to print on each branch"
 );
 arg_info!(NO_BOLD, "no-bold", "don't bold anything");
 pub const PATH_HELP: &str = "the path to search. If not provided, search the current directory.";
@@ -227,7 +233,7 @@ fn usize_arg(info: &ArgInfo, requires_expr: bool, default_value: Option<&'static
     arg
 }
 
-fn get_args<'a>() -> [Arg; 20] {
+fn get_args<'a>() -> [Arg; 21] {
     let tree = Arg::new(TREE.id)
         .long(TREE.id)
         .help(TREE.h)
@@ -290,6 +296,7 @@ fn get_args<'a>() -> [Arg; 20] {
         usize_arg(&MAX_DEPTH, false, None),
         usize_arg(&PREFIX_LEN, false, Some(DEFAULT_PREFIX_LEN)),
         usize_arg(&MAX_LENGTH, true, Some(DEFAULT_MAX_LENGTH)),
+        usize_arg(&LONG_BRANCHES_EACH, true, Some(DEFAULT_LONG_BRANCH_EACH)),
         char_style,
         long,
         bool_arg(MENU, false),

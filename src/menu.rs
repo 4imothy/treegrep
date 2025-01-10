@@ -136,6 +136,8 @@ impl<'a> Menu<'a> {
             .split(|&byte| byte == formats::NEW_LINE as u8)
             .map(|v| String::from_utf8_lossy(v).into())
             .collect();
+        path_ids.shrink_to_fit();
+        buffer.shrink_to_fit();
 
         let mut term = term::Term::new(out)?;
         term.claim()?;

@@ -7,8 +7,6 @@ use crossterm::style::StyledContent;
 use std::ffi::OsString;
 use std::io::{self, Write};
 
-const LONG_BRANCH_FILES_PER_LINE: usize = 5;
-
 impl Directory {
     fn write(
         &self,
@@ -67,8 +65,9 @@ impl Directory {
         files: &Vec<File>,
     ) -> io::Result<()> {
         let mut first_long_branch = true;
+        let long_branch_files_per_line: usize = config().long_branch_each;
         let num_lines: usize =
-            (files.len() + LONG_BRANCH_FILES_PER_LINE - 1) / LONG_BRANCH_FILES_PER_LINE;
+            (files.len() + long_branch_files_per_line - 1) / long_branch_files_per_line;
         let mut line_id: usize = 0;
 
         let before_no_next = format!(
@@ -92,7 +91,7 @@ impl Directory {
                     write!(out, "{}", before_next)?;
                 }
                 first_long_branch = false;
-            } else if i % LONG_BRANCH_FILES_PER_LINE == 0 {
+            } else if i % long_branch_files_per_line == 0 {
                 write!(out, "{}", formats::LONG_BRANCH_FILE_SEPARATOR)?;
                 writeln!(out)?;
                 line_id += 1;

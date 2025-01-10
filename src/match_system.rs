@@ -144,7 +144,7 @@ impl Line {
             Match::remove_overlapping(&mut matches);
         }
         Line {
-            contents: formats::style_line(contents, matches).to_vec(),
+            contents: formats::style_line(contents, matches),
             line_num,
         }
     }

@@ -45,6 +45,7 @@ pub struct Config {
     pub max_depth: Option<usize>,
     pub threads: Option<usize>,
     pub max_length: usize,
+    pub long_branch_each: usize,
     pub trim: bool,
     pub c: Characters,
 }
@@ -142,6 +143,8 @@ impl Config {
         let max_depth: Option<usize> = get_usize_option(&matches, args::MAX_DEPTH.id)?;
         let threads: Option<usize> = get_usize_option(&matches, args::THREADS.id)?;
         let max_length: usize = get_usize_option_with_default(&matches, args::MAX_LENGTH.id)?;
+        let long_branch_each: usize =
+            get_usize_option_with_default(&matches, args::LONG_BRANCHES_EACH.id)?;
 
         let (searcher, searcher_path) =
             Searchers::get_searcher(matches.get_one::<String>(args::SEARCHER.id))?;
@@ -206,6 +209,7 @@ impl Config {
                 globs,
                 ignore,
                 max_length,
+                long_branch_each,
                 c: Config::get_characters(
                     matches.get_one::<String>(args::CHAR_STYLE.id),
                     get_usize_option_with_default(&matches, args::PREFIX_LEN.id)?,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::config;
-use crate::match_system::{Line, Match};
+use crate::match_system::Match;
 use crossterm::style::{
     style, Attribute, Color, ResetColor, SetAttribute, SetForegroundColor, StyledContent, Stylize,
 };
@@ -20,8 +20,6 @@ const MATCHED_COLORS: [SetForegroundColor; 3] = [GREEN_FG, MAGENTA_FG, RED_FG];
 pub const MENU_SELECTED: Color = Color::DarkGrey;
 pub const SELECTED_INDICATOR_CLEAR: &str = "   ";
 pub const LONG_BRANCH_FILE_SEPARATOR: &str = ", ";
-
-pub const PREFIX_LEN_DEFAULT: usize = 3;
 
 pub struct Chars {
     pub bl: char,
@@ -139,10 +137,6 @@ pub fn resets() -> String {
     result
 }
 
-pub fn bold() -> Vec<u8> {
-    BOLD.to_string().into_bytes()
-}
-
 fn style_str(orig: &str, color: Color, attr: Attribute) -> StyledContent<&str> {
     let mut styled = style(orig);
     if config().colors {
@@ -173,38 +167,36 @@ pub fn line_number(num: usize) -> StyledContent<String> {
     styled_num
 }
 
-pub fn get_color(i: usize) -> SetForegroundColor {
-    MATCHED_COLORS[i % MATCHED_COLORS.len()]
+pub fn bold() -> Vec<u8> {
+    BOLD.to_string().into_bytes()
 }
 
-pub fn style_line(mut contents: &[u8], matches: Vec<Match>, line_num: usize) -> Line {
+pub fn color(i: usize) -> Vec<u8> {
+    MATCHED_COLORS[i % MATCHED_COLORS.len()]
+        .to_string()
+        .into_bytes()
+}
+
+pub fn style_line(mut contents: &[u8], matches: Vec<Match>) -> Vec<u8> {
     let cut;
     if config().trim {
         (contents, cut) = contents.trim_left();
     } else {
         cut = 0;
     }
-    if let Some(max_len) = config().max_length {
-        if max_len < contents.len() {
-            contents = &contents[0..max_len];
-        }
+    if config().max_length < contents.len() {
+        contents = &contents[0..config().max_length];
     }
     let mut styled_line = contents.to_vec();
     if config().colors {
         let mut shift = 0;
         for mut m in matches {
-            if m.start >= contents.len() {
-                break;
-            }
-            if m.end >= contents.len() {
-                m.end = contents.len();
-            }
-            if cut > m.start || cut > m.end || m.start == m.end {
+            if m.start == m.end || m.start >= config().max_length {
                 continue;
             }
             m.start -= cut;
             m.end -= cut;
-            let styler = get_color(m.pattern_id).to_string().into_bytes();
+            let styler = color(m.pattern_id);
             let mut start = m.start + shift;
             shift += styler.len();
             styled_line.splice(start..start, styler.into_iter());
@@ -221,10 +213,7 @@ pub fn style_line(mut contents: &[u8], matches: Vec<Match>, line_num: usize) -> 
         }
     }
 
-    Line {
-        contents: styled_line,
-        line_num,
-    }
+    styled_line
 }
 
 trait SliceExt {
