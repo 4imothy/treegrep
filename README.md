@@ -72,8 +72,9 @@ Options:
       --no-color             don't use colors
       --no-bold              don't bold anything
       --max-depth <>         the max depth to search
-      --prefix-len <>        number of characters to show before a match
-      --max-length <>        set the max length for a matched line
+      --prefix-len <>        number of characters to show before a match [default: 3]
+      --max-length <>        set the max length for a matched line [default: 1000]
+      --long-branch-each <>  number of files to print on each branch [default: 5]
       --char-style <>        style of characters to use [possible values: ascii, single, double, heavy, rounded, none]
       --long-branch          multiple files from the same directory are shown on the same branch
   -m, --menu                 open results in a menu to be edited with $EDITOR
