@@ -7,6 +7,7 @@ complete -c tgrep -l threads -d 'set the appropriate number of threads to use' -
 complete -c tgrep -l max-depth -d 'the max depth to search' -r
 complete -c tgrep -l prefix-len -d 'number of characters to show before a match' -r
 complete -c tgrep -l max-length -d 'set the max length for a matched line' -r
+complete -c tgrep -l long-branch-each -d 'number of files to print on each branch' -r
 complete -c tgrep -l char-style -d 'style of characters to use' -r -f -a "{ascii\t'',single\t'',double\t'',heavy\t'',rounded\t'',none\t''}"
 complete -c tgrep -s t -l tree -d 'display the files that would be search in tree format'
 complete -c tgrep -s . -l hidden -d 'search hidden files'

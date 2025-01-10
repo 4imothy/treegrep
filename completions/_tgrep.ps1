@@ -33,6 +33,7 @@ Register-ArgumentCompleter -Native -CommandName 'tgrep' -ScriptBlock {
             [CompletionResult]::new('--max-depth', '--max-depth', [CompletionResultType]::ParameterName, 'the max depth to search')
             [CompletionResult]::new('--prefix-len', '--prefix-len', [CompletionResultType]::ParameterName, 'number of characters to show before a match')
             [CompletionResult]::new('--max-length', '--max-length', [CompletionResultType]::ParameterName, 'set the max length for a matched line')
+            [CompletionResult]::new('--long-branch-each', '--long-branch-each', [CompletionResultType]::ParameterName, 'number of files to print on each branch')
             [CompletionResult]::new('--char-style', '--char-style', [CompletionResultType]::ParameterName, 'style of characters to use')
             [CompletionResult]::new('-t', '-t', [CompletionResultType]::ParameterName, 'display the files that would be search in tree format')
             [CompletionResult]::new('--tree', '--tree', [CompletionResultType]::ParameterName, 'display the files that would be search in tree format')
