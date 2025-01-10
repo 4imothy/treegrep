@@ -638,7 +638,7 @@ impl<'a> Menu<'a> {
         self.give_up_term()?;
 
         use std::os::unix::process::CommandExt;
-        command.exec();
+        let _ = command.exec();
         Ok(())
     }
 }
