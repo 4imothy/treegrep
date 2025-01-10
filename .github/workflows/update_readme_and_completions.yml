@@ -1,4 +1,4 @@
-name: Update ReadMe
+name: Update ReadMe and Completions
 
 on:
   push:
@@ -19,6 +19,7 @@ jobs:
       - run: |
           sed -i '/### \*--help\* Output/q' README.md
           help_output=$(cargo run -- --help)
+          changes=false
 
           {
             echo -e "\`\`\`"
@@ -32,5 +33,23 @@ jobs:
             git config user.email "actions@github.com"
             git add README.md
             git commit -m "update help output"
+            changes=true
+          fi
+
+          cargo build --release
+
+          if git diff --exit-code completions/ > /dev/null; then
+            echo "No changes in completions/"
+          else
+            git config user.name "GitHub Actions"
+            git config user.email "actions@github.com"
+            git add completions/
+            git commit -m "update completions"
+            changes=true
+          fi
+
+          if [ "$changes_made" = true ]; then
             git push
+          else
+            echo "No changes to push"
           fi
