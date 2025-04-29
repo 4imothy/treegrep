@@ -64,7 +64,7 @@ Options:
   -., --hidden               search hidden files
   -n, --line-number          show line number of match
   -f, --files                don't show matched contents
-      --links                show linked paths for symbolic links
+      --links                search linked paths
       --trim                 trim whitespace at the beginning of lines
       --pcre2                enable PCRE2
       --no-ignore            don't use ignore files
