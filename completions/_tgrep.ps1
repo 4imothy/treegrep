@@ -43,7 +43,7 @@ Register-ArgumentCompleter -Native -CommandName 'tgrep' -ScriptBlock {
             [CompletionResult]::new('--line-number', '--line-number', [CompletionResultType]::ParameterName, 'show line number of match')
             [CompletionResult]::new('-f', '-f', [CompletionResultType]::ParameterName, 'don''t show matched contents')
             [CompletionResult]::new('--files', '--files', [CompletionResultType]::ParameterName, 'don''t show matched contents')
-            [CompletionResult]::new('--links', '--links', [CompletionResultType]::ParameterName, 'show linked paths for symbolic links')
+            [CompletionResult]::new('--links', '--links', [CompletionResultType]::ParameterName, 'search linked paths')
             [CompletionResult]::new('--trim', '--trim', [CompletionResultType]::ParameterName, 'trim whitespace at the beginning of lines')
             [CompletionResult]::new('--pcre2', '--pcre2', [CompletionResultType]::ParameterName, 'enable PCRE2')
             [CompletionResult]::new('--no-ignore', '--no-ignore', [CompletionResultType]::ParameterName, 'don''t use ignore files')

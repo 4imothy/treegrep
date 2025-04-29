@@ -40,7 +40,7 @@ set edit:completion:arg-completer[tgrep] = {|@words|
             cand --line-number 'show line number of match'
             cand -f 'don''t show matched contents'
             cand --files 'don''t show matched contents'
-            cand --links 'show linked paths for symbolic links'
+            cand --links 'search linked paths'
             cand --trim 'trim whitespace at the beginning of lines'
             cand --pcre2 'enable PCRE2'
             cand --no-ignore 'don''t use ignore files'

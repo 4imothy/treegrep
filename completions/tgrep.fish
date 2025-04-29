@@ -13,7 +13,7 @@ complete -c tgrep -s t -l tree -d 'display the files that would be search in tre
 complete -c tgrep -s . -l hidden -d 'search hidden files'
 complete -c tgrep -s n -l line-number -d 'show line number of match'
 complete -c tgrep -s f -l files -d 'don\'t show matched contents'
-complete -c tgrep -l links -d 'show linked paths for symbolic links'
+complete -c tgrep -l links -d 'search linked paths'
 complete -c tgrep -l trim -d 'trim whitespace at the beginning of lines'
 complete -c tgrep -l pcre2 -d 'enable PCRE2'
 complete -c tgrep -l no-ignore -d 'don\'t use ignore files'
