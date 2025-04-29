@@ -84,7 +84,7 @@ arg_info!(
     "prefix-len",
     "number of characters to show before a match"
 );
-arg_info!(LINKS, "links", "show linked paths for symbolic links");
+arg_info!(LINKS, "links", "search linked paths");
 arg_info!(
     TRIM_LEFT,
     "trim",
