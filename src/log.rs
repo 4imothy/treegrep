@@ -23,8 +23,7 @@ macro_rules! log {
 pub fn set_panic_hook() {
     let default_hook = panic::take_hook();
     panic::set_hook(Box::new(move |info| {
-        let log_file = LOG.get_or_init(|| gen_log());
-        writeln!(log_file.lock().unwrap(), "{}", info).unwrap();
+        log!("{}", info);
         default_hook(info);
     }));
 }
