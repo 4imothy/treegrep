@@ -133,12 +133,12 @@ fn links() {
     let tar_dir: PathBuf = target_dir();
     let dir = Dir::new("links");
     let linked_file = PathBuf::from("linked_file");
-    dir.create_file_str(&linked_file, "top file contents");
+    dir.create_file_str(&linked_file, "top file content");
     dir.link_file(&linked_file, "link_to_file");
 
     let linked_dir = PathBuf::from("linked");
     dir.add_child(&linked_dir);
-    dir.create_file_str(&linked_dir.join("file"), "child file contents");
+    dir.create_file_str(&linked_dir.join("file"), "child file content");
     dir.link_dir(&linked_dir, "link_to_dir");
 
     let (rg_results, tg_results) = get_outputs(&dir.path, ".", Some("--links"));

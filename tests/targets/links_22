@@ -1,11 +1,11 @@
 links
 ├──linked
 │  └──file
-│     └──child file contents
+│     └──child file content
 ├──link_to_dir -> linked
 │  └──file
-│     └──child file contents
+│     └──child file content
 ├──linked_file
-│  └──top file contents
+│  └──top file content
 └──link_to_file -> linked_file
-   └──top file contents
+   └──top file content

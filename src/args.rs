@@ -5,7 +5,6 @@ use clap::{Arg, ArgAction, ArgGroup, Command, ValueHint};
 use clap_complete;
 
 pub const DEFAULT_PREFIX_LEN: &str = "3";
-pub const DEFAULT_MAX_LENGTH: &str = "1000";
 pub const DEFAULT_LONG_BRANCH_EACH: &str = "5";
 
 pub mod names {
@@ -75,7 +74,7 @@ arg_info!(
 arg_info!(HIDDEN, "hidden", "search hidden files", '.');
 arg_info!(LINE_NUMBER, "line-number", "show line number of match", 'n');
 arg_info!(MENU, "menu", MENU_HELP, 'm');
-arg_info!(FILES, "files", "don't show matched contents", 'f');
+arg_info!(FILES, "files", "don't show matched content", 'f');
 arg_info!(MAX_DEPTH, "max-depth", "the max depth to search");
 arg_info!(SEARCHER, "searcher", "executable to do the searching", 's');
 arg_info!(CHAR_STYLE, "char-style", "style of characters to use");
@@ -295,7 +294,7 @@ fn get_args<'a>() -> [Arg; 21] {
         bool_arg(NO_BOLD, false),
         usize_arg(&MAX_DEPTH, false, None),
         usize_arg(&PREFIX_LEN, false, Some(DEFAULT_PREFIX_LEN)),
-        usize_arg(&MAX_LENGTH, true, Some(DEFAULT_MAX_LENGTH)),
+        usize_arg(&MAX_LENGTH, true, None),
         usize_arg(&LONG_BRANCHES_EACH, true, Some(DEFAULT_LONG_BRANCH_EACH)),
         char_style,
         long,

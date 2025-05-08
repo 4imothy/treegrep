@@ -9,27 +9,27 @@ use std::process::Command;
 
 const OVERWRITE: bool = false;
 
-fn normalize_newlines(contents: &mut Vec<u8>) {
+fn normalize_newlines(content: &mut Vec<u8>) {
     let mut i = 0;
-    if contents.len() == 0 {
+    if content.len() == 0 {
         panic!("empty output can't be normalized");
     }
-    while i < contents.len() - 1 {
-        if contents[i] == b'\r' && contents[i + 1] == b'\n' {
-            contents[i] = b'\n';
-            contents.remove(i + 1);
+    while i < content.len() - 1 {
+        if content[i] == b'\r' && content[i + 1] == b'\n' {
+            content[i] = b'\n';
+            content.remove(i + 1);
         } else {
             i += 1;
         }
     }
 }
 
-fn get_target_contents(path: PathBuf) -> Vec<u8> {
-    let mut contents: Vec<u8> = fs::read(&path).unwrap();
+fn get_target_content(path: PathBuf) -> Vec<u8> {
+    let mut content: Vec<u8> = fs::read(&path).unwrap();
 
-    normalize_newlines(&mut contents);
+    normalize_newlines(&mut content);
 
-    contents
+    content
 }
 
 fn check_results(
@@ -42,22 +42,24 @@ fn check_results(
         let mut file = fs::File::create(tar_path).unwrap();
         file.write_all(&rg_results).unwrap();
     } else {
-        let contents = get_target_contents(tar_path);
-        let rg_str = String::from_utf8_lossy(&rg_results);
-        let tg_str = String::from_utf8_lossy(&tg_results);
-        let contents_str = String::from_utf8_lossy(&contents);
-        println!("file contents");
-        println!("{}", contents_str);
-        println!("rg output");
-        println!("{}", rg_str);
-        println!("tg output");
-        println!("{}", tg_str);
+        let content = get_target_content(tar_path);
+        let content_str = String::from_utf8_lossy(&content);
+        if *tg_results != content {
+            let tg_str = String::from_utf8_lossy(&tg_results);
+            print_diff(&tg_str, "tgrep output", &content_str);
+        }
+        if *rg_results != content {
+            let rg_str = String::from_utf8_lossy(&rg_results);
+            println!("rg output");
+            println!("{}", rg_str);
+            print_diff(&rg_str, "rg output", &content_str);
+        }
 
         if single_poss_tar {
-            let pass = contents == *tg_results && contents == *rg_results;
-            assert!(pass);
+            assert!(content == *tg_results);
+            assert!(content == *rg_results);
         } else {
-            return Some((*tg_results == contents, *rg_results == contents));
+            return Some((*tg_results == content, *rg_results == content));
         }
     }
     None
@@ -127,8 +129,6 @@ pub fn get_outputs(path: &Path, expr: &str, extra_option: Option<&str>) -> (Vec<
 
     let rg_out = tg_on_rg.output().ok().unwrap();
 
-    println!("{:?}", tg_on_rg);
-    println!("{:?}", rg_out);
     if !rg_out.status.success() && rg_out.stderr.len() > 0 {
         panic!("cmd failed {}", String::from_utf8_lossy(&rg_out.stderr));
     }
@@ -175,4 +175,25 @@ pub fn target_dir() -> PathBuf {
         fs::create_dir_all(&p).unwrap();
     }
     p
+}
+
+fn print_diff(output: &str, output_name: &str, target: &str) {
+    println!("target content");
+    println!("{}", target);
+    println!("{}", output_name);
+    println!("{}", output);
+    println!("diff:");
+    let target_lines: Vec<&str> = target.lines().collect();
+    let output_lines: Vec<&str> = output.lines().collect();
+    let max_lines = target_lines.len().max(output_lines.len());
+
+    for i in 0..max_lines {
+        let target_line: &str = target_lines.get(i).unwrap_or(&"");
+        let output_line: &str = output_lines.get(i).unwrap_or(&"");
+        if target_line != output_line {
+            println!("line {}:", i + 1);
+            println!("  target: {}", target_line);
+            println!("  output: {}", output_line);
+        }
+    }
 }
