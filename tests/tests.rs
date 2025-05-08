@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use utils::*;
 
 #[test]
-fn wide_directory_tree() {
+fn wide_directory() {
     let tar_dir: PathBuf = target_dir();
     let dir = Dir::new("wide");
     dir.create_file_str(&PathBuf::from("top_file"), "text in top level file");
@@ -34,7 +34,7 @@ fn wide_directory_tree() {
 }
 
 #[test]
-fn deep_directory_tree() {
+fn deep_directory() {
     let pool: &[u8] = include_bytes!("pool/alice_adventures_in_wonderland_by_lewis_carroll.txt");
 
     let tar_dir: PathBuf = target_dir();

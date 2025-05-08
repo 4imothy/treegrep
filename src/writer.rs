@@ -117,8 +117,7 @@ fn write_path(
             }
         )?;
     }
-    let file_in_tree: bool = config().tree && count == 0;
-    if config().count && !file_in_tree {
+    if config().count && count > 0 {
         write!(f, ": {}", count)?;
     }
     if new_line {
@@ -247,6 +246,10 @@ impl<'a> Entry for LongBranchEntry<'a> {
 impl<'a> Display for LongBranchEntry<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
         write_prefix(f, &self.prefix)?;
+        if config().colors || config().bold {
+            write!(f, "{}", formats::RESET)?;
+        }
+
         for (i, file) in self.files.iter().enumerate() {
             write_path(
                 f,
@@ -382,7 +385,7 @@ impl File {
             new_line: !config().menu,
         }));
 
-        if config().just_files {
+        if config().files {
             return;
         }
 

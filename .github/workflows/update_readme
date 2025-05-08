@@ -11,8 +11,8 @@ EXAMPLES = '### examples'
 EXAMPLES_TO_RUN = [
     ['--regexp', r'\bstruct\s+\w+', '--regexp', r'\bimpl\s+\w+', '--path', 'src', '--line-number', '--count'],
     ['Print', os.path.join('src', 'menu.rs'), '--trim', '--line-number', '--char-style=ascii'],
-    ['--tree'],
-    ['--tree', '--long-branch']
+    ['--files', '--hidden'],
+    ['--files', '--long-branch', '--hidden']
 ]
 
 def run_and_capture_examples(examples):
@@ -76,13 +76,14 @@ def update_readme(*, add_examples):
                 exit(1)
             f.write(EXAMPLES + '\n')
             for output in example_outputs:
+                f.write('\n')
                 f.write(output)
-                f.write('\n\n')
+                f.write('\n')
         else:
             for line in lines[examples_index:help_index]:
                 f.write(line)
 
-        f.write(HELP + '\n')
+        f.write('\n' + HELP + '\n')
         f.write(help_output)
 
 if __name__ == '__main__':

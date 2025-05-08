@@ -12,8 +12,8 @@ pub fn wrap_dirs(dirs: Vec<Directory>) -> Option<Matches> {
     Some(Matches::Dir(dirs))
 }
 
-pub fn wrap_file(file: Option<File>, tree: bool) -> Option<Matches> {
-    file.filter(|f| !f.lines.is_empty() || tree)
+pub fn wrap_file(file: Option<File>, just_files: bool) -> Option<Matches> {
+    file.filter(|f| !f.lines.is_empty() || just_files)
         .map(Matches::File)
 }
 

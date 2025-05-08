@@ -24,7 +24,7 @@ pub fn search() -> Result<Option<Matches>, Message> {
     } else {
         Ok(wrap_file(
             Some(search_file(&config().path, &patterns)?),
-            config().tree,
+            config().just_files,
         ))
     }
 }
@@ -67,7 +67,7 @@ fn search_dir(patterns: &Vec<Regex>) -> Result<Vec<Directory>, Message> {
                     }
                 } else if path.is_file() {
                     let file = search_file(&path, &patterns)?;
-                    if file.lines.len() > 0 || config().tree {
+                    if file.lines.len() > 0 || config().just_files {
                         if let Some(mut dir_path) = file.path.parent().map(|v| v.to_path_buf()) {
                             let mut prev_id: usize =
                                 *path_to_index.get(dir_path.as_os_str()).unwrap();
@@ -98,7 +98,7 @@ fn search_dir(patterns: &Vec<Regex>) -> Result<Vec<Directory>, Message> {
 
 fn search_file(pb: &PathBuf, patterns: &Vec<Regex>) -> Result<File, Message> {
     let mut file = File::new(pb)?;
-    if config().tree {
+    if config().just_files {
         return Ok(file);
     }
     let m_content_bytes: Option<Vec<u8>> = fs::read(pb).ok();

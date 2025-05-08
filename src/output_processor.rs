@@ -175,7 +175,7 @@ pub fn process_json_lines(lines: Vec<&[u8]>) -> Result<Option<Matches>, Message>
     } else {
         Ok(wrap_file(
             dirs.get_mut(d_id).unwrap().files.pop(),
-            config().tree,
+            config().just_files,
         ))
     }
 }

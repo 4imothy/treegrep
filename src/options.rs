@@ -33,7 +33,7 @@ pub trait Options {
         Self::max_depth(cmd, config.max_depth)?;
         Self::threads(cmd, config.threads)?;
         Self::links(cmd, config.links)?;
-        Self::files(cmd, config.just_files)?;
+        Self::files(cmd, config.files)?;
         Self::ignore(cmd, config.ignore)?;
         Ok(())
     }

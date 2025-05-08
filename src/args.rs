@@ -41,13 +41,6 @@ pub const HIDE_CONTENT_GROUP_ID: &str = "hide_contents";
 pub const CHAR_STYLE_OPTIONS: [&str; 6] = ["ascii", "single", "double", "heavy", "rounded", "none"];
 
 arg_info!(
-    TREE,
-    "tree",
-    "display the files that would be search in tree format",
-    't'
-);
-
-arg_info!(
     LONG_BRANCHES,
     "long-branch",
     "multiple files from the same directory are shown on the same branch"
@@ -58,7 +51,7 @@ arg_info!(
     "number of files to print on each branch"
 );
 arg_info!(NO_BOLD, "no-bold", "don't bold anything");
-pub const PATH_HELP: &str = "the path to search. If not provided, search the current directory.";
+pub const PATH_HELP: &str = "the path to search, if not provided, search the current directory";
 arg_info!(PATH_POSITIONAL, "positional target", PATH_HELP);
 arg_info!(PATH, "path", PATH_HELP, 'p');
 pub const EXPR_HELP: &str = "the regex expression";
@@ -74,7 +67,13 @@ arg_info!(
 arg_info!(HIDDEN, "hidden", "search hidden files", '.');
 arg_info!(LINE_NUMBER, "line-number", "show line number of match", 'n');
 arg_info!(MENU, "menu", MENU_HELP, 'm');
-arg_info!(FILES, "files", "don't show matched content", 'f');
+arg_info!(
+    FILES,
+    "files",
+    "if a pattern is given hide matched content, otherwise show the files that would be searched",
+    'f'
+);
+
 arg_info!(MAX_DEPTH, "max-depth", "the max depth to search");
 arg_info!(SEARCHER, "searcher", "executable to do the searching", 's');
 arg_info!(CHAR_STYLE, "char-style", "style of characters to use");
@@ -154,14 +153,10 @@ pub fn generate_command() -> Command {
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .version(env!("CARGO_PKG_VERSION"));
 
-    if tree_arg_present() {
-        command = command.allow_missing_positional(true);
-    }
-
     command = command.group(
         ArgGroup::new(HIDE_CONTENT_GROUP_ID)
             .id(HIDE_CONTENT_GROUP_ID)
-            .args([TREE.id, FILES.id]),
+            .arg(FILES.id),
     );
 
     command = add_expressions(command);
@@ -181,15 +176,6 @@ pub fn generate_command() -> Command {
         command = command.arg(opt);
     }
     return command;
-}
-
-fn tree_arg_present() -> bool {
-    std::env::args().any(|arg| {
-        arg == format!("--{}", TREE.id)
-            || (arg.starts_with('-')
-                && arg.chars().nth(1) != Some('-')
-                && arg.chars().skip(1).any(|c| c == TREE.s.unwrap()))
-    })
 }
 
 pub fn completions_arg_present() -> bool {
@@ -232,14 +218,7 @@ fn usize_arg(info: &ArgInfo, requires_expr: bool, default_value: Option<&'static
     arg
 }
 
-fn get_args<'a>() -> [Arg; 21] {
-    let tree = Arg::new(TREE.id)
-        .long(TREE.id)
-        .help(TREE.h)
-        .action(ArgAction::SetTrue)
-        .conflicts_with(EXPRESSION_GROUP_ID)
-        .short(TREE.s);
-
+fn get_args<'a>() -> [Arg; 20] {
     let long = Arg::new(LONG_BRANCHES.id)
         .long(LONG_BRANCHES.id)
         .help(LONG_BRANCHES.h)
@@ -278,13 +257,12 @@ fn get_args<'a>() -> [Arg; 21] {
         .value_name("")
         .action(ArgAction::Set);
     [
-        tree,
         glob,
         searcher,
         usize_arg(&THREADS, false, None),
         bool_arg(HIDDEN, false),
         bool_arg(LINE_NUMBER, false),
-        bool_arg(FILES, true),
+        bool_arg(FILES, false),
         bool_arg(LINKS, false),
         bool_arg(TRIM_LEFT, true),
         bool_arg(PCRE2, true),
@@ -307,7 +285,7 @@ fn add_expressions(command: Command) -> Command {
         .arg(
             Arg::new(EXPRESSION_POSITIONAL.id)
                 .help(EXPRESSION_POSITIONAL.h)
-                .required_unless_present_any([TREE.id, LONG_BRANCHES.id, EXPRESSION.id])
+                .required_unless_present_any([FILES.id, EXPRESSION.id])
                 .index(1),
         )
         .arg(
@@ -316,7 +294,7 @@ fn add_expressions(command: Command) -> Command {
                 .short(EXPRESSION.s.unwrap())
                 .help(EXPRESSION.h)
                 .value_name("")
-                .required_unless_present_any([TREE.id, LONG_BRANCHES.id, EXPRESSION_POSITIONAL.id])
+                .required_unless_present_any([FILES.id, EXPRESSION_POSITIONAL.id])
                 .action(ArgAction::Append),
         )
         .group(

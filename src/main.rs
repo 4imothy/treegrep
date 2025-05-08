@@ -55,7 +55,7 @@ fn run(matches: ArgMatches, bold: bool, colors: bool) -> Result<(), Message> {
     CONFIG.set(c).ok().unwrap();
 
     let matches: Option<Matches>;
-    if config().tree || searcher_path.is_none() {
+    if config().just_files || searcher_path.is_none() {
         matches = matcher::search()?;
     } else {
         matches = get_matches_from_cmd(searcher_path.unwrap())?;

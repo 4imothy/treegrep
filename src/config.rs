@@ -26,7 +26,6 @@ pub struct Characters {
 pub struct Config {
     pub cwd: PathBuf,
     pub path: PathBuf,
-    pub tree: bool,
     pub long_branch: bool,
     pub bold: bool,
     pub colors: bool,
@@ -38,6 +37,7 @@ pub struct Config {
     pub hidden: bool,
     pub line_number: bool,
     pub menu: bool,
+    pub files: bool,
     pub just_files: bool,
     pub links: bool,
     pub ignore: bool,
@@ -78,7 +78,8 @@ fn get_usize_option_with_default(matches: &ArgMatches, name: &str) -> Result<usi
 
 impl Config {
     pub fn get_matches_from(args: Vec<OsString>) -> ArgMatches {
-        let mut full_args = args;
+        let mut full_args = args; // TODO can probably do a check for completions here than reading
+                                  // from the cmdline
         if !args::completions_arg_present() {
             if let Some(env_args) = std::env::var_os(args::DEFAULT_OPTS_ENV_NAME) {
                 if !env_args.is_empty() {
@@ -129,13 +130,12 @@ impl Config {
             .map(|exprs| exprs.map(String::to_owned).collect())
             .unwrap_or_else(Vec::new);
 
-        let tree: bool = matches.get_flag(args::TREE.id);
         let long_branch: bool = matches.get_flag(args::LONG_BRANCHES.id);
         let count: bool = matches.get_flag(args::SHOW_COUNT.id);
         let hidden: bool = matches.get_flag(args::HIDDEN.id);
         let line_number: bool = matches.get_flag(args::LINE_NUMBER.id);
         let menu: bool = matches.get_flag(args::MENU.id);
-        let just_files: bool = matches.get_flag(args::FILES.id);
+        let files: bool = matches.get_flag(args::FILES.id);
         let links: bool = matches.get_flag(args::LINKS.id);
         let trim: bool = matches.get_flag(args::TRIM_LEFT.id);
         let pcre2: bool = matches.get_flag(args::PCRE2.id);
@@ -186,14 +186,15 @@ impl Config {
 
         let is_dir = path.is_dir();
         let prefix_len = get_usize_option_with_default(&matches, args::PREFIX_LEN.id)?;
+        let just_files = files && patterns.len() == 0;
 
         Ok((
             Config {
                 cwd,
                 path,
-                tree,
                 long_branch,
                 is_dir,
+                just_files,
                 bold,
                 searcher,
                 patterns,
@@ -203,7 +204,7 @@ impl Config {
                 count,
                 hidden,
                 menu,
-                just_files,
+                files,
                 links,
                 max_depth,
                 threads,
@@ -323,7 +324,7 @@ mod tests {
         assert!(config.trim);
         assert!(config.colors);
         assert!(config.menu);
-        assert!(config.just_files);
+        assert!(config.files);
         match config.searcher {
             Searchers::RipGrep => {}
             _ => panic!("wrong searcher"),
@@ -338,14 +339,14 @@ mod tests {
         assert!(config.hidden);
         assert!(config.count);
         assert!(config.menu);
-        assert!(config.just_files);
+        assert!(config.files);
         assert_eq!(config.patterns, vec!["posexpr", "pattern1", "pattern2"]);
     }
 
     #[test]
-    fn test_longs_tree() {
+    fn test_longs_files() {
         let config = get_config_from([
-            "--tree",
+            "--files",
             "--max-depth=5",
             "--no-ignore",
             "--hidden",
@@ -355,23 +356,15 @@ mod tests {
         assert_eq!(config.max_depth, Some(5));
         assert!(!config.ignore);
         assert!(config.hidden);
-        assert!(config.tree);
         assert!(config.links);
         assert!(config.colors);
         assert!(config.menu);
-        assert!(generate_command()
-            .try_get_matches_from(["--tree", "posexpr"])
-            .is_err());
     }
 
     #[test]
-    fn test_shorts_tree() {
-        let config = get_config_from(["-.tm"]);
-        assert!(config.tree);
+    fn test_shorts_files() {
+        let config = get_config_from(["-.fm"]);
         assert!(config.hidden);
         assert!(config.menu);
-        assert!(generate_command()
-            .try_get_matches_from(["posexpr", "-t"])
-            .is_err());
     }
 }

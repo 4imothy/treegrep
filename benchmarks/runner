@@ -75,7 +75,7 @@ def get_commands(to_search):
 def get_files_commands(to_search):
     commands = {
             'rg': ['rg', '--files', to_search],
-            'tgrep': ['tgrep', '--tree', '--path', to_search]
+            'tgrep': ['tgrep', '--files', '--path', to_search]
         }
     return commands
 

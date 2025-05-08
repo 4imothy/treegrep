@@ -40,7 +40,7 @@ impl PathInfo {
     }
 
     pub fn bottom(&mut self) {
-        let last_match_is_path = (config().just_files || config().tree) as usize;
+        let last_match_is_path = config().files as usize;
         self.prev = self.paths.len() - 1 - last_match_is_path;
         self.next = self.paths.len() - last_match_is_path;
         self.passed = false;
