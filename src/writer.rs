@@ -36,7 +36,6 @@ pub struct OpenInfo<'a> {
 
 pub trait Entry: Display {
     fn open_info(&self) -> Result<OpenInfo, Message>;
-    fn set_term_width(&mut self, width: u16);
 }
 
 struct FileEntry<'a> {
@@ -44,7 +43,6 @@ struct FileEntry<'a> {
     name: &'a str,
     path: &'a Path,
     linked: Option<&'a OsStr>,
-    term_width: Option<u16>,
     count: usize,
     new_line: bool,
 }
@@ -55,10 +53,6 @@ impl<'a> Entry for FileEntry<'a> {
             path: self.path,
             line: None,
         })
-    }
-
-    fn set_term_width(&mut self, width: u16) {
-        self.term_width = Some(width);
     }
 }
 
@@ -73,7 +67,6 @@ struct DirEntry<'a> {
     prefix: Vec<PrefixComponent>,
     name: &'a str,
     path: &'a Path,
-    term_width: Option<u16>,
     linked: Option<&'a OsStr>,
     count: usize,
     new_line: bool,
@@ -85,10 +78,6 @@ impl<'a> Entry for DirEntry<'a> {
             path: self.path,
             line: None,
         })
-    }
-
-    fn set_term_width(&mut self, width: u16) {
-        self.term_width = Some(width);
     }
 }
 
@@ -155,7 +144,6 @@ struct LineEntry<'a> {
     prefix: Vec<PrefixComponent>,
     content: &'a str,
     path: &'a Path,
-    term_width: Option<u16>,
     matches: &'a [Match],
     line_num: usize,
     new_line: bool,
@@ -167,10 +155,6 @@ impl<'a> Entry for LineEntry<'a> {
             path: self.path,
             line: Some(self.line_num),
         })
-    }
-
-    fn set_term_width(&mut self, width: u16) {
-        self.term_width = Some(width);
     }
 }
 
@@ -251,17 +235,12 @@ impl<'a> Display for LineEntry<'a> {
 struct LongBranchEntry<'a> {
     prefix: Vec<PrefixComponent>,
     files: &'a [File],
-    term_width: Option<u16>,
     new_line: bool,
 }
 
 impl<'a> Entry for LongBranchEntry<'a> {
     fn open_info(&self) -> Result<OpenInfo, Message> {
         Err(mes!("can't open a long branch"))
-    }
-
-    fn set_term_width(&mut self, width: u16) {
-        self.term_width = Some(width);
     }
 }
 
@@ -314,7 +293,6 @@ impl Directory {
                 path: &self.path,
                 linked: self.linked.as_deref(),
                 count: self.children.len() + self.files.len(),
-                term_width: None,
                 new_line: !config().menu,
             }));
         }
@@ -364,7 +342,6 @@ impl Directory {
                     prefix_next.clone()
                 },
                 files: branch,
-                term_width: None,
                 new_line: !config().menu,
             }));
         }
@@ -401,7 +378,6 @@ impl File {
             name: &self.name,
             path: &self.path,
             linked: self.linked.as_deref(),
-            term_width: None,
             count: self.lines.len(),
             new_line: !config().menu,
         }));
@@ -420,7 +396,6 @@ impl File {
                 prefix,
                 content: &line.content,
                 path: &self.path,
-                term_width: None,
                 matches: &line.matches,
                 line_num: line.line_num,
                 new_line: !config().menu,
