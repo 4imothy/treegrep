@@ -203,3 +203,55 @@ treegrep
 ```
 </details>
 
+### *--help*
+```
+treegrep 0.1.4
+
+by Timothy Cronin
+
+home page: https://github.com/4imothy/treegrep
+
+pattern matcher that displays results in a tree structure with an interface to jump to matched text
+
+tgrep [OPTIONS] [positional regexp] [positional target]
+Arguments:
+  [positional regexp]  the regex expression
+  [positional target]  the path to search, if not provided, search the current directory
+
+Options:
+  -e, --regexp <>            the regex expression
+  -p, --path <>              the path to search, if not provided, search the current directory
+      --completions <shell>  generate completions for given shell [possible values: bash, elvish, fish, powershell, zsh]
+      --glob <>              rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic
+  -s, --searcher <>          executable to do the searching [possible values: rg, tgrep]
+      --threads <>           set the appropriate number of threads to use
+  -., --hidden               search hidden files
+  -n, --line-number          show line number of match
+  -f, --files                if a pattern is given hide matched content, otherwise show the files that would be searched
+      --links                search linked paths
+      --trim                 trim whitespace at the beginning of lines
+      --pcre2                enable PCRE2
+      --no-ignore            don't use ignore files
+  -c, --count                display number of files matched in directory and number of lines matched in a file
+      --no-color             don't use colors
+      --no-bold              don't bold anything
+      --max-depth <>         the max depth to search
+      --prefix-len <>        number of characters to show before a match [default: 3]
+      --max-length <>        set the max length for a matched line
+      --long-branch-each <>  number of files to print on each branch [default: 5]
+      --char-style <>        style of characters to use [possible values: ascii, single, double, heavy, rounded, none]
+      --long-branch          multiple files from the same directory are shown on the same branch
+  -m, --menu                 open results in a menu to be edited with $EDITOR
+                             navigate through the menu using the following commands:
+                              - move up/down: k/j, p/n, up arrow/down arrow
+                              - move up/down with a bigger jump: K/J, P/N
+                              - move up/down paths: {/}, [/]
+                              - move to the start/end: g/G, </>, home/end
+                              - move up/down a page: b/f, pageup/pagedown
+                              - center cursor: z/l
+                              - quit: q, ctrl + c
+  -h, --help                 Print help
+  -V, --version              Print version
+
+any of the above can be set using the TREEGREP_DEFAULT_OPTS environment variable
+```
