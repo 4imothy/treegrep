@@ -5,39 +5,198 @@ treegrep is a pattern matcher that displays results in a tree structure with an 
 [![tests](https://github.com/4imothy/treegrep/actions/workflows/ci.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
 [![release](https://github.com/4imothy/treegrep/actions/workflows/cr.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
 
-https://github.com/4imothy/treegrep/assets/40186632/9c85c309-df78-4996-8127-ee5ad9f91ec3
+[examples](#examples) and [help](#--help).
 
-
-### Currently Supported Backends
+### supported backends
 - *[ripgrep](https://github.com/BurntSushi/ripgrep)*
 - *[treegrep](https://github.com/4imothy/treegrep)*
 
-### Links
+### links
 [crates.io](https://crates.io/crates/treegrep) | [GitHub](https://github.com/4imothy/treegrep) | [AUR](https://aur.archlinux.org/packages/treegrep-bin) | [NetBSD](https://pkgsrc.se/sysutils/treegrep)
 
-### To Install
+### installation
+- **Cargo:** ```cargo install treegrep```
+- **Releases:** Download from [releases](https://github.com/4imothy/treegrep/releases/)
+- **Manual:**
+  ```
+  git clone https://github.com/4imothy/treegrep
+  cd treegrep
+  cargo build --release
+  ```
 
-#### Cargo
-```
-cargo install treegrep
-```
+### examples
+<details>
+<summary><code>tgrep --regexp \bstruct\s+\w+ --regexp \bimpl\s+\w+ --path src --line-number --count</code></summary>
 
-#### NetBSD
 ```
-pkgin install treegrep
+src: 12
+├──config.rs: 3
+│  ├──12: pub struct Characters {
+│  ├──26: pub struct Config {
+│  └──79: impl Config {
+├──errors.rs: 4
+│  ├──8: pub struct Message {
+│  ├──22: impl Error for Message {}
+│  ├──24: impl fmt::Debug for Message {
+│  └──30: impl fmt::Display for Message {
+├──args.rs: 2
+│  ├──17: pub struct ArgInfo {
+│  └──23: impl ArgInfo {
+├──match_system.rs: 10
+│  ├──39: pub struct Directory {
+│  ├──48: impl Directory {
+│  ├──61: pub struct File {
+│  ├──68: impl File {
+│  ├──107: pub struct Match {
+│  ├──113: impl Match {
+│  ├──138: pub struct Line {
+│  ├──144: impl Line {
+│  ├──160:     impl PartialEq for Match {
+│  └──167:     impl Debug for Match {
+├──formats.rs: 2
+│  ├──19: pub struct Chars {
+│  └──99: pub struct DisplayRepeater<T>(T, usize);
+├──output_processor.rs: 2
+│  ├──29: impl File {
+│  └──101: impl AsUsize for Value {
+├──searchers.rs: 4
+│  ├──13: struct ShortName(String);
+│  ├──15: impl ShortName {
+│  ├──22: impl Deref for ShortName {
+│  └──85: impl Searchers {
+├──term.rs: 1
+│  └──13: pub struct Term<'a> {
+├──options.rs: 2
+│  ├──42: pub struct Rg;
+│  └──44: impl Options for Rg {
+├──writer.rs: 8
+│  ├──21: impl Clone for PrefixComponent {
+│  ├──32: pub struct OpenInfo<'a> {
+│  ├──42: struct FileEntry<'a> {
+│  ├──72: struct DirEntry<'a> {
+│  ├──154: struct LineEntry<'a> {
+│  ├──251: struct LongBranchEntry<'a> {
+│  ├──296: impl Directory {
+│  └──374: impl File {
+├──menu.rs: 5
+│  ├──19: struct PathInfo {
+│  ├──26: impl PathInfo {
+│  ├──83: pub struct Menu<'a> {
+│  ├──100: struct Window {
+│  └──106: impl Window {
+└──matcher.rs: 1
+   └──121: impl File {
 ```
+</details>
 
-#### Releases
-Download from [releases](https://github.com/4imothy/treegrep/releases/)
+<details>
+<summary><code>tgrep Print src/menu.rs --trim --line-number --char-style=ascii</code></summary>
 
-#### Manual
 ```
-git clone https://github.com/4imothy/treegrep
-cd treegrep
-cargo build --release
+menu.rs
++--9: style::{Print, SetBackgroundColor},
++--330: queue!(self.term, cursor::MoveTo(START_X, cursor), Print(line))?;
++--360: Print(self.lines.get(id).unwrap())
++--389: Print(
++--506: Print(config().c.selected_indicator),
++--508: Print(self.lines.get(self.selected_id).unwrap())
++--516: Print(formats::SELECTED_INDICATOR_CLEAR),
++--518: Print(self.lines.get(self.selected_id).unwrap())
++--532: Print(format!(
++--544: Print(format!(
++--557: Print(format!(
 ```
+</details>
 
-### *--help* Output
+<details>
+<summary><code>tgrep --tree</code></summary>
+
+```
+treegrep
+├──benchmarks
+│  ├──times
+│  └──runner
+├──tests
+│  ├──pool
+│  │  └──alice_adventures_in_wonderland_by_lewis_carroll.txt
+│  ├──targets
+│  │  ├──links_22
+│  │  ├──glob_inclusion
+│  │  ├──colon
+│  │  ├──wide_21
+│  │  ├──glob_exclusion
+│  │  ├──links_11
+│  │  ├──links_21
+│  │  ├──links_12
+│  │  ├──deep
+│  │  ├──line_number
+│  │  ├──max_depth
+│  │  ├──file
+│  │  └──wide_12
+│  ├──utils.rs
+│  ├──tests.rs
+│  └──file_system.rs
+├──src
+│  ├──config.rs
+│  ├──errors.rs
+│  ├──log.rs
+│  ├──args.rs
+│  ├──match_system.rs
+│  ├──formats.rs
+│  ├──output_processor.rs
+│  ├──searchers.rs
+│  ├──term.rs
+│  ├──options.rs
+│  ├──writer.rs
+│  ├──menu.rs
+│  ├──main.rs
+│  └──matcher.rs
+├──completions
+│  ├──tgrep.elv
+│  ├──tgrep.bash
+│  ├──_tgrep
+│  ├──tgrep.fish
+│  └──_tgrep.ps1
+├──README
+│  └──demo.mp4
+├──Cargo.lock
+├──LICENSE
+├──README.md
+├──build.rs
+├──todos.norg
+└──Cargo.toml
+```
+</details>
+
+<details>
+<summary><code>tgrep --tree --long-branch</code></summary>
+
+```
+treegrep
+├──benchmarks
+│  └──times, runner
+├──tests
+│  ├──pool
+│  │  └──alice_adventures_in_wonderland_by_lewis_carroll.txt
+│  ├──targets
+│  │  ├──links_22, glob_inclusion, colon, wide_21, glob_exclusion
+│  │  ├──links_11, links_21, links_12, deep, line_number
+│  │  └──max_depth, file, wide_12
+│  └──utils.rs, tests.rs, file_system.rs
+├──src
+│  ├──config.rs, errors.rs, log.rs, args.rs, match_system.rs
+│  ├──formats.rs, output_processor.rs, searchers.rs, term.rs, options.rs
+│  └──writer.rs, menu.rs, main.rs, matcher.rs
+├──completions
+│  └──tgrep.elv, tgrep.bash, _tgrep, tgrep.fish, _tgrep.ps1
+├──README
+│  └──demo.mp4
+├──Cargo.lock, LICENSE, README.md, build.rs, todos.norg
+└──Cargo.toml
+```
+</details>
+
+### *--help*
 ```
 treegrep 0.1.4
 
@@ -45,7 +204,7 @@ by Timothy Cronin
 
 home page: https://github.com/4imothy/treegrep
 
-pattern matcher frontend or backend which displays results in a tree
+pattern matcher that displays results in a tree structure with an interface to jump to matched text
 
 tgrep [OPTIONS] [positional regexp] [positional target]
 Arguments:

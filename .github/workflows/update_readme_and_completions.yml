@@ -2,7 +2,8 @@ name: Update ReadMe and Completions
 
 on:
   push:
-    branches: [ "main" ]
+    paths:
+      - '**.rs'
 
 permissions:
   contents: write
@@ -17,22 +18,14 @@ jobs:
         with:
           toolchain: stable
       - run: |
-          sed -i '/### \*--help\* Output/q' README.md
-          help_output=$(cargo run -- --help)
-          changes=false
-
-          {
-            echo -e "\`\`\`"
-            echo "$help_output"
-            echo -e "\`\`\`"
-          } >> README.md
+          ./.github/workflows/update_readme false
           if git diff --exit-code README.md > /dev/null; then
-            echo "No changes in README"
+            echo "no changes in readme"
           else
             git config user.name "GitHub Actions"
             git config user.email "actions@github.com"
             git add README.md
-            git commit -m "update help output"
+            git commit -m "update readme"
             changes=true
           fi
 
@@ -50,6 +43,4 @@ jobs:
 
           if [ "$changes" = true ]; then
             git push
-          else
-            echo "No changes to push"
           fi

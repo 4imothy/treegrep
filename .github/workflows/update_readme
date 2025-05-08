@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+
+import subprocess
+import sys
+import os
+
+README_PATH = 'README.md'
+HELP = '### *--help*'
+EXAMPLES = '### examples'
+
+EXAMPLES_TO_RUN = [
+    ['--regexp', r'\bstruct\s+\w+', '--regexp', r'\bimpl\s+\w+', '--path', 'src', '--line-number', '--count'],
+    ['Print', os.path.join('src', 'menu.rs'), '--trim', '--line-number', '--char-style=ascii'],
+    ['--tree'],
+    ['--tree', '--long-branch']
+]
+
+def run_and_capture_examples(examples):
+    outputs = []
+    for cmd in examples:
+        try:
+            full_cmd = ['cargo', 'run', '--'] + cmd + ['--no-color', '--no-bold']
+            result = subprocess.run(
+                full_cmd,
+                check=True,
+                text=True,
+                capture_output=True
+            )
+            cmd_str = 'tgrep ' + ' '.join(cmd)
+            output = (
+                f'<details>\n'
+                f'<summary><code>{cmd_str}</code></summary>\n\n'
+                f'```\n'
+                f'{result.stdout}'
+                f'```\n'
+                f'</details>'
+            )
+            outputs.append(output)
+        except subprocess.CalledProcessError as e:
+            print(f'error running example {cmd}: {e}')
+            return None
+    return outputs
+
+def update_readme(*, add_examples):
+    with open(README_PATH, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+
+    examples_index = -1
+    help_index = -1
+    for i, line in enumerate(lines):
+        if line.strip() == EXAMPLES:
+            examples_index = i
+        if line.strip() == HELP:
+            help_index = i
+
+    try:
+        result = subprocess.run(
+            ['cargo', 'run', '--', '--help'],
+            check=True,
+            text=True,
+            capture_output=True
+        )
+        help_output = f'```\n{result.stdout}```\n'
+    except subprocess.CalledProcessError as e:
+        print(f'help output: {e}')
+        exit(1)
+
+    with open(README_PATH, 'w', encoding='utf-8') as f:
+        for line in lines[:examples_index]:
+            f.write(line)
+
+        if add_examples:
+            example_outputs = run_and_capture_examples(EXAMPLES_TO_RUN)
+            if not example_outputs:
+                print('failed to generate example outputs')
+                exit(1)
+            f.write(EXAMPLES + '\n')
+            for output in example_outputs:
+                f.write(output)
+                f.write('\n\n')
+        else:
+            for line in lines[examples_index:help_index]:
+                f.write(line)
+
+        f.write(HELP + '\n')
+        f.write(help_output)
+
+if __name__ == '__main__':
+    add_examples = len(sys.argv) > 1 and sys.argv[1].lower() == 'true'
+    update_readme(add_examples=add_examples)
