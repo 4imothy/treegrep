@@ -25,41 +25,14 @@ treegrep is a pattern matcher that displays results in a tree structure with an 
   ```
 
 ### examples
-
 <details>
 <summary><code>tgrep --regexp \bstruct\s+\w+ --regexp \bimpl\s+\w+ --path src --line-number --count</code></summary>
 
 ```
 src: 12
-├──options.rs: 2
-│  ├──42: pub struct Rg;
-│  ╰──44: impl Options for Rg {
-├──menu.rs: 5
-│  ├──19: struct PathInfo {
-│  ├──26: impl PathInfo {
-│  ├──83: pub struct Menu<'a> {
-│  ├──100: struct Window {
-│  ╰──106: impl Window {
-├──formats.rs: 2
-│  ├──19: pub struct Chars {
-│  ╰──99: pub struct DisplayRepeater<T>(T, usize);
-├──args.rs: 2
-│  ├──17: pub struct ArgInfo {
-│  ╰──23: impl ArgInfo {
-├──matcher.rs: 1
-│  ╰──121: impl File {
-├──config.rs: 3
-│  ├──12: pub struct Characters {
-│  ├──26: pub struct Config {
-│  ╰──79: impl Config {
 ├──output_processor.rs: 2
 │  ├──29: impl File {
 │  ╰──101: impl AsUsize for Value {
-├──errors.rs: 4
-│  ├──8: pub struct Message {
-│  ├──22: impl Error for Message {}
-│  ├──24: impl fmt::Debug for Message {
-│  ╰──30: impl fmt::Display for Message {
 ├──writer.rs: 8
 │  ├──21: impl Clone for PrefixComponent {
 │  ├──32: pub struct OpenInfo<'a> {
@@ -69,6 +42,12 @@ src: 12
 │  ├──234: struct LongBranchEntry<'a> {
 │  ├──278: impl Directory {
 │  ╰──354: impl File {
+├──menu.rs: 5
+│  ├──19: struct PathInfo {
+│  ├──26: impl PathInfo {
+│  ├──83: pub struct Menu<'a> {
+│  ├──100: struct Window {
+│  ╰──106: impl Window {
 ├──match_system.rs: 10
 │  ├──39: pub struct Directory {
 │  ├──48: impl Directory {
@@ -80,13 +59,33 @@ src: 12
 │  ├──144: impl Line {
 │  ├──160:     impl PartialEq for Match {
 │  ╰──167:     impl Debug for Match {
+├──errors.rs: 4
+│  ├──8: pub struct Message {
+│  ├──22: impl Error for Message {}
+│  ├──24: impl fmt::Debug for Message {
+│  ╰──30: impl fmt::Display for Message {
+├──options.rs: 2
+│  ├──42: pub struct Rg;
+│  ╰──44: impl Options for Rg {
+├──args.rs: 2
+│  ├──17: pub struct ArgInfo {
+│  ╰──23: impl ArgInfo {
 ├──term.rs: 1
 │  ╰──13: pub struct Term<'a> {
-╰──searchers.rs: 4
-   ├──13: struct ShortName(String);
-   ├──15: impl ShortName {
-   ├──22: impl Deref for ShortName {
-   ╰──85: impl Searchers {
+├──matcher.rs: 1
+│  ╰──121: impl File {
+├──searchers.rs: 4
+│  ├──13: struct ShortName(String);
+│  ├──15: impl ShortName {
+│  ├──22: impl Deref for ShortName {
+│  ╰──85: impl Searchers {
+├──formats.rs: 2
+│  ├──19: pub struct Chars {
+│  ╰──99: pub struct DisplayRepeater<T>(T, usize);
+╰──config.rs: 3
+   ├──12: pub struct Characters {
+   ├──26: pub struct Config {
+   ╰──79: impl Config {
 ```
 </details>
 
