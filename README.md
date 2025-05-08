@@ -1,10 +1,9 @@
 ## treegrep
 
-treegrep is a frontend for existing pattern matchers or a standalone pattern matcher which presents results in a tree format
+treegrep is a pattern matcher that displays results in a tree structure with an interface to jump to matched text.
 
 [![tests](https://github.com/4imothy/treegrep/actions/workflows/ci.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
 [![release](https://github.com/4imothy/treegrep/actions/workflows/cr.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
-
 
 https://github.com/4imothy/treegrep/assets/40186632/9c85c309-df78-4996-8127-ee5ad9f91ec3
 
