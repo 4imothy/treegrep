@@ -2,7 +2,7 @@
 
 treegrep is a pattern matcher that displays results in a tree structure with an interface to jump to matched text.
 
-[![tests](https://github.com/4imothy/treegrep/actions/workflows/ci.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
+[![test](https://github.com/4imothy/treegrep/actions/workflows/test.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
 [![release](https://github.com/4imothy/treegrep/actions/workflows/cr.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
 
 [examples](#examples) and [help](#--help).
