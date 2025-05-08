@@ -1,5 +1,5 @@
 complete -c tgrep -s e -l regexp -d 'the regex expression' -r
-complete -c tgrep -s p -l path -d 'the path to search. If not provided, search the current directory.' -r -F
+complete -c tgrep -s p -l path -d 'the path to search, if not provided, search the current directory' -r -F
 complete -c tgrep -l completions -d 'generate completions for given shell' -r -f -a "bash\t''
 elvish\t''
 fish\t''
@@ -19,10 +19,9 @@ double\t''
 heavy\t''
 rounded\t''
 none\t''"
-complete -c tgrep -s t -l tree -d 'display the files that would be search in tree format'
 complete -c tgrep -s . -l hidden -d 'search hidden files'
 complete -c tgrep -s n -l line-number -d 'show line number of match'
-complete -c tgrep -s f -l files -d 'don\'t show matched content'
+complete -c tgrep -s f -l files -d 'if a pattern is given hide matched content, otherwise show the files that would be searched'
 complete -c tgrep -l links -d 'search linked paths'
 complete -c tgrep -l trim -d 'trim whitespace at the beginning of lines'
 complete -c tgrep -l pcre2 -d 'enable PCRE2'

@@ -17,8 +17,8 @@ _tgrep() {
     _arguments "${_arguments_options[@]}" : \
 '*-e+[the regex expression]::_default' \
 '*--regexp=[the regex expression]::_default' \
-'-p+[the path to search. If not provided, search the current directory.]::_files' \
-'--path=[the path to search. If not provided, search the current directory.]::_files' \
+'-p+[the path to search, if not provided, search the current directory]::_files' \
+'--path=[the path to search, if not provided, search the current directory]::_files' \
 '--completions=[generate completions for given shell]:shell:(bash elvish fish powershell zsh)' \
 '*--glob=[rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic]::_default' \
 '-s+[executable to do the searching]::(rg tgrep)' \
@@ -29,14 +29,12 @@ _tgrep() {
 '--max-length=[set the max length for a matched line]::_default' \
 '--long-branch-each=[number of files to print on each branch]::_default' \
 '--char-style=[style of characters to use]::(ascii single double heavy rounded none)' \
-'(-e --regexp)-t[display the files that would be search in tree format]' \
-'(-e --regexp)--tree[display the files that would be search in tree format]' \
 '-.[search hidden files]' \
 '--hidden[search hidden files]' \
 '-n[show line number of match]' \
 '--line-number[show line number of match]' \
-'-f[don'\''t show matched content]' \
-'--files[don'\''t show matched content]' \
+'-f[if a pattern is given hide matched content, otherwise show the files that would be searched]' \
+'--files[if a pattern is given hide matched content, otherwise show the files that would be searched]' \
 '--links[search linked paths]' \
 '--trim[trim whitespace at the beginning of lines]' \
 '--pcre2[enable PCRE2]' \
@@ -53,7 +51,7 @@ _tgrep() {
 '-V[Print version]' \
 '--version[Print version]' \
 '::positional regexp -- the regex expression:_default' \
-'::positional target -- the path to search. If not provided, search the current directory.:_files' \
+'::positional target -- the path to search, if not provided, search the current directory:_files' \
 && ret=0
 }
 
