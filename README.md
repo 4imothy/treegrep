@@ -63,7 +63,7 @@ Options:
       --threads <>           set the appropriate number of threads to use
   -., --hidden               search hidden files
   -n, --line-number          show line number of match
-  -f, --files                don't show matched contents
+  -f, --files                don't show matched content
       --links                search linked paths
       --trim                 trim whitespace at the beginning of lines
       --pcre2                enable PCRE2
@@ -73,7 +73,7 @@ Options:
       --no-bold              don't bold anything
       --max-depth <>         the max depth to search
       --prefix-len <>        number of characters to show before a match [default: 3]
-      --max-length <>        set the max length for a matched line [default: 1000]
+      --max-length <>        set the max length for a matched line
       --long-branch-each <>  number of files to print on each branch [default: 5]
       --char-style <>        style of characters to use [possible values: ascii, single, double, heavy, rounded, none]
       --long-branch          multiple files from the same directory are shown on the same branch
