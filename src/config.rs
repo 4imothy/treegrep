@@ -44,7 +44,8 @@ pub struct Config {
     pub pcre2: bool,
     pub max_depth: Option<usize>,
     pub threads: Option<usize>,
-    pub max_length: usize,
+    pub max_length: Option<usize>,
+    pub prefix_len: usize,
     pub long_branch_each: usize,
     pub trim: bool,
     pub c: Characters,
@@ -142,7 +143,7 @@ impl Config {
 
         let max_depth: Option<usize> = get_usize_option(&matches, args::MAX_DEPTH.id)?;
         let threads: Option<usize> = get_usize_option(&matches, args::THREADS.id)?;
-        let max_length: usize = get_usize_option_with_default(&matches, args::MAX_LENGTH.id)?;
+        let max_length: Option<usize> = get_usize_option(&matches, args::MAX_LENGTH.id)?;
         let long_branch_each: usize =
             get_usize_option_with_default(&matches, args::LONG_BRANCHES_EACH.id)?;
 
@@ -184,6 +185,7 @@ impl Config {
         };
 
         let is_dir = path.is_dir();
+        let prefix_len = get_usize_option_with_default(&matches, args::PREFIX_LEN.id)?;
 
         Ok((
             Config {
@@ -208,11 +210,12 @@ impl Config {
                 trim,
                 globs,
                 ignore,
+                prefix_len,
                 max_length,
                 long_branch_each,
                 c: Config::get_characters(
                     matches.get_one::<String>(args::CHAR_STYLE.id),
-                    get_usize_option_with_default(&matches, args::PREFIX_LEN.id)?,
+                    prefix_len,
                 ),
             },
             searcher_path,
@@ -296,7 +299,6 @@ mod tests {
     #[test]
     fn test_default_opts() {
         let config = get_config_from(["expression"]);
-        assert!(config.max_length == args::DEFAULT_MAX_LENGTH.parse::<usize>().ok().unwrap());
         assert!(
             config.c.spacer == " ".repeat(args::DEFAULT_PREFIX_LEN.parse::<usize>().ok().unwrap())
         );
@@ -311,7 +313,7 @@ mod tests {
     fn check_parsed_config_from_example_opts(config: Config) {
         assert!(config.line_number);
         assert_eq!(config.max_depth, Some(5));
-        assert_eq!(config.max_length, 20);
+        assert_eq!(config.max_length, Some(20));
         assert!(config.pcre2);
         assert!(!config.ignore);
         assert!(config.hidden);

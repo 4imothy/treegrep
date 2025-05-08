@@ -119,8 +119,8 @@ fn search_file(pb: &PathBuf, patterns: &Vec<Regex>) -> Result<File, Message> {
 }
 
 impl File {
-    fn add_matches(&mut self, contents: Vec<u8>, patterns: &Vec<Regex>) {
-        let lines = contents.split_inclusive(|&byte| byte == formats::NEW_LINE as u8);
+    fn add_matches(&mut self, content: Vec<u8>, patterns: &Vec<Regex>) {
+        let lines = content.split(|&byte| byte == formats::NEW_LINE as u8);
 
         for (line_num, line) in lines.enumerate() {
             let mut matches: Vec<Match> = Vec::new();
@@ -139,7 +139,11 @@ impl File {
                 }
             }
             if was_match {
-                self.lines.push(Line::new(line, matches, line_num + 1));
+                self.lines.push(Line::new(
+                    line.to_str_lossy().to_string(),
+                    matches,
+                    line_num + 1,
+                ));
             }
         }
     }

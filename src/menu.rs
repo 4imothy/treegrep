@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::args::MENU_HELP;
-use crate::{
-    config, formats,
-    match_system::{Directory, File, Matches},
-    term, writer,
-};
+use crate::{config, formats, term, writer::Entry};
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent},
@@ -89,9 +85,8 @@ pub struct Menu<'a> {
     selected_id: usize,
     cursor_y: u16,
     term: term::Term<'a>,
-    searched: &'a Matches,
     max_line_id: usize,
-    lines: Vec<String>,
+    lines: &'a Vec<Box<dyn Entry + 'a>>,
     colors: bool,
     scroll_offset: u16,
     big_jump: u16,
@@ -128,22 +123,19 @@ impl Window {
 }
 
 impl<'a> Menu<'a> {
-    fn new(out: StdoutLock<'a>, searched: &'a Matches) -> io::Result<Menu<'a>> {
+    fn new(
+        out: StdoutLock<'a>,
+        lines: &'a Vec<Box<dyn Entry + 'a>>,
+        path_ids: Vec<usize>,
+    ) -> io::Result<Menu<'a>> {
         let mut buffer: Vec<u8> = Vec::new();
-        let mut path_ids: Vec<usize> = Vec::new();
-        writer::write_results(&mut buffer, &searched, Some(&mut path_ids))?;
-        let lines: Vec<String> = buffer
-            .split(|&byte| byte == formats::NEW_LINE as u8)
-            .map(|v| String::from_utf8_lossy(v).into())
-            .collect();
-        path_ids.shrink_to_fit();
         buffer.shrink_to_fit();
 
         let mut term = term::Term::new(out)?;
         term.claim()?;
 
         let (scroll_offset, big_jump, small_jump) = Menu::scroll_info(term.height);
-        let max_line_id = lines.len() - 2;
+        let max_line_id = lines.len() - 1;
 
         Ok(Menu {
             selected_id: 0,
@@ -151,7 +143,6 @@ impl<'a> Menu<'a> {
             first_y: 0,
             last_y: 0,
             term,
-            searched,
             max_line_id,
             window: Window {
                 first_id: 0,
@@ -177,7 +168,7 @@ impl<'a> Menu<'a> {
     }
 
     fn width(&self) -> u16 {
-        self.term.width
+        self.term.width()
     }
 
     fn down_page(&mut self) -> io::Result<()> {
@@ -221,8 +212,12 @@ impl<'a> Menu<'a> {
         (scroll_offset, big_jump, small_jump)
     }
 
-    pub fn enter(out: StdoutLock, matches: Matches) -> io::Result<()> {
-        let mut menu: Menu = Menu::new(out, &matches)?;
+    pub fn enter(
+        out: StdoutLock<'a>,
+        lines: &'a Vec<Box<dyn Entry + 'a>>,
+        path_ids: Vec<usize>,
+    ) -> io::Result<()> {
+        let mut menu: Menu = Menu::new(out, lines, path_ids)?;
 
         menu.draw()?;
 
@@ -261,15 +256,15 @@ impl<'a> Menu<'a> {
                         }
                         KeyCode::Char('l') => menu.center_cursor()?,
                         KeyCode::Enter => {
-                            let match_info = MatchInfo::find(menu.selected_id, &menu.searched);
-                            let path = config().path.join(match_info.path);
-                            if config().long_branch {
-                                menu.popup("failed to open due to configuration".to_string())?;
-                            } else {
-                                return menu.exit_and_open(
-                                    path.as_os_str().to_os_string(),
-                                    match_info.line_num,
-                                );
+                            let selected = &menu.lines.get(menu.selected_id).unwrap();
+                            match selected.open_info() {
+                                Ok(info) => {
+                                    return menu.exit_and_open(
+                                        info.path.as_os_str().to_os_string(),
+                                        info.line,
+                                    )
+                                }
+                                Err(mes) => menu.popup(mes.mes)?,
                             }
                         }
                         _ => {}
@@ -298,7 +293,7 @@ impl<'a> Menu<'a> {
                     _ => {}
                 }
             } else if let Ok(Event::Resize(new_width, new_height)) = event {
-                if menu.term.height != new_height || menu.term.width != new_width {
+                if menu.height() != new_height || menu.width() != new_width {
                     menu.resize(new_height, new_width)?;
                 }
             }
@@ -309,21 +304,21 @@ impl<'a> Menu<'a> {
     fn draw(&mut self) -> io::Result<()> {
         self.term.clear()?;
 
-        let skip: usize = if self.selected_id > self.cursor_y as usize {
-            self.selected_id - self.cursor_y as usize
+        let skip: usize;
+        let count_above_cursor: usize;
+        if self.selected_id > self.cursor_y as usize {
+            skip = self.selected_id - self.cursor_y as usize;
+            count_above_cursor = self.cursor_y as usize;
         } else {
-            0
+            skip = 0;
+            count_above_cursor = self.selected_id;
         };
 
-        let count_print_above_cursor: usize = if self.selected_id > self.cursor_y as usize {
-            self.cursor_y as usize
-        } else {
-            self.selected_id
-        };
-        let take: usize = (count_print_above_cursor + (self.height() - self.cursor_y) as usize)
+        let take: usize = (count_above_cursor + (self.height() - self.cursor_y) as usize)
             .min(self.max_line_id + 1);
         self.window.set(skip, skip + take - 1);
-        let start_cursor = START_Y + self.cursor_y - count_print_above_cursor as u16;
+        let start_cursor = START_Y + self.cursor_y - count_above_cursor as u16;
+
         for (i, line) in self.lines.iter().skip(skip).take(take).enumerate() {
             let cursor = start_cursor + i as u16;
             if i + skip == 0 {
@@ -524,8 +519,8 @@ impl<'a> Menu<'a> {
         )
     }
 
-    fn popup(&mut self, contents: String) -> io::Result<()> {
-        let lines: Vec<&str> = contents.lines().collect();
+    fn popup(&mut self, content: String) -> io::Result<()> {
+        let lines: Vec<&str> = content.lines().collect();
         let content_width = lines.iter().map(|line| line.len()).max().unwrap() as u16;
         let height = lines.len() as u16 + 2;
         let x = self.width().saturating_sub(content_width) / 2;
@@ -640,74 +635,5 @@ impl<'a> Menu<'a> {
         use std::os::unix::process::CommandExt;
         let _ = command.exec();
         Ok(())
-    }
-}
-
-struct MatchInfo {
-    path: OsString,
-    line_num: Option<usize>,
-}
-
-impl MatchInfo {
-    pub fn new(path: OsString, line_num: Option<usize>) -> Self {
-        MatchInfo { path, line_num }
-    }
-
-    pub fn find(selected: usize, searched: &Matches) -> MatchInfo {
-        let mut current: usize = 0;
-        match searched {
-            Matches::Dir(dirs) => {
-                return Self::search_dir(dirs.get(0).unwrap(), selected, &mut current, dirs)
-                    .unwrap();
-            }
-            Matches::File(file) => {
-                return Self::search_file(file, selected, &mut current).unwrap();
-            }
-        }
-    }
-
-    fn search_dir(
-        dir: &Directory,
-        selected: usize,
-        current: &mut usize,
-        dirs: &Vec<Directory>,
-    ) -> Option<Self> {
-        let children = &dir.children;
-        let files = &dir.files;
-        if *current == selected {
-            return Some(Self::new(dir.path.as_os_str().to_owned(), None));
-        }
-        *current += 1;
-        for child in children {
-            if let Some(sel) = Self::search_dir(dirs.get(*child).unwrap(), selected, current, dirs)
-            {
-                return Some(sel);
-            }
-        }
-        for file in files {
-            if let Some(sel) = Self::search_file(file, selected, current) {
-                return Some(sel);
-            }
-        }
-        return None;
-    }
-
-    fn search_file(file: &File, selected: usize, current: &mut usize) -> Option<Self> {
-        if *current == selected {
-            return Some(Self::new(file.path.clone().into_os_string(), None));
-        }
-        *current += 1;
-        if !config().just_files {
-            for line in file.lines.iter() {
-                if *current == selected {
-                    return Some(Self::new(
-                        file.path.clone().into_os_string(),
-                        Some(line.line_num),
-                    ));
-                }
-                *current += 1;
-            }
-        }
-        None
     }
 }

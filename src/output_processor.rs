@@ -149,8 +149,18 @@ pub fn process_json_lines(lines: Vec<&[u8]>) -> Result<Option<Matches>, Message>
 
                 cur_file.as_mut().unwrap().lines.push(Line::new(
                     match res["data"]["lines"]["text"].as_str() {
-                        Some(text) => text.as_bytes(),
-                        None => res["data"]["lines"]["bytes"].as_str().unwrap().as_bytes(),
+                        Some(text) => text
+                            .strip_suffix(formats::CRLF)
+                            .or_else(|| text.strip_suffix(formats::NEW_LINE))
+                            .unwrap_or(text)
+                            .to_string(),
+                        None => {
+                            let text = res["data"]["lines"]["bytes"].as_str().unwrap();
+                            text.strip_suffix(formats::CRLF)
+                                .or_else(|| text.strip_suffix(formats::NEW_LINE))
+                                .unwrap_or(text)
+                                .to_string()
+                        }
                     },
                     matches,
                     res["data"]["line_number"].as_usize().unwrap(),

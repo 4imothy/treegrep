@@ -25,7 +25,7 @@ use std::ffi::OsString;
 use std::io::{stdout, StdoutLock};
 use std::process::Command;
 use std::sync::OnceLock;
-use writer::write_results;
+use writer::{matches_to_display_lines, write_results, Entry};
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
@@ -66,10 +66,24 @@ fn run(matches: ArgMatches, bold: bool, colors: bool) -> Result<(), Message> {
     }
 
     let mut out: StdoutLock = stdout().lock();
+    let m = matches.unwrap();
+    let mut path_ids = config().menu.then(|| Vec::<usize>::new());
+    let lines: Vec<Box<dyn Entry>> = matches_to_display_lines(&m, path_ids.as_mut());
+
     if config().menu {
-        Menu::enter(out, matches.unwrap()).map_err(|e| mes!("{}", e.to_string()))?;
+        Menu::enter(
+            out,
+            &lines,
+            path_ids
+                .map(|mut p| {
+                    p.shrink_to_fit();
+                    p
+                })
+                .unwrap(),
+        )
+        .map_err(|e| mes!("{}", e.to_string()))?;
     } else {
-        write_results(&mut out, &matches.unwrap(), None).map_err(|e| mes!("{}", e.to_string()))?;
+        write_results(&mut out, &lines).map_err(|e| mes!("{}", e.to_string()))?;
     }
 
     Ok(())
@@ -89,8 +103,8 @@ fn get_matches_from_cmd(searcher_path: OsString) -> Result<Option<Matches>, Mess
     if !output.status.success() && output.stderr.len() > 0 {
         return Err(mes!(
             "{} had errors:\n{}",
-            cmd.get_program().to_string_lossy().to_string(),
-            String::from_utf8_lossy(&output.stderr).to_string()
+            cmd.get_program().to_string_lossy(),
+            String::from_utf8_lossy(&output.stderr)
         ));
     }
     let results: Vec<u8> = output.stdout;

@@ -2,7 +2,6 @@
 
 use crate::config;
 use crate::errors::{mes, Message};
-use crate::formats;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
@@ -121,6 +120,9 @@ impl Match {
     }
 
     fn remove_overlapping(matches: &mut Vec<Match>) {
+        if matches.len() == 0 {
+            return;
+        }
         matches.sort_by(|a, b| a.start.cmp(&b.start).then_with(|| b.end.cmp(&a.end)));
         let mut current_max_end = matches[0].end;
         for m_id in 1..matches.len() {
@@ -134,17 +136,17 @@ impl Match {
 }
 
 pub struct Line {
-    pub contents: Vec<u8>,
+    pub content: String,
+    pub matches: Vec<Match>,
     pub line_num: usize,
 }
 
 impl Line {
-    pub fn new(contents: &[u8], mut matches: Vec<Match>, line_num: usize) -> Self {
-        if matches.len() > 0 {
-            Match::remove_overlapping(&mut matches);
-        }
+    pub fn new(content: String, mut matches: Vec<Match>, line_num: usize) -> Self {
+        Match::remove_overlapping(&mut matches);
         Line {
-            contents: formats::style_line(contents, matches),
+            content,
+            matches,
             line_num,
         }
     }

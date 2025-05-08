@@ -6,10 +6,12 @@ use crossterm::{
 };
 use std::io::{self, StdoutLock, Write};
 use std::panic;
+use std::sync::atomic::{AtomicU16, Ordering};
+
+pub static TERM_WIDTH: AtomicU16 = AtomicU16::new(0);
 
 pub struct Term<'a> {
     pub height: u16,
-    pub width: u16,
     out: StdoutLock<'a>,
     in_alternate_screen: bool,
 }
@@ -17,16 +19,17 @@ pub struct Term<'a> {
 impl<'a> Term<'a> {
     pub fn new(out: StdoutLock<'a>) -> io::Result<Term<'a>> {
         let (width, height) = terminal::size()?;
+        TERM_WIDTH.store(width, Ordering::SeqCst);
         Ok(Term {
             out,
             height,
-            width,
             in_alternate_screen: false,
         })
     }
 
     pub fn set_dims(&mut self, dims: (u16, u16)) {
-        (self.width, self.height) = dims;
+        TERM_WIDTH.store(dims.0, Ordering::SeqCst);
+        self.height = dims.1;
     }
 
     pub fn clear(&mut self) -> io::Result<()> {
@@ -60,6 +63,10 @@ impl<'a> Term<'a> {
             terminal::EnableLineWrap,
             cursor::Show,
         )
+    }
+
+    pub fn width(&self) -> u16 {
+        TERM_WIDTH.load(Ordering::SeqCst)
     }
 
     pub fn give(&mut self) -> io::Result<()> {
