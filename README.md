@@ -213,6 +213,10 @@ home page: https://github.com/4imothy/treegrep
 pattern matcher that displays results in a tree structure with an interface to jump to matched text
 
 tgrep [OPTIONS] [positional regexp] [positional target]
+       tgrep [OPTIONS] [positional regexp] [positional target] <COMMAND>
+Commands:
+  completions  generate completions for given shell
+
 Arguments:
   [positional regexp]  the regex expression
   [positional target]  the path to search, if not provided, search the current directory
@@ -220,7 +224,6 @@ Arguments:
 Options:
   -e, --regexp <>            the regex expression
   -p, --path <>              the path to search, if not provided, search the current directory
-      --completions <shell>  generate completions for given shell [possible values: bash, elvish, fish, powershell, zsh]
       --glob <>              rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic
   -s, --searcher <>          executable to do the searching [possible values: rg, tgrep]
       --threads <>           set the appropriate number of threads to use
