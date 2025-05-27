@@ -22,7 +22,6 @@ set edit:completion:arg-completer[tgrep] = {|@words|
             cand --regexp 'the regex expression'
             cand -p 'the path to search, if not provided, search the current directory'
             cand --path 'the path to search, if not provided, search the current directory'
-            cand --completions 'generate completions for given shell'
             cand --glob 'rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic'
             cand -s 'executable to do the searching'
             cand --searcher 'executable to do the searching'
@@ -54,6 +53,11 @@ set edit:completion:arg-completer[tgrep] = {|@words|
             cand --help 'Print help'
             cand -V 'Print version'
             cand --version 'Print version'
+            cand completions 'generate completions for given shell'
+        }
+        &'tgrep;completions'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
         }
     ]
     $completions[$command]

@@ -19,7 +19,6 @@ _tgrep() {
 '*--regexp=[the regex expression]::_default' \
 '-p+[the path to search, if not provided, search the current directory]::_files' \
 '--path=[the path to search, if not provided, search the current directory]::_files' \
-'--completions=[generate completions for given shell]:shell:(bash elvish fish powershell zsh)' \
 '*--glob=[rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic]::_default' \
 '-s+[executable to do the searching]::(rg tgrep)' \
 '--searcher=[executable to do the searching]::(rg tgrep)' \
@@ -53,13 +52,38 @@ _tgrep() {
 '--version[Print version]' \
 '::positional regexp -- the regex expression:_default' \
 '::positional target -- the path to search, if not provided, search the current directory:_files' \
+":: :_tgrep_commands" \
+"*::: :->treegrep" \
 && ret=0
+    case $state in
+    (treegrep)
+        words=($line[3] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:tgrep-command-$line[3]:"
+        case $line[3] in
+            (completions)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+':shell:(bash elvish fish powershell zsh)' \
+&& ret=0
+;;
+        esac
+    ;;
+esac
 }
 
 (( $+functions[_tgrep_commands] )) ||
 _tgrep_commands() {
-    local commands; commands=()
+    local commands; commands=(
+'completions:generate completions for given shell' \
+    )
     _describe -t commands 'tgrep commands' commands "$@"
+}
+(( $+functions[_tgrep__completions_commands] )) ||
+_tgrep__completions_commands() {
+    local commands; commands=()
+    _describe -t commands 'tgrep completions commands' commands "$@"
 }
 
 if [ "$funcstack[1]" = "_tgrep" ]; then
