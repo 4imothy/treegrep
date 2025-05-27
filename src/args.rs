@@ -110,6 +110,8 @@ arg_info!(
     "completions",
     "generate completions for given shell"
 );
+pub const SHELL_ID: &str = "shell";
+
 arg_info!(OVERVIEW, "overview", "conclude results with an overview");
 
 const HELP: &str = concat!(
@@ -145,6 +147,8 @@ pub fn generate_command() -> Command {
         .bin_name(names::TREEGREP_BIN)
         .help_template(HELP.to_owned())
         .args_override_self(true)
+        .subcommand_negates_reqs(true)
+        .disable_help_subcommand(true)
         .after_help(
             "any of the above can be set using the ".to_string()
                 + DEFAULT_OPTS_ENV_NAME
@@ -160,31 +164,21 @@ pub fn generate_command() -> Command {
             .arg(FILES.id),
     );
 
+    command = command.subcommand(
+        Command::new(COMPLETIONS.id).about(COMPLETIONS.h).arg(
+            Arg::new(SHELL_ID)
+                .value_name(SHELL_ID)
+                .value_parser(clap::value_parser!(clap_complete::Shell))
+                .required(true),
+        ),
+    );
     command = add_expressions(command);
     command = add_targets(command);
-
-    command = command.arg(
-        Arg::new(COMPLETIONS.id)
-            .long(COMPLETIONS.id)
-            .help(COMPLETIONS.h)
-            .action(ArgAction::Set)
-            .value_name("shell")
-            .value_parser(clap::value_parser!(clap_complete::Shell))
-            .exclusive(true),
-    );
 
     for opt in get_args() {
         command = command.arg(opt);
     }
     return command;
-}
-
-pub fn completions_arg_present() -> bool {
-    std::env::args().any(|arg| {
-        arg == format!("--{}", COMPLETIONS.id)
-            || arg == format!("--{}", COMPLETIONS.id)
-            || arg.starts_with(&format!("--{}=", COMPLETIONS.id))
-    })
 }
 
 fn bool_arg(info: ArgInfo) -> Arg {

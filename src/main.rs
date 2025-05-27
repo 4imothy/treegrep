@@ -14,7 +14,7 @@ mod searchers;
 mod term;
 mod writer;
 use clap::ArgMatches;
-use clap_complete::{aot::Shell, generate};
+use clap_complete::generate;
 use config::Config;
 use errors::{mes, Message};
 use match_system::Matches;
@@ -39,7 +39,7 @@ fn main() {
     if LOG {
         log::set_panic_hook();
     }
-    let matches = Config::get_matches();
+    let matches = Config::fill();
     let (bold, colors) = Config::get_styling(&matches);
     run(matches, bold, colors).unwrap_or_else(|e| {
         eprintln!("{} {}", formats::error_prefix(bold, colors), e);
@@ -48,9 +48,18 @@ fn main() {
 }
 
 fn run(matches: ArgMatches, bold: bool, colors: bool) -> Result<(), Message> {
-    if gen_completions_if_needed(&matches)? {
-        return Ok(());
+    if let Some((c, sub_m)) = matches.subcommand() {
+        if c == args::COMPLETIONS.id {
+            let &shell = sub_m
+                .get_one::<clap_complete::Shell>(args::SHELL_ID)
+                .unwrap();
+            let mut cmd = args::generate_command();
+            let mut fd = std::io::stdout();
+            generate(shell, &mut cmd, args::names::TREEGREP_BIN, &mut fd);
+            return Ok(());
+        }
     }
+
     let (c, searcher_path) = Config::get_config(matches, bold, colors)?;
     CONFIG.set(c).ok().unwrap();
 
@@ -110,14 +119,4 @@ fn get_matches_from_cmd(searcher_path: OsString) -> Result<Option<Matches>, Mess
     let results: Vec<u8> = output.stdout;
 
     process_results(results)
-}
-
-fn gen_completions_if_needed(matches: &ArgMatches) -> Result<bool, Message> {
-    if let Some(&shell) = matches.get_one::<Shell>(args::COMPLETIONS.id) {
-        let mut cmd = args::generate_command();
-        let mut fd = std::io::stdout();
-        generate(shell, &mut cmd, args::names::TREEGREP_BIN, &mut fd);
-        return Ok(true);
-    }
-    Ok(false)
 }

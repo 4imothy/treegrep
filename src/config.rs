@@ -78,30 +78,27 @@ fn get_usize_option_with_default(matches: &ArgMatches, name: &str) -> Result<usi
 }
 
 impl Config {
-    pub fn get_matches_from(args: Vec<OsString>) -> ArgMatches {
-        let mut full_args = args; // TODO can probably do a check for completions here than reading
-                                  // from the cmdline
-        if !args::completions_arg_present() {
-            if let Some(env_args) = std::env::var_os(args::DEFAULT_OPTS_ENV_NAME) {
-                if !env_args.is_empty() {
-                    full_args.splice(
-                        0..0,
-                        env_args
-                            .into_string()
-                            .unwrap_or_default()
-                            .split_whitespace()
-                            .map(OsString::from)
-                            .collect::<Vec<_>>(),
-                    );
-                }
+    pub fn fill_from(args: Vec<OsString>) -> ArgMatches {
+        let mut full_args = args;
+        if let Some(env_args) = std::env::var_os(args::DEFAULT_OPTS_ENV_NAME) {
+            if !env_args.is_empty() {
+                full_args.splice(
+                    0..0,
+                    env_args
+                        .into_string()
+                        .unwrap_or_default()
+                        .split_whitespace()
+                        .map(OsString::from)
+                        .collect::<Vec<_>>(),
+                );
             }
         }
 
         generate_command().get_matches_from(full_args)
     }
 
-    pub fn get_matches() -> ArgMatches {
-        Self::get_matches_from(std::env::args_os().skip(1).collect())
+    pub fn fill() -> ArgMatches {
+        Self::fill_from(std::env::args_os().skip(1).collect())
     }
 
     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
@@ -294,7 +291,7 @@ mod tests {
     #[test]
     fn test_env_opts() {
         std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" "));
-        let matches = Config::get_matches();
+        let matches = Config::fill();
         let (bold, colors) = Config::get_styling(&matches);
         let (config, _) = Config::get_config(matches, bold, colors).ok().unwrap();
         check_parsed_config_from_example_opts(config);
