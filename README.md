@@ -234,6 +234,7 @@ Options:
   -c, --count                display number of files matched in directory and number of lines matched in a file
       --no-color             don't use colors
       --no-bold              don't bold anything
+      --overview             conclude results with an overview
       --max-depth <>         the max depth to search
       --prefix-len <>        number of characters to show before a match [default: 3]
       --max-length <>        set the max length for a matched line
