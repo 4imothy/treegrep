@@ -41,17 +41,14 @@ def run_and_capture_examples(examples):
             return None
     return outputs
 
-def update_readme(*, add_examples):
+def update_readme():
     with open(README_PATH, 'r', encoding='utf-8') as f:
         lines = f.readlines()
 
     examples_index = -1
-    help_index = -1
     for i, line in enumerate(lines):
         if line.strip() == EXAMPLES:
             examples_index = i
-        if line.strip() == HELP:
-            help_index = i
 
     try:
         result = subprocess.run(
@@ -69,25 +66,17 @@ def update_readme(*, add_examples):
         for line in lines[:examples_index]:
             f.write(line)
 
-        if add_examples:
-            example_outputs = run_and_capture_examples(EXAMPLES_TO_RUN)
-            if not example_outputs:
-                print('failed to generate example outputs')
-                exit(1)
-            f.write(EXAMPLES + '\n')
-            for output in example_outputs:
-                f.write(output)
-                f.write('\n\n')
-        else:
-            for line in lines[examples_index:help_index]:
-                f.write(line)
-            if not lines[help_index - 1].endswith('\n'):
-                print('here')
-                f.write('\n')
+        example_outputs = run_and_capture_examples(EXAMPLES_TO_RUN)
+        if not example_outputs:
+            print('failed to generate example outputs')
+            exit(1)
+        f.write(EXAMPLES + '\n')
+        for output in example_outputs:
+            f.write(output)
+            f.write('\n\n')
 
         f.write(HELP + '\n')
         f.write(help_output)
 
 if __name__ == '__main__':
-    add_examples = len(sys.argv) > 1 and sys.argv[1].lower() == 'true'
-    update_readme(add_examples=add_examples)
+    update_readme()

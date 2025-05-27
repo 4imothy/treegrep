@@ -18,7 +18,7 @@ jobs:
         with:
           toolchain: stable
       - run: |
-          ./.github/workflows/update_readme false
+          ./.github/workflows/update_readme
           if git diff --exit-code README.md > /dev/null; then
             echo "no changes in readme"
           else
