@@ -19,7 +19,7 @@ _tgrep() {
 
     case "${cmd}" in
         tgrep)
-            opts="-e -p -s -. -n -f -c -m -h -V --regexp --path --completions --glob --searcher --threads --hidden --line-number --files --links --trim --pcre2 --no-ignore --count --no-color --no-bold --max-depth --prefix-len --max-length --long-branch-each --char-style --long-branch --menu --help --version [positional regexp] [positional target]"
+            opts="-e -p -s -. -n -f -c -m -h -V --regexp --path --completions --glob --searcher --threads --hidden --line-number --files --links --trim --pcre2 --no-ignore --count --no-color --no-bold --overview --max-depth --prefix-len --max-length --long-branch-each --char-style --long-branch --menu --help --version [positional regexp] [positional target]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

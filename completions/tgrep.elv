@@ -46,6 +46,7 @@ set edit:completion:arg-completer[tgrep] = {|@words|
             cand --count 'display number of files matched in directory and number of lines matched in a file'
             cand --no-color 'don''t use colors'
             cand --no-bold 'don''t bold anything'
+            cand --overview 'conclude results with an overview'
             cand --long-branch 'multiple files from the same directory are shown on the same branch'
             cand -m 'open results in a menu to be edited with $EDITOR navigate through the menu using the following commands:  - move up/down: k/j, p/n, up arrow/down arrow  - move up/down with a bigger jump: K/J, P/N  - move up/down paths: {/}, [/]  - move to the start/end: g/G, </>, home/end  - move up/down a page: b/f, pageup/pagedown  - center cursor: z/l  - quit: q, ctrl + c'
             cand --menu 'open results in a menu to be edited with $EDITOR navigate through the menu using the following commands:  - move up/down: k/j, p/n, up arrow/down arrow  - move up/down with a bigger jump: K/J, P/N  - move up/down paths: {/}, [/]  - move to the start/end: g/G, </>, home/end  - move up/down a page: b/f, pageup/pagedown  - center cursor: z/l  - quit: q, ctrl + c'
