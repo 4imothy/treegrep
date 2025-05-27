@@ -38,16 +38,17 @@ pub trait Entry: Display {
     fn open_info(&self) -> Result<OpenInfo, Message>;
 }
 
-struct FileEntry<'a> {
+struct PathDisplay<'a> {
     prefix: Vec<PrefixComponent>,
     name: &'a str,
     path: &'a Path,
     linked: Option<&'a OsStr>,
     count: usize,
     new_line: bool,
+    dir: bool,
 }
 
-impl<'a> Entry for FileEntry<'a> {
+impl<'a> Entry for PathDisplay<'a> {
     fn open_info(&self) -> Result<OpenInfo, Message> {
         Ok(OpenInfo {
             path: self.path,
@@ -56,35 +57,17 @@ impl<'a> Entry for FileEntry<'a> {
     }
 }
 
-impl<'a> Display for FileEntry<'a> {
+impl<'a> Display for PathDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
         write_prefix(f, &self.prefix)?;
-        write_path(f, self.name, self.linked, false, self.count, self.new_line)
-    }
-}
-
-struct DirEntry<'a> {
-    prefix: Vec<PrefixComponent>,
-    name: &'a str,
-    path: &'a Path,
-    linked: Option<&'a OsStr>,
-    count: usize,
-    new_line: bool,
-}
-
-impl<'a> Entry for DirEntry<'a> {
-    fn open_info(&self) -> Result<OpenInfo, Message> {
-        Ok(OpenInfo {
-            path: self.path,
-            line: None,
-        })
-    }
-}
-
-impl<'a> Display for DirEntry<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
-        write_prefix(f, &self.prefix)?;
-        write_path(f, self.name, self.linked, true, self.count, self.new_line)
+        write_path(
+            f,
+            self.name,
+            self.linked,
+            self.dir,
+            self.count,
+            self.new_line,
+        )
     }
 }
 
@@ -139,7 +122,7 @@ fn write_prefix(f: &mut fmt::Formatter, prefix_components: &Vec<PrefixComponent>
     Ok(())
 }
 
-struct LineEntry<'a> {
+struct LineDisplay<'a> {
     prefix: Vec<PrefixComponent>,
     content: &'a str,
     path: &'a Path,
@@ -148,7 +131,7 @@ struct LineEntry<'a> {
     new_line: bool,
 }
 
-impl<'a> Entry for LineEntry<'a> {
+impl<'a> Entry for LineDisplay<'a> {
     fn open_info(&self) -> Result<OpenInfo, Message> {
         Ok(OpenInfo {
             path: self.path,
@@ -157,7 +140,7 @@ impl<'a> Entry for LineEntry<'a> {
     }
 }
 
-impl<'a> Display for LineEntry<'a> {
+impl<'a> Display for LineDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
         write_prefix(f, &self.prefix)?;
         if config().colors || config().bold {
@@ -231,19 +214,19 @@ impl<'a> Display for LineEntry<'a> {
     }
 }
 
-struct LongBranchEntry<'a> {
+struct LongBranchDisplay<'a> {
     prefix: Vec<PrefixComponent>,
     files: &'a [File],
     new_line: bool,
 }
 
-impl<'a> Entry for LongBranchEntry<'a> {
+impl<'a> Entry for LongBranchDisplay<'a> {
     fn open_info(&self) -> Result<OpenInfo, Message> {
         Err(mes!("can't open a long branch"))
     }
 }
 
-impl<'a> Display for LongBranchEntry<'a> {
+impl<'a> Display for LongBranchDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
         write_prefix(f, &self.prefix)?;
         if config().colors || config().bold {
@@ -270,9 +253,7 @@ impl<'a> Display for LongBranchEntry<'a> {
     }
 }
 
-// TODO should these structs have the name Entry as part of it it is known they are entries through
-// the type
-struct OverviewEntry {
+struct OverviewDisplay {
     dirs: usize,
     files: usize,
     lines: usize,
@@ -280,13 +261,13 @@ struct OverviewEntry {
     new_line: bool,
 }
 
-impl<'a> Entry for OverviewEntry {
+impl<'a> Entry for OverviewDisplay {
     fn open_info(&self) -> Result<OpenInfo, Message> {
         Err(mes!("can't open stats"))
     }
 }
 
-impl<'a> Display for OverviewEntry {
+impl<'a> Display for OverviewDisplay {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
         if config().colors || config().bold {
             write!(f, "{}", formats::RESET)?;
@@ -327,7 +308,7 @@ impl Directory {
         child_prefix: Vec<PrefixComponent>,
         dirs: &'a Vec<Directory>,
         path_ids: &mut Option<&mut Vec<usize>>,
-        overview: &mut Option<&mut Box<OverviewEntry>>,
+        overview: &mut Option<&mut Box<OverviewDisplay>>,
     ) {
         let children = &self.children;
         let files = &self.files;
@@ -335,13 +316,14 @@ impl Directory {
         let clen = children.len();
         if clen > 0 || flen > 0 {
             path_ids.as_mut().map(|p| p.push(lines.len()));
-            lines.push(Box::new(DirEntry {
+            lines.push(Box::new(PathDisplay {
                 prefix: cur_prefix.clone(),
                 name: &self.name,
                 path: &self.path,
                 linked: self.linked.as_deref(),
                 count: self.children.len() + self.files.len(),
                 new_line: !config().menu,
+                dir: true,
             }));
         }
 
@@ -402,7 +384,7 @@ impl Directory {
         let prefix_next = with_push(prefix.clone(), PrefixComponent::MatchWithNext);
 
         for (i, branch) in self.files.chunks(long_branch_files_per_line).enumerate() {
-            lines.push(Box::new(LongBranchEntry {
+            lines.push(Box::new(LongBranchDisplay {
                 prefix: if i + 1 == num_lines {
                     prefix_no_next.clone()
                 } else {
@@ -422,7 +404,7 @@ impl File {
         prefix: Vec<PrefixComponent>,
         parent_has_next: bool,
         path_ids: &mut Option<&mut Vec<usize>>,
-        overview: &mut Option<&mut Box<OverviewEntry>>,
+        overview: &mut Option<&mut Box<OverviewDisplay>>,
     ) {
         if let Some(o) = overview {
             o.lines += self.lines.len();
@@ -445,13 +427,14 @@ impl File {
         };
 
         path_ids.as_mut().map(|p| p.push(lines.len()));
-        lines.push(Box::new(FileEntry {
+        lines.push(Box::new(PathDisplay {
             prefix: cur_p,
             name: &self.name,
             path: &self.path,
             linked: self.linked.as_deref(),
             count: self.lines.len(),
             new_line: !config().menu,
+            dir: false,
         }));
 
         if config().files {
@@ -464,7 +447,7 @@ impl File {
             } else {
                 with_push(line_p.clone(), PrefixComponent::MatchNoNext)
             };
-            lines.push(Box::new(LineEntry {
+            lines.push(Box::new(LineDisplay {
                 prefix,
                 content: &line.content,
                 path: &self.path,
@@ -481,9 +464,9 @@ pub fn matches_to_display_lines<'a>(
     mut path_ids: Option<&mut Vec<usize>>,
 ) -> Vec<Box<dyn Entry + 'a>> {
     let mut lines: Vec<Box<dyn Entry + 'a>> = Vec::new();
-    let mut overview: Option<Box<OverviewEntry>> = config()
+    let mut overview: Option<Box<OverviewDisplay>> = config()
         .overview
-        .then(|| OverviewEntry {
+        .then(|| OverviewDisplay {
             dirs: 0,
             files: usize::from(!config().is_dir),
             lines: 0,
