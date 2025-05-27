@@ -270,6 +270,50 @@ impl<'a> Display for LongBranchEntry<'a> {
     }
 }
 
+// TODO should these structs have the name Entry as part of it it is known they are entries through
+// the type
+struct OverviewEntry {
+    dirs: usize,
+    files: usize,
+    lines: usize,
+    count: usize,
+    new_line: bool,
+}
+
+impl<'a> Entry for OverviewEntry {
+    fn open_info(&self) -> Result<OpenInfo, Message> {
+        Err(mes!("can't open stats"))
+    }
+}
+
+impl<'a> Display for OverviewEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
+        if config().colors || config().bold {
+            write!(f, "{}", formats::RESET)?;
+        }
+        if !config().just_files {
+            write!(
+                f,
+                "found {} matches in {} lines across ",
+                self.count, self.lines
+            )?;
+        }
+        write!(
+            f,
+            "{} {}",
+            self.files,
+            if self.files == 1 { "file" } else { "files" }
+        )?;
+        if config().is_dir {
+            write!(f, " within {} directories", self.dirs)?;
+        }
+        if self.new_line {
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
+
 fn with_push(mut v: Vec<PrefixComponent>, item: PrefixComponent) -> Vec<PrefixComponent> {
     v.push(item);
     v
@@ -283,6 +327,7 @@ impl Directory {
         child_prefix: Vec<PrefixComponent>,
         dirs: &'a Vec<Directory>,
         path_ids: &mut Option<&mut Vec<usize>>,
+        overview: &mut Option<&mut Box<OverviewEntry>>,
     ) {
         let children = &self.children;
         let files = &self.files;
@@ -299,6 +344,12 @@ impl Directory {
                 new_line: !config().menu,
             }));
         }
+
+        if let Some(o) = overview {
+            o.dirs += 1;
+            o.files += files.len();
+        }
+
         for (i, child_id) in children.iter().enumerate() {
             let dir = dirs.get(*child_id).unwrap();
             let (cur_prefix, new_child_prefix) = if i + 1 != clen || flen > 0 {
@@ -312,14 +363,27 @@ impl Directory {
                     with_push(child_prefix.clone(), PrefixComponent::Spacer),
                 )
             };
-            dir.to_lines(lines, cur_prefix, new_child_prefix, dirs, path_ids);
+            dir.to_lines(
+                lines,
+                cur_prefix,
+                new_child_prefix,
+                dirs,
+                path_ids,
+                overview,
+            );
         }
         if files.len() > 0 {
             if config().long_branch {
                 self.long_branch_files_to_lines(lines, child_prefix);
             } else {
                 for (i, file) in files.iter().enumerate() {
-                    file.to_lines(lines, child_prefix.clone(), i + 1 != flen, path_ids);
+                    file.to_lines(
+                        lines,
+                        child_prefix.clone(),
+                        i + 1 != flen,
+                        path_ids,
+                        overview,
+                    );
                 }
             }
         }
@@ -358,7 +422,12 @@ impl File {
         prefix: Vec<PrefixComponent>,
         parent_has_next: bool,
         path_ids: &mut Option<&mut Vec<usize>>,
+        overview: &mut Option<&mut Box<OverviewEntry>>,
     ) {
+        if let Some(o) = overview {
+            o.lines += self.lines.len();
+            o.count += self.lines.iter().map(|l| l.matches.len()).sum::<usize>();
+        }
         let (cur_p, line_p) = if config().is_dir {
             if parent_has_next {
                 (
@@ -412,15 +481,39 @@ pub fn matches_to_display_lines<'a>(
     mut path_ids: Option<&mut Vec<usize>>,
 ) -> Vec<Box<dyn Entry + 'a>> {
     let mut lines: Vec<Box<dyn Entry + 'a>> = Vec::new();
+    let mut overview: Option<Box<OverviewEntry>> = config()
+        .overview
+        .then(|| OverviewEntry {
+            dirs: 0,
+            files: usize::from(!config().is_dir),
+            lines: 0,
+            count: 0,
+            new_line: !config().menu,
+        })
+        .map(Box::new);
     match &result {
         Matches::Dir(dirs) => {
-            dirs.get(0)
-                .unwrap()
-                .to_lines(&mut lines, Vec::new(), Vec::new(), dirs, &mut path_ids);
+            dirs.get(0).unwrap().to_lines(
+                &mut lines,
+                Vec::new(),
+                Vec::new(),
+                dirs,
+                &mut path_ids,
+                &mut overview.as_mut(),
+            );
         }
         Matches::File(file) => {
-            file.to_lines(&mut lines, Vec::new(), false, &mut path_ids);
+            file.to_lines(
+                &mut lines,
+                Vec::new(),
+                false,
+                &mut path_ids,
+                &mut overview.as_mut(),
+            );
         }
+    }
+    if let Some(o) = overview.take() {
+        lines.push(o);
     }
     lines
 }

@@ -110,6 +110,7 @@ arg_info!(
     "completions",
     "generate completions for given shell"
 );
+arg_info!(OVERVIEW, "overview", "conclude results with an overview");
 
 const HELP: &str = concat!(
     "{name} {version}
@@ -186,7 +187,7 @@ pub fn completions_arg_present() -> bool {
     })
 }
 
-fn bool_arg(info: ArgInfo, requires_expr: bool) -> Arg {
+fn bool_arg(info: ArgInfo) -> Arg {
     let mut arg = Arg::new(info.id)
         .long(info.id)
         .help(info.h)
@@ -194,10 +195,6 @@ fn bool_arg(info: ArgInfo, requires_expr: bool) -> Arg {
 
     if let Some(s) = info.s {
         arg = arg.short(s);
-    }
-
-    if requires_expr {
-        arg = arg.requires(EXPRESSION_GROUP_ID);
     }
 
     arg
@@ -218,7 +215,7 @@ fn usize_arg(info: &ArgInfo, requires_expr: bool, default_value: Option<&'static
     arg
 }
 
-fn get_args<'a>() -> [Arg; 20] {
+fn get_args<'a>() -> [Arg; 21] {
     let long = Arg::new(LONG_BRANCHES.id)
         .long(LONG_BRANCHES.id)
         .help(LONG_BRANCHES.h)
@@ -260,23 +257,24 @@ fn get_args<'a>() -> [Arg; 20] {
         glob,
         searcher,
         usize_arg(&THREADS, false, None),
-        bool_arg(HIDDEN, false),
-        bool_arg(LINE_NUMBER, false),
-        bool_arg(FILES, false),
-        bool_arg(LINKS, false),
-        bool_arg(TRIM_LEFT, true),
-        bool_arg(PCRE2, true),
-        bool_arg(NO_IGNORE, false),
-        bool_arg(SHOW_COUNT, false),
-        bool_arg(NO_COLORS, false),
-        bool_arg(NO_BOLD, false),
+        bool_arg(HIDDEN),
+        bool_arg(LINE_NUMBER),
+        bool_arg(FILES),
+        bool_arg(LINKS),
+        bool_arg(TRIM_LEFT).requires(EXPRESSION_GROUP_ID),
+        bool_arg(PCRE2).requires(EXPRESSION_GROUP_ID),
+        bool_arg(NO_IGNORE),
+        bool_arg(SHOW_COUNT),
+        bool_arg(NO_COLORS),
+        bool_arg(NO_BOLD),
+        bool_arg(OVERVIEW),
         usize_arg(&MAX_DEPTH, false, None),
         usize_arg(&PREFIX_LEN, false, Some(DEFAULT_PREFIX_LEN)),
         usize_arg(&MAX_LENGTH, true, None),
         usize_arg(&LONG_BRANCHES_EACH, true, Some(DEFAULT_LONG_BRANCH_EACH)),
         char_style,
         long,
-        bool_arg(MENU, false),
+        bool_arg(MENU),
     ]
 }
 

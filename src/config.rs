@@ -39,6 +39,7 @@ pub struct Config {
     pub menu: bool,
     pub files: bool,
     pub just_files: bool,
+    pub overview: bool,
     pub links: bool,
     pub ignore: bool,
     pub pcre2: bool,
@@ -140,6 +141,7 @@ impl Config {
         let trim: bool = matches.get_flag(args::TRIM_LEFT.id);
         let pcre2: bool = matches.get_flag(args::PCRE2.id);
         let ignore: bool = !matches.get_flag(args::NO_IGNORE.id);
+        let overview: bool = matches.get_flag(args::OVERVIEW.id);
 
         let max_depth: Option<usize> = get_usize_option(&matches, args::MAX_DEPTH.id)?;
         let threads: Option<usize> = get_usize_option(&matches, args::THREADS.id)?;
@@ -218,6 +220,7 @@ impl Config {
                     matches.get_one::<String>(args::CHAR_STYLE.id),
                     prefix_len,
                 ),
+                overview,
             },
             searcher_path,
         ))

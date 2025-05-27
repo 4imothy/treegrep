@@ -113,23 +113,11 @@ fn get_matches_from_cmd(searcher_path: OsString) -> Result<Option<Matches>, Mess
 }
 
 fn gen_completions_if_needed(matches: &ArgMatches) -> Result<bool, Message> {
-    if let Some(shell) = matches.get_one::<Shell>(args::COMPLETIONS.id) {
+    if let Some(&shell) = matches.get_one::<Shell>(args::COMPLETIONS.id) {
         let mut cmd = args::generate_command();
         let mut fd = std::io::stdout();
-        match shell {
-            Shell::Bash => generate(Shell::Bash, &mut cmd, args::names::TREEGREP_BIN, &mut fd),
-            Shell::Zsh => generate(Shell::Zsh, &mut cmd, args::names::TREEGREP_BIN, &mut fd),
-            Shell::Elvish => generate(Shell::Bash, &mut cmd, args::names::TREEGREP_BIN, &mut fd),
-            Shell::PowerShell => generate(
-                Shell::PowerShell,
-                &mut cmd,
-                args::names::TREEGREP_BIN,
-                &mut fd,
-            ),
-            Shell::Fish => generate(Shell::Fish, &mut cmd, args::names::TREEGREP_BIN, &mut fd),
-            _ => return Err(mes!("cannot generate completions for {shell}")),
-        }
+        generate(shell, &mut cmd, args::names::TREEGREP_BIN, &mut fd);
         return Ok(true);
     }
-    return Ok(false);
+    Ok(false)
 }

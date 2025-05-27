@@ -128,9 +128,6 @@ impl<'a> Menu<'a> {
         lines: &'a Vec<Box<dyn Entry + 'a>>,
         path_ids: Vec<usize>,
     ) -> io::Result<Menu<'a>> {
-        let mut buffer: Vec<u8> = Vec::new();
-        buffer.shrink_to_fit();
-
         let mut term = term::Term::new(out)?;
         term.claim()?;
 
