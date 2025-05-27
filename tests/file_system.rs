@@ -33,7 +33,7 @@ impl Dir {
 
     pub fn create_file_bytes(&self, file_name: &PathBuf, content: &[u8]) {
         let file_path = self.path.join(file_name);
-        let mut file = fs::File::create(&file_path).expect("Failed to create file");
+        let mut file = fs::File::create(file_path).expect("Failed to create file");
 
         file.write_all(content).expect("Failed to write to file");
     }
@@ -42,7 +42,7 @@ impl Dir {
         let link_path = self.path.join(link_name);
 
         #[cfg(unix)]
-        std::os::unix::fs::symlink(target_dir, &link_path).expect("failed to link dir");
+        std::os::unix::fs::symlink(target_dir, link_path).expect("failed to link dir");
 
         #[cfg(windows)]
         std::os::windows::fs::symlink_dir(target_dir, &link_path).expect("failed to link dir");
@@ -52,7 +52,7 @@ impl Dir {
         let link_path = self.path.join(link_name);
 
         #[cfg(unix)]
-        std::os::unix::fs::symlink(target_file, &link_path).expect("failed to link file");
+        std::os::unix::fs::symlink(target_file, link_path).expect("failed to link file");
 
         #[cfg(windows)]
         std::os::windows::fs::symlink_file(target_file, &link_path).expect("failed to link file");

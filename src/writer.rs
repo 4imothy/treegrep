@@ -261,13 +261,13 @@ struct OverviewDisplay {
     new_line: bool,
 }
 
-impl<'a> Entry for OverviewDisplay {
+impl Entry for OverviewDisplay {
     fn open_info(&self) -> Result<OpenInfo, Message> {
         Err(mes!("can't open stats"))
     }
 }
 
-impl<'a> Display for OverviewDisplay {
+impl Display for OverviewDisplay {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
         if config().colors || config().bold {
             write!(f, "{}", formats::RESET)?;
@@ -315,7 +315,9 @@ impl Directory {
         let flen = files.len();
         let clen = children.len();
         if clen > 0 || flen > 0 {
-            path_ids.as_mut().map(|p| p.push(lines.len()));
+            if let Some(p) = path_ids.as_mut() {
+                p.push(lines.len())
+            }
             lines.push(Box::new(PathDisplay {
                 prefix: cur_prefix.clone(),
                 name: &self.name,
@@ -354,7 +356,7 @@ impl Directory {
                 overview,
             );
         }
-        if files.len() > 0 {
+        if !files.is_empty() {
             if config().long_branch {
                 self.long_branch_files_to_lines(lines, child_prefix);
             } else {
@@ -426,7 +428,9 @@ impl File {
             (prefix.clone(), prefix)
         };
 
-        path_ids.as_mut().map(|p| p.push(lines.len()));
+        if let Some(p) = path_ids.as_mut() {
+            p.push(lines.len())
+        }
         lines.push(Box::new(PathDisplay {
             prefix: cur_p,
             name: &self.name,
@@ -476,7 +480,7 @@ pub fn matches_to_display_lines<'a>(
         .map(Box::new);
     match &result {
         Matches::Dir(dirs) => {
-            dirs.get(0).unwrap().to_lines(
+            dirs.first().unwrap().to_lines(
                 &mut lines,
                 Vec::new(),
                 Vec::new(),

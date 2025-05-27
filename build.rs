@@ -8,9 +8,10 @@ use std::io::Error;
 use std::path::Path;
 
 include!("src/args.rs");
+const DEBUG: bool = cfg!(debug_assertions);
 
 fn main() -> Result<(), Error> {
-    if !(cfg!(debug_assertions)) {
+    if !DEBUG {
         let project_root = std::env::var("CARGO_MANIFEST_DIR").unwrap();
         let completions_dir_path = Path::new(&project_root).join("completions");
         if !completions_dir_path.exists() {

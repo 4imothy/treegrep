@@ -2,7 +2,6 @@
 
 use clap::builder::PossibleValue;
 use clap::{Arg, ArgAction, ArgGroup, Command, ValueHint};
-use clap_complete;
 
 pub const DEFAULT_PREFIX_LEN: &str = "3";
 pub const DEFAULT_LONG_BRANCH_EACH: &str = "5";
@@ -178,7 +177,7 @@ pub fn generate_command() -> Command {
     for opt in get_args() {
         command = command.arg(opt);
     }
-    return command;
+    command
 }
 
 fn bool_arg(info: ArgInfo) -> Arg {
@@ -209,7 +208,7 @@ fn usize_arg(info: &ArgInfo, requires_expr: bool, default_value: Option<&'static
     arg
 }
 
-fn get_args<'a>() -> [Arg; 21] {
+fn get_args() -> [Arg; 21] {
     let long = Arg::new(LONG_BRANCHES.id)
         .long(LONG_BRANCHES.id)
         .help(LONG_BRANCHES.h)

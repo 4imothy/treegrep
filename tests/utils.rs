@@ -11,7 +11,7 @@ const OVERWRITE: bool = false;
 
 fn normalize_newlines(content: &mut Vec<u8>) {
     let mut i = 0;
-    if content.len() == 0 {
+    if content.is_empty() {
         panic!("empty output can't be normalized");
     }
     while i < content.len() - 1 {
@@ -25,7 +25,7 @@ fn normalize_newlines(content: &mut Vec<u8>) {
 }
 
 fn get_target_content(path: PathBuf) -> Vec<u8> {
-    let mut content: Vec<u8> = fs::read(&path).unwrap();
+    let mut content: Vec<u8> = fs::read(path).unwrap();
 
     normalize_newlines(&mut content);
 
@@ -40,16 +40,16 @@ fn check_results(
 ) -> Option<(bool, bool)> {
     if OVERWRITE {
         let mut file = fs::File::create(tar_path).unwrap();
-        file.write_all(&rg_results).unwrap();
+        file.write_all(rg_results).unwrap();
     } else {
         let content = get_target_content(tar_path);
         let content_str = String::from_utf8_lossy(&content);
         if *tg_results != content {
-            let tg_str = String::from_utf8_lossy(&tg_results);
+            let tg_str = String::from_utf8_lossy(tg_results);
             print_diff(&tg_str, "tgrep output", &content_str);
         }
         if *rg_results != content {
-            let rg_str = String::from_utf8_lossy(&rg_results);
+            let rg_str = String::from_utf8_lossy(rg_results);
             println!("rg output");
             println!("{}", rg_str);
             print_diff(&rg_str, "rg output", &content_str);
@@ -129,12 +129,12 @@ pub fn get_outputs(path: &Path, expr: &str, extra_option: Option<&str>) -> (Vec<
 
     let rg_out = tg_on_rg.output().ok().unwrap();
 
-    if !rg_out.status.success() && rg_out.stderr.len() > 0 {
+    if !rg_out.status.success() && !rg_out.stderr.is_empty() {
         panic!("cmd failed {}", String::from_utf8_lossy(&rg_out.stderr));
     }
 
     let tg_out = tg.output().ok().unwrap();
-    if !tg_out.status.success() && rg_out.stderr.len() > 0 {
+    if !tg_out.status.success() && !rg_out.stderr.is_empty() {
         panic!("cmd failed {}", String::from_utf8_lossy(&rg_out.stderr));
     }
     let mut rg_stdout: Vec<u8> = rg_out.stdout;

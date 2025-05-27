@@ -44,25 +44,24 @@ impl File {
                 let d_id: usize;
                 let mut to_add_id: Option<usize> = None;
 
-                if is_start_path(&dir_path) {
+                if is_start_path(dir_path) {
                     d_id = 0;
                 } else if let Some(id) = path_to_index.get(dir_path.as_os_str()) {
                     d_id = *id;
                 } else {
-                    let n_dir = Directory::new(&dir_path)?;
+                    let n_dir = Directory::new(dir_path)?;
                     path_to_index.insert(n_dir.path.as_os_str().to_owned(), dirs.len());
                     d_id = dirs.len();
                     to_add_id = Some(d_id);
                     dirs.push(n_dir);
                 }
-                let dir: &mut Directory;
-                dir = dirs.get_mut(d_id).unwrap();
+                let dir = dirs.get_mut(d_id).unwrap();
                 let f_id = dir.files.len();
                 dir.files.push(file);
 
-                if !is_start_path(&dir_path) {
+                if !is_start_path(dir_path) {
                     while let Some(p_parent) = dir_path.parent() {
-                        if is_start_path(&p_parent) {
+                        if is_start_path(p_parent) {
                             if let Some(id) = to_add_id {
                                 dirs.get_mut(0).unwrap().children.push(id);
                             }
@@ -70,7 +69,7 @@ impl File {
                         }
                         let m_id = path_to_index.get(p_parent.as_os_str());
                         if m_id.is_none() {
-                            let mut n_dir = Directory::new(&p_parent)?;
+                            let mut n_dir = Directory::new(p_parent)?;
                             let n_id = dirs.len();
                             path_to_index.insert(n_dir.path.as_os_str().to_owned(), n_id);
                             if let Some(id) = to_add_id {

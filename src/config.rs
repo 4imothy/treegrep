@@ -5,7 +5,6 @@ use crate::errors::{mes, Message};
 use crate::formats;
 use crate::searchers::Searchers;
 use clap::ArgMatches;
-use dunce;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
@@ -56,7 +55,7 @@ pub fn canonicalize(p: PathBuf) -> Result<PathBuf, Message> {
     dunce::canonicalize(&p).map_err(|_| {
         mes!(
             "failed to canonicalize path `{}`",
-            p.to_string_lossy().to_owned()
+            p.to_string_lossy().into_owned()
         )
     })
 }
@@ -126,7 +125,7 @@ impl Config {
         let globs: Vec<String> = matches
             .get_many::<String>(args::GLOB.id)
             .map(|exprs| exprs.map(String::to_owned).collect())
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_default();
 
         let long_branch: bool = matches.get_flag(args::LONG_BRANCHES.id);
         let count: bool = matches.get_flag(args::SHOW_COUNT.id);
@@ -185,7 +184,7 @@ impl Config {
 
         let is_dir = path.is_dir();
         let prefix_len = get_usize_option_with_default(&matches, args::PREFIX_LEN.id)?;
-        let just_files = files && patterns.len() == 0;
+        let just_files = files && patterns.is_empty();
 
         Ok((
             Config {

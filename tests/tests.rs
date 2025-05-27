@@ -27,8 +27,8 @@ fn wide_directory() {
     dir.create_file_str(&second.join("file_in_second"), "text in second directory");
 
     let (rg_results, tg_results) = get_outputs(&dir.path, "text", None);
-    let tar_12 = tar_dir.join(format!("wide_12"));
-    let tar_21 = tar_dir.join(format!("wide_21"));
+    let tar_12 = tar_dir.join("wide_12");
+    let tar_21 = tar_dir.join("wide_21");
     let tars = vec![tar_12, tar_21];
     assert_pass_pool(tars, rg_results, tg_results);
 }
@@ -142,10 +142,10 @@ fn links() {
     dir.link_dir(&linked_dir, "link_to_dir");
 
     let (rg_results, tg_results) = get_outputs(&dir.path, ".", Some("--links"));
-    let tar_11 = tar_dir.join(format!("links_11"));
-    let tar_12 = tar_dir.join(format!("links_12"));
-    let tar_21 = tar_dir.join(format!("links_21"));
-    let tar_22 = tar_dir.join(format!("links_22"));
+    let tar_11 = tar_dir.join("links_11");
+    let tar_12 = tar_dir.join("links_12");
+    let tar_21 = tar_dir.join("links_21");
+    let tar_22 = tar_dir.join("links_22");
     let tars = vec![tar_11, tar_12, tar_21, tar_22];
     assert_pass_pool(tars, rg_results, tg_results);
 }

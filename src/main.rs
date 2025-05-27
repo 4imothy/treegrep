@@ -63,12 +63,11 @@ fn run(matches: ArgMatches, bold: bool, colors: bool) -> Result<(), Message> {
     let (c, searcher_path) = Config::get_config(matches, bold, colors)?;
     CONFIG.set(c).ok().unwrap();
 
-    let matches: Option<Matches>;
-    if config().just_files || searcher_path.is_none() {
-        matches = matcher::search()?;
+    let matches: Option<Matches> = if config().just_files || searcher_path.is_none() {
+        matcher::search()?
     } else {
-        matches = get_matches_from_cmd(searcher_path.unwrap())?;
-    }
+        get_matches_from_cmd(searcher_path.unwrap())?
+    };
 
     if matches.is_none() {
         return Ok(());
@@ -76,7 +75,7 @@ fn run(matches: ArgMatches, bold: bool, colors: bool) -> Result<(), Message> {
 
     let mut out: StdoutLock = stdout().lock();
     let m = matches.unwrap();
-    let mut path_ids = config().menu.then(|| Vec::<usize>::new());
+    let mut path_ids = config().menu.then(Vec::<usize>::new);
     let lines: Vec<Box<dyn Entry>> = matches_to_display_lines(&m, path_ids.as_mut());
 
     if config().menu {
@@ -109,14 +108,13 @@ fn get_matches_from_cmd(searcher_path: OsString) -> Result<Option<Matches>, Mess
         )
     })?;
 
-    if !output.status.success() && output.stderr.len() > 0 {
+    if !output.status.success() && !output.stderr.is_empty() {
         return Err(mes!(
             "{} had errors:\n{}",
             cmd.get_program().to_string_lossy(),
             String::from_utf8_lossy(&output.stderr)
         ));
     }
-    let results: Vec<u8> = output.stdout;
 
-    process_results(results)
+    process_results(output.stdout)
 }

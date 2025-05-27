@@ -6,7 +6,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 pub fn wrap_dirs(dirs: Vec<Directory>) -> Option<Matches> {
-    if dirs.get(0).unwrap().children.is_empty() && dirs.get(0).unwrap().files.is_empty() {
+    if dirs.first().unwrap().children.is_empty() && dirs.first().unwrap().files.is_empty() {
         return None;
     }
     Some(Matches::Dir(dirs))
@@ -119,18 +119,18 @@ impl Match {
         }
     }
 
-    fn remove_overlapping(matches: &mut Vec<Match>) {
-        if matches.len() == 0 {
+    fn remove_overlapping(matches: &mut [Match]) {
+        if matches.is_empty() {
             return;
         }
         matches.sort_by(|a, b| a.start.cmp(&b.start).then_with(|| b.end.cmp(&a.end)));
         let mut current_max_end = matches[0].end;
-        for m_id in 1..matches.len() {
-            if matches[m_id].start <= current_max_end {
-                matches[m_id].start = current_max_end;
-                matches[m_id].end = current_max_end.max(matches[m_id].end);
+        for m in matches.iter_mut().skip(1) {
+            if m.start <= current_max_end {
+                m.start = current_max_end;
+                m.end = current_max_end.max(m.end);
             }
-            current_max_end = current_max_end.max(matches[m_id].end);
+            current_max_end = current_max_end.max(m.end);
         }
     }
 }
@@ -233,15 +233,15 @@ mod tests {
     #[test]
     fn test_path_name() {
         let mut path = Path::new("/path/to/file.txt");
-        assert_eq!(path_name(&path).ok(), Some("file.txt".to_string()));
+        assert_eq!(path_name(path).ok(), Some("file.txt".to_string()));
 
         path = Path::new("/path/to/unicode_åß∂ƒ.txt");
-        assert_eq!(path_name(&path).ok(), Some("unicode_åß∂ƒ.txt".to_string()));
+        assert_eq!(path_name(path).ok(), Some("unicode_åß∂ƒ.txt".to_string()));
 
         path = Path::new("/path/to/directory/");
-        assert_eq!(path_name(&path).ok(), Some("directory".to_string()));
+        assert_eq!(path_name(path).ok(), Some("directory".to_string()));
 
         path = Path::new("/");
-        assert_eq!(path_name(&path).ok(), None);
+        assert_eq!(path_name(path).ok(), None);
     }
 }

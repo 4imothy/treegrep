@@ -7,7 +7,6 @@ use crate::options::{Options, Rg};
 use std::env;
 use std::ffi::OsString;
 use std::ops::Deref;
-use std::path::PathBuf;
 use std::process::Command;
 
 struct ShortName(String);
@@ -16,6 +15,12 @@ impl ShortName {
     fn new(name: &str) -> Self {
         assert!(name == names::TREEGREP_BIN || name == names::RIPGREP_BIN);
         ShortName(name.to_owned())
+    }
+}
+
+impl std::fmt::Display for ShortName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -29,16 +34,15 @@ impl Deref for ShortName {
 
 fn get_exe_path(bin: &ShortName) -> Option<OsString> {
     env::var("PATH").ok().and_then(|path| {
-        env::split_paths(&path).find_map(|p| {
-            let mut candidate = PathBuf::from(p);
-            candidate.push(&bin.0);
-            if candidate.exists() {
-                return Some(candidate.into_os_string());
+        env::split_paths(&path).find_map(|mut p| {
+            p.push(&bin.0);
+            if p.exists() {
+                return Some(p.into_os_string());
             }
             if cfg!(target_os = "windows") {
-                candidate.set_extension(&env::consts::EXE_SUFFIX[1..]);
-                if candidate.exists() {
-                    return Some(candidate.into_os_string());
+                p.set_extension(&env::consts::EXE_SUFFIX[1..]);
+                if p.exists() {
+                    return Some(p.into_os_string());
                 }
             }
             None
@@ -53,23 +57,23 @@ pub enum Searchers {
 
 fn bin_name(chosen: Option<&String>) -> Result<Option<ShortName>, Message> {
     match chosen {
-        Some(s) if s == &names::TREEGREP_BIN || s == &names::TREEGREP => {
+        Some(s) if s == names::TREEGREP_BIN || s == names::TREEGREP => {
             Ok(Some(ShortName(names::TREEGREP_BIN.to_owned())))
         }
-        Some(s) if s == &names::RIPGREP_BIN || s == &names::RIPGREP => {
+        Some(s) if s == names::RIPGREP_BIN || s == names::RIPGREP => {
             Ok(Some(ShortName(names::RIPGREP_BIN.to_owned())))
         }
         Some(s)
             if cfg!(target_os = "windows")
-                && (s == &(names::TREEGREP_BIN.to_owned() + &env::consts::EXE_SUFFIX)
-                    || s == &(names::TREEGREP.to_owned() + &env::consts::EXE_SUFFIX)) =>
+                && (s == &(names::TREEGREP_BIN.to_owned() + env::consts::EXE_SUFFIX)
+                    || s == &(names::TREEGREP.to_owned() + env::consts::EXE_SUFFIX)) =>
         {
             Ok(Some(ShortName(names::TREEGREP_BIN.to_owned())))
         }
         Some(s)
             if cfg!(target_os = "windows")
-                && (s == &(names::RIPGREP_BIN.to_owned() + &env::consts::EXE_SUFFIX)
-                    || s == &(names::RIPGREP.to_owned() + &env::consts::EXE_SUFFIX)) =>
+                && (s == &(names::RIPGREP_BIN.to_owned() + env::consts::EXE_SUFFIX)
+                    || s == &(names::RIPGREP.to_owned() + env::consts::EXE_SUFFIX)) =>
         {
             Ok(Some(ShortName(names::RIPGREP_BIN.to_owned())))
         }
@@ -89,7 +93,7 @@ impl Searchers {
                 names::TREEGREP_BIN => Ok((Searchers::TreeGrep, None)),
                 _ => match get_exe_path(&c) {
                     Some(path) => Ok((Searchers::from_str(&c), Some(path))),
-                    _ => Err(mes!("failed to find searcher `{}`", c.to_owned())),
+                    _ => Err(mes!("failed to find searcher `{}`", c)),
                 },
             },
             None => {
@@ -123,7 +127,7 @@ impl Searchers {
     }
 
     fn to_short_name(&self) -> ShortName {
-        ShortName::new(&self.to_str())
+        ShortName::new(self.to_str())
     }
 
     pub fn to_str(&self) -> &str {

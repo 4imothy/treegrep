@@ -16,9 +16,9 @@ pub trait Options {
     fn ignore(cmd: &mut Command, want: bool) -> Result<(), Message>;
     fn max_depth(cmd: &mut Command, md: Option<usize>) -> Result<(), Message>;
     fn threads(cmd: &mut Command, threads: Option<usize>) -> Result<(), Message>;
-    fn patterns(cmd: &mut Command, patterns: &Vec<String>);
+    fn patterns(cmd: &mut Command, patterns: &[String]);
     fn path(cmd: &mut Command, path: &Path);
-    fn globs(cmd: &mut Command, globs: &Vec<String>);
+    fn globs(cmd: &mut Command, globs: &[String]);
 
     fn add_options(cmd: &mut Command) -> Result<(), Message> {
         let config = config();
@@ -46,13 +46,13 @@ impl Options for Rg {
         cmd.arg("--json");
     }
 
-    fn globs(cmd: &mut Command, globs: &Vec<String>) {
+    fn globs(cmd: &mut Command, globs: &[String]) {
         for g in globs {
             cmd.arg(format!("--glob={}", g));
         }
     }
 
-    fn patterns(cmd: &mut Command, patterns: &Vec<String>) {
+    fn patterns(cmd: &mut Command, patterns: &[String]) {
         for p in patterns {
             cmd.arg(format!("--regexp={}", p));
         }
@@ -62,8 +62,7 @@ impl Options for Rg {
         cmd.arg(path);
     }
 
-    fn files(_cmd: &mut Command, want: bool) -> Result<(), Message> {
-        if want {}
+    fn files(_cmd: &mut Command, _want: bool) -> Result<(), Message> {
         Ok(())
     }
 

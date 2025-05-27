@@ -169,36 +169,34 @@ impl<'a> Menu<'a> {
     }
 
     fn down_page(&mut self) -> io::Result<()> {
-        let dist;
-        if self.max_cursor_y() as usize > self.max_line_id {
-            dist = self.max_line_id - self.selected_id;
+        let dist = if self.max_cursor_y() as usize > self.max_line_id {
+            self.max_line_id - self.selected_id
         } else {
-            dist = (self.height() as usize).min(self.max_line_id as usize - self.selected_id);
-        }
+            (self.height() as usize).min(self.max_line_id - self.selected_id)
+        };
         if dist == 0 {
             return Ok(());
         }
         for i in 1..=dist {
-            self.pi.down(self.selected_id + i as usize);
+            self.pi.down(self.selected_id + i);
         }
         self.selected_id += dist;
         self.draw()
     }
 
     fn up_page(&mut self) -> io::Result<()> {
-        let dist;
-        if self.max_cursor_y() as usize > self.max_line_id {
-            dist = self.selected_id
+        let dist = if self.max_cursor_y() as usize > self.max_line_id {
+            self.selected_id
         } else {
-            dist = (self.height() as usize).min(self.selected_id);
-        }
+            (self.height() as usize).min(self.selected_id)
+        };
         if dist == 0 {
             return Ok(());
         }
         for i in 1..=dist {
-            self.pi.up(self.selected_id - i as usize);
+            self.pi.up(self.selected_id - i);
         }
-        self.selected_id -= dist as usize;
+        self.selected_id -= dist;
         self.draw()
     }
 
@@ -442,7 +440,7 @@ impl<'a> Menu<'a> {
         self.pi.bottom();
         self.selected_id = self.max_line_id;
         if self.window.last_id >= self.window.max_id {
-            self.cursor_y = self.last_y as u16;
+            self.cursor_y = self.last_y;
         } else {
             self.cursor_y = self.max_cursor_y();
         }
@@ -456,7 +454,7 @@ impl<'a> Menu<'a> {
         self.pi.top();
         self.selected_id = 0;
         if self.window.first_id == 0 {
-            self.cursor_y = self.first_y as u16;
+            self.cursor_y = self.first_y;
         } else {
             self.cursor_y = 0;
         }
