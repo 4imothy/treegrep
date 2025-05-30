@@ -128,7 +128,7 @@ impl Config {
             .unwrap_or_default();
 
         let long_branch: bool = matches.get_flag(args::LONG_BRANCHES.id);
-        let count: bool = matches.get_flag(args::SHOW_COUNT.id);
+        let count: bool = matches.get_flag(args::COUNT.id);
         let hidden: bool = matches.get_flag(args::HIDDEN.id);
         let line_number: bool = matches.get_flag(args::LINE_NUMBER.id);
         let menu: bool = matches.get_flag(args::MENU.id);

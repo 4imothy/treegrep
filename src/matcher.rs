@@ -126,9 +126,6 @@ impl File {
                 }
                 for m in it {
                     was_match = true;
-                    if !config().colors {
-                        break;
-                    };
                     matches.push(Match::new(j, m.start(), m.end()));
                 }
             }

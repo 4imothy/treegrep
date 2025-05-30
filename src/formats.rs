@@ -119,27 +119,30 @@ pub fn error_prefix(bold: bool, colors: bool) -> String {
     }
 }
 
-pub fn style_str(orig: &str, color: Color, attr: Attribute) -> StyledContent<&str> {
+fn style_with<D>(orig: D, color: Color) -> StyledContent<D>
+where
+    D: Display,
+{
     let mut styled = style(orig);
     if config().colors {
         styled = styled.with(color);
     }
     if config().bold {
-        styled = styled.attribute(attr);
+        styled = styled.bold();
     }
     styled
 }
 
-pub fn dir_name(name: &str) -> StyledContent<&str> {
-    style_str(name, Color::Blue, Attribute::Bold)
+pub fn dir_name(name: String) -> StyledContent<String> {
+    style_with(name, Color::Blue)
 }
 
-pub fn file_name(name: &str) -> StyledContent<&str> {
-    style_str(name, Color::Cyan, Attribute::Bold)
+pub fn file_name(name: String) -> StyledContent<String> {
+    style_with(name, Color::Cyan)
 }
 
 pub fn match_substring(orig: &str, pattern_id: usize) -> StyledContent<&str> {
-    style_str(orig, match_color(pattern_id), Attribute::Bold)
+    style_with(orig, match_color(pattern_id))
 }
 
 pub fn line_number(num: usize) -> StyledContent<usize> {
@@ -153,6 +156,6 @@ pub fn line_number(num: usize) -> StyledContent<usize> {
     styled_num
 }
 
-pub fn match_color(i: usize) -> Color {
+fn match_color(i: usize) -> Color {
     MATCHED_COLORS[i % MATCHED_COLORS.len()]
 }

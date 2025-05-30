@@ -58,7 +58,7 @@ arg_info!(EXPRESSION_POSITIONAL, "positional regexp", EXPR_HELP);
 arg_info!(EXPRESSION, "regexp", EXPR_HELP, 'e');
 arg_info!(NO_COLORS, "no-color", "don't use colors");
 arg_info!(
-    SHOW_COUNT,
+    COUNT,
     "count",
     "display number of files matched in directory and number of lines matched in a file",
     'c'
@@ -257,7 +257,7 @@ fn get_args() -> [Arg; 21] {
         bool_arg(TRIM_LEFT).requires(EXPRESSION_GROUP_ID),
         bool_arg(PCRE2).requires(EXPRESSION_GROUP_ID),
         bool_arg(NO_IGNORE),
-        bool_arg(SHOW_COUNT),
+        bool_arg(COUNT),
         bool_arg(NO_COLORS),
         bool_arg(NO_BOLD),
         bool_arg(OVERVIEW),

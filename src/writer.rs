@@ -6,9 +6,10 @@ use crate::formats;
 use crate::match_system::{Directory, File, Match, Matches};
 use crate::term::TERM_WIDTH;
 use core::fmt::{self, Display};
-use std::ffi::OsStr;
+use crossterm::style::StyledContent;
 use std::io::{self, Write};
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 
 enum PrefixComponent {
@@ -39,13 +40,42 @@ pub trait Entry: Display {
 }
 
 struct PathDisplay<'a> {
-    prefix: Vec<PrefixComponent>,
-    name: &'a str,
+    prefix: Option<Vec<PrefixComponent>>,
+    name: StyledContent<String>,
     path: &'a Path,
-    linked: Option<&'a OsStr>,
+    linked: Option<StyledContent<String>>,
     count: usize,
     new_line: bool,
-    dir: bool,
+}
+
+impl<'a> PathDisplay<'a> {
+    fn new(
+        prefix: Option<Vec<PrefixComponent>>,
+        path: &'a PathBuf,
+        linked: &'a Option<PathBuf>,
+        count: usize,
+        new_line: bool,
+        dir: bool,
+    ) -> Result<PathDisplay<'a>, Message> {
+        let (name, linked) = {
+            let p = path_name(path)?;
+            let l = linked.as_ref().map(|l| path_name(l.as_ref())).transpose()?;
+            if dir {
+                (formats::dir_name(p), l.map(formats::dir_name))
+            } else {
+                (formats::file_name(p), l.map(formats::file_name))
+            }
+        };
+
+        Ok(PathDisplay {
+            prefix,
+            name,
+            path,
+            linked,
+            count,
+            new_line,
+        })
+    }
 }
 
 impl<'a> Entry for PathDisplay<'a> {
@@ -59,57 +89,45 @@ impl<'a> Entry for PathDisplay<'a> {
 
 impl<'a> Display for PathDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
-        write_prefix(f, &self.prefix)?;
-        write_path(
-            f,
-            self.name,
-            self.linked,
-            self.dir,
-            self.count,
-            self.new_line,
-        )
+        if let Some(p) = &self.prefix {
+            write_prefix(f, p)?;
+        }
+        write_path(f, &self.name, &self.linked, self.count, self.new_line)
     }
 }
 
 fn write_path(
     f: &mut fmt::Formatter,
-    name: &str,
-    linked: Option<&OsStr>,
-    dir: bool,
+    name: &StyledContent<String>,
+    linked: &Option<StyledContent<String>>,
     count: usize,
     new_line: bool,
 ) -> fmt::Result {
-    write!(
-        f,
-        "{}",
-        if dir {
-            formats::dir_name(name)
-        } else {
-            formats::file_name(name)
+    if cfg!(feature = "test") {
+        write!(f, "[ps]{}[pe]", name)?;
+        if let Some(l) = linked {
+            write!(f, " -> [ps]{}[pe]", l)?;
         }
-    )?;
-    if let Some(l) = linked {
-        let link: &str = &l.to_string_lossy();
-        write!(
-            f,
-            " -> {}",
-            if dir {
-                formats::dir_name(link)
-            } else {
-                formats::file_name(link)
-            }
-        )?;
+    } else {
+        write!(f, "{}", name)?;
+        if let Some(l) = linked {
+            write!(f, " -> {}", l)?;
+        }
     }
     if config().count && count > 0 {
         write!(f, ": {}", count)?;
     }
+    if config().colors || config().bold {
+        write!(f, "{}", formats::RESET)?;
+    }
+
     if new_line {
         writeln!(f)?;
     }
     Ok(())
 }
 
-fn write_prefix(f: &mut fmt::Formatter, prefix_components: &Vec<PrefixComponent>) -> fmt::Result {
+fn write_prefix(f: &mut fmt::Formatter, prefix_components: &[PrefixComponent]) -> fmt::Result {
     for c in prefix_components {
         let s = match c {
             PrefixComponent::MatchWithNext => &config().c.match_with_next,
@@ -175,35 +193,35 @@ impl<'a> Display for LineDisplay<'a> {
             write!(f, "{}: ", formats::line_number(self.line_num))?;
         }
 
-        if !config().colors {
-            f.write_str(content)?;
-        } else {
-            let mut last = 0;
+        let mut last = 0;
 
-            for m in self.matches.iter() {
-                if m.start >= m.end || m.start >= content.len() {
-                    continue;
-                }
+        for m in self.matches.iter() {
+            if m.start >= m.end || m.start >= content.len() {
+                continue;
+            }
 
-                let m_start = m.start.saturating_sub(cut);
-                let m_end = m.end.saturating_sub(cut).min(content.len());
-                if m_start >= content.len() {
-                    continue;
-                }
+            let m_start = m.start.saturating_sub(cut);
+            let m_end = m.end.saturating_sub(cut).min(content.len());
+            if m_start >= content.len() {
+                continue;
+            }
 
-                if last < m_start {
-                    f.write_str(&content[last..m_start])?;
-                }
+            if last < m_start {
+                f.write_str(&content[last..m_start])?;
+            }
 
-                let styled = formats::match_substring(&content[m_start..m_end], m.pattern_id);
+            let styled = formats::match_substring(&content[m_start..m_end], m.pattern_id);
+            if cfg!(feature = "test") {
+                write!(f, "[m{}s]{}[m{}e]", m.pattern_id, styled, m.pattern_id)?;
+            } else {
                 write!(f, "{}", styled)?;
-
-                last = m_end;
             }
 
-            if last < content.len() {
-                f.write_str(&content[last..])?;
-            }
+            last = m_end;
+        }
+
+        if last < content.len() {
+            f.write_str(&content[last..])?;
         }
 
         if self.new_line {
@@ -216,7 +234,7 @@ impl<'a> Display for LineDisplay<'a> {
 
 struct LongBranchDisplay<'a> {
     prefix: Vec<PrefixComponent>,
-    files: &'a [File],
+    files: Vec<PathDisplay<'a>>,
     new_line: bool,
 }
 
@@ -234,14 +252,7 @@ impl<'a> Display for LongBranchDisplay<'a> {
         }
 
         for (i, file) in self.files.iter().enumerate() {
-            write_path(
-                f,
-                &file.name,
-                file.linked.as_deref(),
-                false,
-                file.lines.len(),
-                false,
-            )?;
+            write_path(f, &file.name, &file.linked, file.count, false)?;
             if i + 1 != self.files.len() {
                 f.write_str(formats::LONG_BRANCH_FILE_SEPARATOR)?;
             }
@@ -295,6 +306,20 @@ impl Display for OverviewDisplay {
     }
 }
 
+fn path_name(path: &Path) -> Result<String, Message> {
+    let name = path.file_name().ok_or(mes!(
+        "failed to get name of `{}`",
+        path.as_os_str().to_string_lossy()
+    ))?;
+
+    name.to_os_string().into_string().map_err(|_| {
+        mes!(
+            "failed to get name of `{}`",
+            path.as_os_str().to_string_lossy()
+        )
+    })
+}
+
 fn with_push(mut v: Vec<PrefixComponent>, item: PrefixComponent) -> Vec<PrefixComponent> {
     v.push(item);
     v
@@ -309,7 +334,7 @@ impl Directory {
         dirs: &'a Vec<Directory>,
         path_ids: &mut Option<&mut Vec<usize>>,
         overview: &mut Option<&mut Box<OverviewDisplay>>,
-    ) {
+    ) -> Result<(), Message> {
         let children = &self.children;
         let files = &self.files;
         let flen = files.len();
@@ -318,15 +343,14 @@ impl Directory {
             if let Some(p) = path_ids.as_mut() {
                 p.push(lines.len())
             }
-            lines.push(Box::new(PathDisplay {
-                prefix: cur_prefix.clone(),
-                name: &self.name,
-                path: &self.path,
-                linked: self.linked.as_deref(),
-                count: self.children.len() + self.files.len(),
-                new_line: !config().menu,
-                dir: true,
-            }));
+            lines.push(Box::new(PathDisplay::new(
+                Some(cur_prefix.clone()),
+                &self.path,
+                &self.linked,
+                self.children.len() + self.files.len(),
+                !config().menu,
+                true,
+            )?));
         }
 
         if let Some(o) = overview {
@@ -354,11 +378,11 @@ impl Directory {
                 dirs,
                 path_ids,
                 overview,
-            );
+            )?;
         }
         if !files.is_empty() {
             if config().long_branch {
-                self.long_branch_files_to_lines(lines, child_prefix);
+                self.long_branch_files_to_lines(lines, child_prefix)?;
             } else {
                 for (i, file) in files.iter().enumerate() {
                     file.to_lines(
@@ -367,23 +391,24 @@ impl Directory {
                         i + 1 != flen,
                         path_ids,
                         overview,
-                    );
+                    )?;
                 }
             }
         }
+        Ok(())
     }
 
     fn long_branch_files_to_lines<'a>(
         &'a self,
         lines: &mut Vec<Box<dyn Entry + 'a>>,
         prefix: Vec<PrefixComponent>,
-    ) {
+    ) -> Result<(), Message> {
         let long_branch_files_per_line: usize = config().long_branch_each;
         let num_lines: usize =
             (self.files.len() + long_branch_files_per_line - 1) / long_branch_files_per_line;
 
         let prefix_no_next = with_push(prefix.clone(), PrefixComponent::MatchNoNext);
-        let prefix_next = with_push(prefix.clone(), PrefixComponent::MatchWithNext);
+        let prefix_next = with_push(prefix, PrefixComponent::MatchWithNext);
 
         for (i, branch) in self.files.chunks(long_branch_files_per_line).enumerate() {
             lines.push(Box::new(LongBranchDisplay {
@@ -392,10 +417,14 @@ impl Directory {
                 } else {
                     prefix_next.clone()
                 },
-                files: branch,
+                files: branch
+                    .iter()
+                    .map(|f| PathDisplay::new(None, &f.path, &f.linked, f.count(), false, false))
+                    .collect::<Result<Vec<PathDisplay<'_>>, Message>>()?,
                 new_line: !config().menu,
             }));
         }
+        Ok(())
     }
 }
 
@@ -407,7 +436,7 @@ impl File {
         parent_has_next: bool,
         path_ids: &mut Option<&mut Vec<usize>>,
         overview: &mut Option<&mut Box<OverviewDisplay>>,
-    ) {
+    ) -> Result<(), Message> {
         if let Some(o) = overview {
             o.lines += self.lines.len();
             o.count += self.lines.iter().map(|l| l.matches.len()).sum::<usize>();
@@ -416,12 +445,12 @@ impl File {
             if parent_has_next {
                 (
                     with_push(prefix.clone(), PrefixComponent::MatchWithNext),
-                    with_push(prefix.clone(), PrefixComponent::SpacerVert),
+                    with_push(prefix, PrefixComponent::SpacerVert),
                 )
             } else {
                 (
                     with_push(prefix.clone(), PrefixComponent::MatchNoNext),
-                    with_push(prefix.clone(), PrefixComponent::Spacer),
+                    with_push(prefix, PrefixComponent::Spacer),
                 )
             }
         } else {
@@ -431,42 +460,44 @@ impl File {
         if let Some(p) = path_ids.as_mut() {
             p.push(lines.len())
         }
-        lines.push(Box::new(PathDisplay {
-            prefix: cur_p,
-            name: &self.name,
-            path: &self.path,
-            linked: self.linked.as_deref(),
-            count: self.lines.len(),
-            new_line: !config().menu,
-            dir: false,
-        }));
+        lines.push(Box::new(PathDisplay::new(
+            Some(cur_p),
+            &self.path,
+            &self.linked,
+            self.count(),
+            !config().menu,
+            false,
+        )?));
 
-        if config().files {
-            return;
+        if !config().files {
+            for (i, line) in self.lines.iter().enumerate() {
+                let prefix = if i + 1 != self.lines.len() {
+                    with_push(line_p.clone(), PrefixComponent::MatchWithNext)
+                } else {
+                    with_push(line_p.clone(), PrefixComponent::MatchNoNext)
+                };
+                lines.push(Box::new(LineDisplay {
+                    prefix,
+                    content: &line.content,
+                    path: &self.path,
+                    matches: &line.matches,
+                    line_num: line.line_num,
+                    new_line: !config().menu,
+                }));
+            }
         }
+        Ok(())
+    }
 
-        for (i, line) in self.lines.iter().enumerate() {
-            let prefix = if i + 1 != self.lines.len() {
-                with_push(line_p.clone(), PrefixComponent::MatchWithNext)
-            } else {
-                with_push(line_p.clone(), PrefixComponent::MatchNoNext)
-            };
-            lines.push(Box::new(LineDisplay {
-                prefix,
-                content: &line.content,
-                path: &self.path,
-                matches: &line.matches,
-                line_num: line.line_num,
-                new_line: !config().menu,
-            }));
-        }
+    fn count(&self) -> usize {
+        self.lines.iter().map(|l| l.matches.len()).sum()
     }
 }
 
 pub fn matches_to_display_lines<'a>(
     result: &'a Matches,
     mut path_ids: Option<&mut Vec<usize>>,
-) -> Vec<Box<dyn Entry + 'a>> {
+) -> Result<Vec<Box<dyn Entry + 'a>>, Message> {
     let mut lines: Vec<Box<dyn Entry + 'a>> = Vec::new();
     let mut overview: Option<Box<OverviewDisplay>> = config()
         .overview
@@ -487,7 +518,7 @@ pub fn matches_to_display_lines<'a>(
                 dirs,
                 &mut path_ids,
                 &mut overview.as_mut(),
-            );
+            )?;
         }
         Matches::File(file) => {
             file.to_lines(
@@ -496,21 +527,41 @@ pub fn matches_to_display_lines<'a>(
                 false,
                 &mut path_ids,
                 &mut overview.as_mut(),
-            );
+            )?;
         }
     }
     if let Some(o) = overview.take() {
         lines.push(o);
     }
-    lines
+    Ok(lines)
 }
 
 pub fn write_results<'a>(
     out: &mut io::StdoutLock,
-    lines: &Vec<Box<dyn Entry + 'a>>,
+    lines: &[Box<dyn Entry + 'a>],
 ) -> io::Result<()> {
     for line in lines {
         write!(out, "{}", line)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_path_name() {
+        let mut path = Path::new("/path/to/file.txt");
+        assert_eq!(path_name(path).ok(), Some("file.txt".to_string()));
+
+        path = Path::new("/path/to/unicode_åß∂ƒ.txt");
+        assert_eq!(path_name(path).ok(), Some("unicode_åß∂ƒ.txt".to_string()));
+
+        path = Path::new("/path/to/directory/");
+        assert_eq!(path_name(path).ok(), Some("directory".to_string()));
+
+        path = Path::new("/");
+        assert_eq!(path_name(path).ok(), None);
+    }
 }

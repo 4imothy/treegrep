@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::config;
-use crate::errors::{mes, Message};
-use std::ffi::OsString;
+use crate::errors::Message;
 use std::path::{Path, PathBuf};
 
 pub fn wrap_dirs(dirs: Vec<Directory>) -> Option<Matches> {
@@ -17,29 +16,14 @@ pub fn wrap_file(file: Option<File>, just_files: bool) -> Option<Matches> {
         .map(Matches::File)
 }
 
-fn path_name(path: &Path) -> Result<String, Message> {
-    let name = path.file_name().ok_or(mes!(
-        "failed to get name of `{}`",
-        path.as_os_str().to_string_lossy()
-    ))?;
-
-    name.to_os_string().into_string().map_err(|_| {
-        mes!(
-            "failed to get name of `{}`",
-            path.as_os_str().to_string_lossy()
-        )
-    })
-}
-
 pub enum Matches {
     Dir(Vec<Directory>),
     File(File),
 }
 
 pub struct Directory {
-    pub name: String,
     pub path: PathBuf,
-    pub linked: Option<OsString>,
+    pub linked: Option<PathBuf>,
     pub children: Vec<usize>,
     pub files: Vec<File>,
     pub to_add: bool,
@@ -48,7 +32,6 @@ pub struct Directory {
 impl Directory {
     pub fn new(path: &Path) -> Result<Self, Message> {
         Ok(Directory {
-            name: path_name(path)?,
             path: path.to_path_buf(),
             linked: get_linked(path),
             children: Vec::new(),
@@ -59,16 +42,14 @@ impl Directory {
 }
 
 pub struct File {
-    pub name: String,
     pub path: PathBuf,
     pub lines: Vec<Line>,
-    pub linked: Option<OsString>,
+    pub linked: Option<PathBuf>,
 }
 
 impl File {
     pub fn new(path: &Path) -> Result<Self, Message> {
         Ok(File {
-            name: path_name(path)?,
             linked: get_linked(path),
             path: path.to_path_buf(),
             lines: Vec::new(),
@@ -76,32 +57,18 @@ impl File {
     }
 }
 
-fn get_linked(path: &Path) -> Option<OsString> {
-    if config().links {
-        if let Some(p_str) = path.as_os_str().to_str() {
-            PathBuf::from(p_str)
-                .read_link()
-                .ok()
-                .and_then(|target_path| match std::env::var("HOME") {
-                    Ok(home) => {
-                        if target_path.starts_with(&home) {
-                            target_path
-                                .strip_prefix(&home)
-                                .ok()
-                                .map(|clean_path| PathBuf::from("~").join(clean_path))
-                        } else {
-                            Some(target_path)
-                        }
-                    }
-                    Err(_) => Some(target_path),
-                })
-                .map(|v| v.as_os_str().to_owned())
-        } else {
-            None
-        }
-    } else {
-        None
+fn get_linked(path: &Path) -> Option<PathBuf> {
+    if !config().links {
+        return None;
     }
+    path.read_link().ok().map(|link| {
+        std::env::var("HOME")
+            .ok()
+            .filter(|home| link.starts_with(home))
+            .and_then(|home| link.strip_prefix(&home).ok())
+            .map(|clean| PathBuf::from("~").join(clean))
+            .unwrap_or(link)
+    })
 }
 
 pub struct Match {
@@ -228,20 +195,5 @@ mod tests {
         Match::remove_overlapping(&mut input);
 
         assert_eq!(input, vec![Match::new(1, 0, 5),]);
-    }
-
-    #[test]
-    fn test_path_name() {
-        let mut path = Path::new("/path/to/file.txt");
-        assert_eq!(path_name(path).ok(), Some("file.txt".to_string()));
-
-        path = Path::new("/path/to/unicode_åß∂ƒ.txt");
-        assert_eq!(path_name(path).ok(), Some("unicode_åß∂ƒ.txt".to_string()));
-
-        path = Path::new("/path/to/directory/");
-        assert_eq!(path_name(path).ok(), Some("directory".to_string()));
-
-        path = Path::new("/");
-        assert_eq!(path_name(path).ok(), None);
     }
 }

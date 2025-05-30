@@ -29,14 +29,12 @@ use writer::{matches_to_display_lines, write_results, Entry};
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
-const LOG: bool = cfg!(debug_assertions);
-
 fn config() -> &'static Config {
     CONFIG.get().unwrap()
 }
 
 fn main() {
-    if LOG {
+    if cfg!(debug_assertions) {
         log::set_panic_hook();
     }
     let matches = Config::fill();
@@ -76,7 +74,7 @@ fn run(matches: ArgMatches, bold: bool, colors: bool) -> Result<(), Message> {
     let mut out: StdoutLock = stdout().lock();
     let m = matches.unwrap();
     let mut path_ids = config().menu.then(Vec::<usize>::new);
-    let lines: Vec<Box<dyn Entry>> = matches_to_display_lines(&m, path_ids.as_mut());
+    let lines: Vec<Box<dyn Entry>> = matches_to_display_lines(&m, path_ids.as_mut())?;
 
     if config().menu {
         Menu::enter(
