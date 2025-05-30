@@ -1,0 +1,9 @@
+[ps]overlapping[pe]: 2
+├──[ps]first[pe]: 2
+│  ├──[ps]second[pe]: 1
+│  │  └──[ps]2_file[pe]: 2
+│  │     └──[m0s]overlapping[m0e] [m0s]over[m0e]
+│  └──[ps]first_file[pe]: 1
+│     └──[m0s]overlapping[m0e]
+└──[ps]top_file[pe]: 3
+   └──[m0s]overlapping[m0e] [m0s]over[m0e] [m0s]overlapping[m0e]

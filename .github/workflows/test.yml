@@ -32,7 +32,7 @@ jobs:
       - name: Test
         shell: bash
         run: |
-          cargo test
+          cargo test --features test
 
   rustfmt:
     runs-on: ubuntu-latest

@@ -1,0 +1,11 @@
+[ps]count[pe]: 2
+├──[ps]sub[pe]: 2
+│  ├──[ps]sub sub[pe]: 1
+│  │  └──[ps]2_file[pe]: 27
+│  │     └──[m0s]e[m0e][m0s]v[m0e][m0s]e[m0e][m0s]n[m0e][m0s] [m0e][m0s]m[m0e][m0s]o[m0e][m0s]r[m0e][m0s]e[m0e][m0s] [m0e][m0s]t[m0e][m0s]e[m0e][m0s]x[m0e][m0s]t[m0e][m0s] [m0e][m0s]b[m0e][m0s]u[m0e][m0s]t[m0e][m0s] [m0e][m0s]o[m0e][m0s]n[m0e][m0s]e[m0e][m0s] [m0e][m0s]l[m0e][m0s]i[m0e][m0s]n[m0e][m0s]e[m0e]
+│  └──[ps]first_file[pe]: 38
+│     ├──[m0s]o[m0e][m0s]t[m0e][m0s]h[m0e][m0s]e[m0e][m0s]r[m0e][m0s] [m0e][m0s]t[m0e][m0s]e[m0e][m0s]x[m0e][m0s]t[m0e]
+│     └──[m0s]t[m0e][m0s]h[m0e][m0s]a[m0e][m0s]t[m0e][m0s] [m0e][m0s]a[m0e][m0s]l[m0e][m0s]s[m0e][m0s]o[m0e][m0s] [m0e][m0s]h[m0e][m0s]a[m0e][m0s]s[m0e][m0s] [m0e][m0s]m[m0e][m0s]u[m0e][m0s]l[m0e][m0s]t[m0e][m0s]i[m0e][m0s]p[m0e][m0s]l[m0e][m0s]e[m0e][m0s] [m0e][m0s]l[m0e][m0s]i[m0e][m0s]n[m0e][m0s]e[m0e][m0s]s[m0e]
+└──[ps]file[pe]: 33
+   ├──[m0s]s[m0e][m0s]o[m0e][m0s]m[m0e][m0s]e[m0e][m0s] [m0e][m0s]l[m0e][m0s]o[m0e][m0s]n[m0e][m0s]g[m0e][m0s] [m0e][m0s]t[m0e][m0s]e[m0e][m0s]x[m0e][m0s]t[m0e]
+   └──[m0s]w[m0e][m0s]i[m0e][m0s]t[m0e][m0s]h[m0e][m0s] [m0e][m0s]m[m0e][m0s]u[m0e][m0s]l[m0e][m0s]t[m0e][m0s]i[m0e][m0s]p[m0e][m0s]l[m0e][m0s]e[m0e][m0s] [m0e][m0s]l[m0e][m0s]i[m0e][m0s]n[m0e][m0s]e[m0e][m0s]s[m0e]

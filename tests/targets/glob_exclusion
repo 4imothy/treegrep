@@ -1,4 +1,4 @@
-glob_exclusion
-└──included
-   └──one_file
-      └──should show
+[ps]glob_exclusion[pe]
+└──[ps]included[pe]
+   └──[ps]one_file[pe]
+      └──[m0s]s[m0e][m0s]h[m0e][m0s]o[m0e][m0s]u[m0e][m0s]l[m0e][m0s]d[m0e][m0s] [m0e][m0s]s[m0e][m0s]h[m0e][m0s]o[m0e][m0s]w[m0e]

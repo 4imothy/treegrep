@@ -1,0 +1,6 @@
+[ps]files[pe]
+├──[ps]top[pe]
+│  ├──[ps]sub[pe]
+│  │  └──[ps]file with some text[pe], [ps]another file[pe]
+│  └──[ps]file_in_first[pe]
+└──[ps]top_file[pe]

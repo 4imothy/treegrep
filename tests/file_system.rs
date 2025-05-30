@@ -27,15 +27,11 @@ impl Dir {
         }
     }
 
-    pub fn create_file_str(&self, file_name: &PathBuf, content: &str) {
-        self.create_file_bytes(file_name, content.as_bytes());
-    }
-
-    pub fn create_file_bytes(&self, file_name: &PathBuf, content: &[u8]) {
+    pub fn create_file_fill(&self, file_name: &PathBuf, content: &[u8]) {
         let file_path = self.path.join(file_name);
-        let mut file = fs::File::create(file_path).expect("Failed to create file");
+        let mut file = fs::File::create(file_path).expect("failed to create file");
 
-        file.write_all(content).expect("Failed to write to file");
+        file.write_all(content).expect("failed to write to file");
     }
 
     pub fn link_dir(&self, target_dir: &Path, link_name: &str) {

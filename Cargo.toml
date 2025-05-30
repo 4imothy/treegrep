@@ -29,6 +29,10 @@ path = "src/main.rs"
 name = "integration"
 path = "tests/tests.rs"
 
+[features]
+test = []
+overwrite = ["test"]
+
 [dependencies]
 crossterm = "0.29.0"
 clap = "4.5.37"

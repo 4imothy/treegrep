@@ -1,0 +1,6 @@
+[ps]long_branch_with_expr[pe]: 2
+├──[ps]top[pe]: 2
+│  ├──[ps]sub[pe]: 2
+│  │  └──[ps]file with some text[pe]: 1, [ps]another file[pe]: 2
+│  └──[ps]file_in_first[pe]: 1
+└──[ps]top_file[pe]: 1
