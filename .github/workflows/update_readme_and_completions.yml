@@ -1,9 +1,10 @@
-name: Update ReadMe and Completions
+name: update readMe and completions
 
 on:
   push:
     paths:
       - '**.rs'
+      - '.github/workflows/update_readme'
 
 permissions:
   contents: write
@@ -18,7 +19,7 @@ jobs:
         with:
           toolchain: stable
       - run: |
-          ./.github/workflows/update_readme
+          ./.github/workflows/update_readme examples
           if git diff --exit-code README.md > /dev/null; then
             echo "no changes in readme"
           else

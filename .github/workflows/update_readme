@@ -11,8 +11,8 @@ EXAMPLES = '### examples'
 EXAMPLES_TO_RUN = [
     ['--regexp', r'\bstruct\s+\w+', '--regexp', r'\bimpl\s+\w+', '--path', 'src', '--line-number', '--count'],
     ['Print', os.path.join('src', 'menu.rs'), '--trim', '--line-number', '--char-style=ascii'],
-    ['--files', '--hidden'],
-    ['--files', '--long-branch', '--hidden']
+    ['--files', '--hidden', '--glob=!.git'],
+    ['--files', '--long-branch', '--hidden', '--glob=!.git']
 ]
 
 def run_and_capture_examples(examples):
@@ -41,14 +41,19 @@ def run_and_capture_examples(examples):
             return None
     return outputs
 
-def update_readme():
+def update_readme(examples):
     with open(README_PATH, 'r', encoding='utf-8') as f:
         lines = f.readlines()
 
     examples_index = -1
+    help_index = -1
     for i, line in enumerate(lines):
         if line.strip() == EXAMPLES:
             examples_index = i
+        if line.strip() == HELP:
+            help_index = i
+    assert examples_index > 0
+    assert help_index > 0
 
     try:
         result = subprocess.run(
@@ -63,20 +68,21 @@ def update_readme():
         exit(1)
 
     with open(README_PATH, 'w', encoding='utf-8') as f:
-        for line in lines[:examples_index]:
+        for line in lines[:examples_index if examples else help_index]:
             f.write(line)
 
-        example_outputs = run_and_capture_examples(EXAMPLES_TO_RUN)
-        if not example_outputs:
-            print('failed to generate example outputs')
-            exit(1)
-        f.write(EXAMPLES + '\n')
-        for output in example_outputs:
-            f.write(output)
-            f.write('\n\n')
+        if examples:
+            example_outputs = run_and_capture_examples(EXAMPLES_TO_RUN)
+            if not example_outputs:
+                print('failed to generate example outputs')
+                exit(1)
+            f.write(EXAMPLES + '\n')
+            for output in example_outputs:
+                f.write(output)
+                f.write('\n\n')
 
         f.write(HELP + '\n')
         f.write(help_output)
 
 if __name__ == '__main__':
-    update_readme()
+    update_readme(sys.argv[1] == 'examples' if len(sys.argv) > 1 else False)
