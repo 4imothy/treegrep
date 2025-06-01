@@ -22,7 +22,7 @@ _tgrep() {
 
     case "${cmd}" in
         tgrep)
-            opts="-e -p -s -. -n -f -c -m -h -V --regexp --path --glob --searcher --threads --hidden --line-number --files --links --trim --pcre2 --no-ignore --count --no-color --no-bold --overview --max-depth --prefix-len --max-length --long-branch-each --char-style --long-branch --menu --help --version [positional regexp] [positional target] completions"
+            opts="-e -p -s -. -n -f -c -m -h -V --regexp --path --glob --searcher --char-style --editor --open-like --long-branch --hidden --line-number --files --links --trim --pcre2 --no-ignore --count --no-color --no-bold --overview --menu --threads --max-depth --prefix-len --max-length --long-branch-each --help --version [positional regexp] [positional target] completions"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -56,6 +56,18 @@ _tgrep() {
                     COMPREPLY=($(compgen -W "rg tgrep" -- "${cur}"))
                     return 0
                     ;;
+                --char-style)
+                    COMPREPLY=($(compgen -W "ascii single double heavy rounded none" -- "${cur}"))
+                    return 0
+                    ;;
+                --editor)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --open-like)
+                    COMPREPLY=($(compgen -W "vi hx code jed default" -- "${cur}"))
+                    return 0
+                    ;;
                 --threads)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
@@ -74,10 +86,6 @@ _tgrep() {
                     ;;
                 --long-branch-each)
                     COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --char-style)
-                    COMPREPLY=($(compgen -W "ascii single double heavy rounded none" -- "${cur}"))
                     return 0
                     ;;
                 *)
