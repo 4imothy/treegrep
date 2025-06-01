@@ -39,7 +39,7 @@ fn get_exe_path(bin: &ShortName) -> Option<OsString> {
             if p.exists() {
                 return Some(p.into_os_string());
             }
-            if cfg!(target_os = "windows") {
+            if cfg!(windows) {
                 p.set_extension(&env::consts::EXE_SUFFIX[1..]);
                 if p.exists() {
                     return Some(p.into_os_string());
@@ -64,14 +64,14 @@ fn bin_name(chosen: Option<&String>) -> Result<Option<ShortName>, Message> {
             Ok(Some(ShortName(names::RIPGREP_BIN.to_owned())))
         }
         Some(s)
-            if cfg!(target_os = "windows")
+            if cfg!(windows)
                 && (s == &(names::TREEGREP_BIN.to_owned() + env::consts::EXE_SUFFIX)
                     || s == &(names::TREEGREP.to_owned() + env::consts::EXE_SUFFIX)) =>
         {
             Ok(Some(ShortName(names::TREEGREP_BIN.to_owned())))
         }
         Some(s)
-            if cfg!(target_os = "windows")
+            if cfg!(windows)
                 && (s == &(names::RIPGREP_BIN.to_owned() + env::consts::EXE_SUFFIX)
                     || s == &(names::RIPGREP.to_owned() + env::consts::EXE_SUFFIX)) =>
         {
@@ -155,7 +155,7 @@ impl Searchers {
                 let s = e.to_str();
                 let mut vec = Vec::new();
                 vec.push(s.to_string());
-                if cfg!(target_os = "windows") {
+                if cfg!(windows) {
                     vec.push(format!("{}{}", s, env::consts::EXE_SUFFIX));
                 }
                 vec
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn test_all_to_str() {
         let res = Searchers::all_to_str();
-        if cfg!(target_os = "windows") {
+        if cfg!(windows) {
             assert_eq!(res, vec!["rg", "rg.exe", "tgrep", "tgrep.exe"]);
         } else {
             assert_eq!(res, vec!["rg", "tgrep"]);

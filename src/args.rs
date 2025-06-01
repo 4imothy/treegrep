@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use clap::builder::PossibleValue;
-use clap::{Arg, ArgAction, ArgGroup, Command, ValueHint};
+use clap::{Arg, ArgAction, ArgGroup, Command, ValueEnum, ValueHint};
 
 pub const DEFAULT_PREFIX_LEN: &str = "3";
 pub const DEFAULT_LONG_BRANCH_EACH: &str = "5";
@@ -25,6 +25,50 @@ impl ArgInfo {
     }
 }
 
+pub enum OpenStrategy {
+    Vi,
+    Hx,
+    Code,
+    Jed,
+    Default,
+}
+
+impl Clone for OpenStrategy {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Vi => Self::Vi,
+            Self::Hx => Self::Hx,
+            Self::Code => Self::Code,
+            Self::Jed => Self::Jed,
+            Self::Default => Self::Default,
+        }
+    }
+}
+
+impl ValueEnum for OpenStrategy {
+    fn value_variants<'a>() -> &'a [Self] {
+        static VARIANTS: [OpenStrategy; 5] = [
+            OpenStrategy::Vi,
+            OpenStrategy::Hx,
+            OpenStrategy::Code,
+            OpenStrategy::Jed,
+            OpenStrategy::Default,
+        ];
+        &VARIANTS
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        let name = match self {
+            OpenStrategy::Vi => "vi",
+            OpenStrategy::Hx => "hx",
+            OpenStrategy::Code => "code",
+            OpenStrategy::Jed => "jed",
+            OpenStrategy::Default => "default",
+        };
+        Some(PossibleValue::new(name))
+    }
+}
+
 macro_rules! arg_info {
     ($var_name:ident, $name:expr, $description:expr) => {
         pub const $var_name: ArgInfo = ArgInfo::new($name, $description, None);
@@ -36,7 +80,6 @@ macro_rules! arg_info {
 
 pub const EXPRESSION_GROUP_ID: &str = "expressions";
 pub const TARGET_GROUP_ID: &str = "targets";
-pub const HIDE_CONTENT_GROUP_ID: &str = "hide_contents";
 pub const CHAR_STYLE_OPTIONS: [&str; 6] = ["ascii", "single", "double", "heavy", "rounded", "none"];
 
 arg_info!(
@@ -76,6 +119,12 @@ arg_info!(
 arg_info!(MAX_DEPTH, "max-depth", "the max depth to search");
 arg_info!(SEARCHER, "searcher", "executable to do the searching", 's');
 arg_info!(CHAR_STYLE, "char-style", "style of characters to use");
+arg_info!(EDITOR, "editor", "command used to open selections");
+arg_info!(
+    OPEN_LIKE,
+    "open-like",
+    "command line syntax for opening a file at a line"
+);
 arg_info!(
     PREFIX_LEN,
     "prefix-len",
@@ -128,8 +177,8 @@ home page: ",
 {all-args}{after-help}"
 );
 
-pub const MENU_HELP: &str = "open results in a menu to be edited with $EDITOR
-navigate through the menu using the following commands:
+pub const MENU_HELP: &str = "show results in a menu to be jumped to
+navigate through with the following commands:
 \u{0020}- move up/down: k/j, p/n, up arrow/down arrow
 \u{0020}- move up/down with a bigger jump: K/J, P/N
 \u{0020}- move up/down paths: {/}, [/]
@@ -156,12 +205,6 @@ pub fn generate_command() -> Command {
         .author(env!("CARGO_PKG_AUTHORS"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .version(env!("CARGO_PKG_VERSION"));
-
-    command = command.group(
-        ArgGroup::new(HIDE_CONTENT_GROUP_ID)
-            .id(HIDE_CONTENT_GROUP_ID)
-            .arg(FILES.id),
-    );
 
     command = command.subcommand(
         Command::new(COMPLETIONS.id).about(COMPLETIONS.h).arg(
@@ -208,12 +251,11 @@ fn usize_arg(info: &ArgInfo, requires_expr: bool, default_value: Option<&'static
     arg
 }
 
-fn get_args() -> [Arg; 21] {
+fn get_args() -> [Arg; 23] {
     let long = Arg::new(LONG_BRANCHES.id)
         .long(LONG_BRANCHES.id)
         .help(LONG_BRANCHES.h)
-        .value_name("")
-        .requires(HIDE_CONTENT_GROUP_ID)
+        .requires(FILES.id)
         .action(ArgAction::SetTrue);
 
     let glob = Arg::new(GLOB.id)
@@ -246,10 +288,27 @@ fn get_args() -> [Arg; 21] {
         )
         .value_name("")
         .action(ArgAction::Set);
+
+    let editor = Arg::new(EDITOR.id)
+        .long(EDITOR.id)
+        .help(EDITOR.h)
+        .value_name("")
+        .action(ArgAction::Set);
+
+    let open_like = Arg::new(OPEN_LIKE.id)
+        .long(OPEN_LIKE.id)
+        .help(OPEN_LIKE.h)
+        .value_parser(clap::builder::EnumValueParser::<OpenStrategy>::new())
+        .value_name("")
+        .action(ArgAction::Set);
+
     [
         glob,
         searcher,
-        usize_arg(&THREADS, false, None),
+        char_style,
+        editor,
+        open_like,
+        long,
         bool_arg(HIDDEN),
         bool_arg(LINE_NUMBER),
         bool_arg(FILES),
@@ -261,13 +320,12 @@ fn get_args() -> [Arg; 21] {
         bool_arg(NO_COLORS),
         bool_arg(NO_BOLD),
         bool_arg(OVERVIEW),
+        bool_arg(MENU),
+        usize_arg(&THREADS, false, None),
         usize_arg(&MAX_DEPTH, false, None),
         usize_arg(&PREFIX_LEN, false, Some(DEFAULT_PREFIX_LEN)),
         usize_arg(&MAX_LENGTH, true, None),
         usize_arg(&LONG_BRANCHES_EACH, true, Some(DEFAULT_LONG_BRANCH_EACH)),
-        char_style,
-        long,
-        bool_arg(MENU),
     ]
 }
 

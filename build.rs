@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 
-use clap::ValueEnum;
 use clap_complete::{generate_to, Shell};
 use std::env;
 use std::fs::create_dir_all;

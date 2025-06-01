@@ -22,10 +22,10 @@ enum PrefixComponent {
 impl Clone for PrefixComponent {
     fn clone(&self) -> Self {
         match self {
-            PrefixComponent::MatchWithNext => PrefixComponent::MatchWithNext,
-            PrefixComponent::MatchNoNext => PrefixComponent::MatchNoNext,
-            PrefixComponent::SpacerVert => PrefixComponent::SpacerVert,
-            PrefixComponent::Spacer => PrefixComponent::Spacer,
+            Self::MatchWithNext => Self::MatchWithNext,
+            Self::MatchNoNext => Self::MatchNoNext,
+            Self::SpacerVert => Self::SpacerVert,
+            Self::Spacer => Self::Spacer,
         }
     }
 }

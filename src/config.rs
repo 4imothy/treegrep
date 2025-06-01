@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use crate::args::{self, generate_command};
+use crate::args::{self, generate_command, OpenStrategy};
 use crate::errors::{mes, Message};
 use crate::formats;
 use crate::searchers::Searchers;
@@ -49,6 +49,8 @@ pub struct Config {
     pub long_branch_each: usize,
     pub trim: bool,
     pub c: Characters,
+    pub editor: Option<String>,
+    pub open_like: Option<OpenStrategy>,
 }
 
 pub fn canonicalize(p: PathBuf) -> Result<PathBuf, Message> {
@@ -160,6 +162,16 @@ impl Config {
             }
         }
 
+        let editor = matches
+            .get_one::<String>(args::EDITOR.id)
+            .cloned()
+            .or_else(|| {
+                cfg!(unix)
+                    .then(|| std::env::var("EDITOR").ok().filter(|s| !s.is_empty()))
+                    .flatten()
+            });
+        let open_like = matches.get_one::<OpenStrategy>(args::OPEN_LIKE.id).cloned();
+
         let path: Option<String> = matches
             .get_one::<String>(args::PATH_POSITIONAL.id)
             .or_else(|| matches.get_one::<String>(args::PATH.id))
@@ -212,11 +224,13 @@ impl Config {
                 prefix_len,
                 max_length,
                 long_branch_each,
+                editor,
+                open_like,
+                overview,
                 c: Config::get_characters(
                     matches.get_one::<String>(args::CHAR_STYLE.id),
                     prefix_len,
                 ),
-                overview,
             },
             searcher_path,
         ))

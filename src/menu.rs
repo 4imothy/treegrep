@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 
+use crate::args::OpenStrategy;
 use crate::args::MENU_HELP;
+use crate::errors::SUBMIT_ISSUE;
 use crate::{config, formats, term, writer::Entry};
 use crossterm::{
     cursor,
@@ -21,6 +23,18 @@ struct PathInfo {
     prev: usize,
     next: usize,
     passed: bool,
+}
+
+impl OpenStrategy {
+    fn from(editor: &str) -> Self {
+        match editor {
+            "vi" | "vim" | "nvim" | "nano" | "emacs" | "jove" | "kak" | "micro" => Self::Vi,
+            "hx" => Self::Hx,
+            "code" => Self::Code,
+            "jed" | "xjed" => Self::Jed,
+            _ => Self::Default,
+        }
+    }
 }
 
 impl PathInfo {
@@ -566,69 +580,68 @@ impl<'a> Menu<'a> {
         self.term.give()
     }
 
-    #[cfg(target_os = "windows")]
     fn exit_and_open(&mut self, mut path: OsString, line_num: Option<usize>) -> io::Result<()> {
-        Command::new("cmd")
-            .arg("/C")
-            .arg("start")
-            .arg(path)
-            .spawn()?;
-        self.give_up_term()
-    }
-
-    #[cfg(unix)]
-    fn exit_and_open(&mut self, mut path: OsString, line_num: Option<usize>) -> io::Result<()> {
-        let opener = std::env::var("EDITOR")
-            .ok()
-            .filter(|val| !val.is_empty())
-            .unwrap_or_else(|| {
-                if cfg!(target_os = "macos") {
-                    "open".to_string()
-                } else {
-                    "xdg-open".to_string()
-                }
-            });
-
-        let mut command: Command = Command::new(&opener);
-        match opener.as_str() {
-            "vi" | "vim" | "nvim" | "nano" | "emacs" | "jove" | "kak" | "micro" => {
-                if let Some(l) = line_num {
-                    command.arg(format!("+{l}"));
-                }
-                command.arg(path);
-            }
-            "hx" => {
-                if let Some(l) = line_num {
-                    path.push(format!(":{l}"));
-                    command.arg(path);
-                } else {
-                    command.arg(path);
-                }
-            }
-            "code" => {
-                if let Some(l) = line_num {
-                    command.arg("--goto");
-                    path.push(format!(":{l}"));
-                    command.arg(path);
-                } else {
-                    command.arg(path);
-                }
-            }
-            "jed" | "xjed" => {
-                command.arg(path);
-                if let Some(l) = line_num {
-                    command.arg("-g");
-                    command.arg(format!("{l}"));
-                }
-            }
-            _ => {
-                command.arg(path);
-            }
-        }
         self.give_up_term()?;
 
-        use std::os::unix::process::CommandExt;
-        let _ = command.exec();
+        let mut cmd = match config().editor.as_deref() {
+            Some(editor) => {
+                let mut cmd = Command::new(editor);
+                match config()
+                    .open_like
+                    .as_ref()
+                    .unwrap_or(&OpenStrategy::from(editor))
+                {
+                    OpenStrategy::Vi => {
+                        if let Some(line) = line_num {
+                            cmd.arg(format!("+{line}"));
+                        }
+                    }
+                    OpenStrategy::Hx => {
+                        if let Some(line) = line_num {
+                            path.push(format!(":{line}"));
+                        }
+                    }
+                    OpenStrategy::Code => {
+                        if let Some(line) = line_num {
+                            cmd.arg("--goto");
+                            path.push(format!(":{line}"));
+                        }
+                    }
+                    OpenStrategy::Jed => {
+                        if let Some(line) = line_num {
+                            cmd.arg("-g").arg(format!("{line}"));
+                        }
+                    }
+                    OpenStrategy::Default => {}
+                }
+                cmd.arg(&path);
+                cmd
+            }
+            None => {
+                let mut cmd = match () {
+                    _ if cfg!(macos) => Command::new("open"),
+                    _ if cfg!(windows) => Command::new("cmd"),
+                    _ if cfg!(unix) => Command::new("xdg-open"),
+                    _ => panic!("unable to find opener {SUBMIT_ISSUE}"),
+                };
+                if cfg!(windows) {
+                    cmd.args(["/C", "start"]);
+                }
+                cmd.arg(&path);
+                cmd
+            }
+        };
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            cmd.exec();
+        }
+        #[cfg(not(unix))]
+        {
+            cmd.spawn()?;
+        }
+
         Ok(())
     }
 }
