@@ -245,7 +245,10 @@ Options:
   -p, --path <>              the path to search, if not provided, search the current directory
       --glob <>              rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic
   -s, --searcher <>          executable to do the searching [possible values: rg, tgrep]
-      --threads <>           set the appropriate number of threads to use
+      --char-style <>        style of characters to use [possible values: ascii, single, double, heavy, rounded, none]
+      --editor <>            command used to open selections
+      --open-like <>         command line syntax for opening a file at a line [possible values: vi, hx, code, jed, default]
+      --long-branch          multiple files from the same directory are shown on the same branch
   -., --hidden               search hidden files
   -n, --line-number          show line number of match
   -f, --files                if a pattern is given hide matched content, otherwise show the files that would be searched
@@ -257,14 +260,8 @@ Options:
       --no-color             don't use colors
       --no-bold              don't bold anything
       --overview             conclude results with an overview
-      --max-depth <>         the max depth to search
-      --prefix-len <>        number of characters to show before a match [default: 3]
-      --max-length <>        set the max length for a matched line
-      --long-branch-each <>  number of files to print on each branch [default: 5]
-      --char-style <>        style of characters to use [possible values: ascii, single, double, heavy, rounded, none]
-      --long-branch          multiple files from the same directory are shown on the same branch
-  -m, --menu                 open results in a menu to be edited with $EDITOR
-                             navigate through the menu using the following commands:
+  -m, --menu                 show results in a menu to be jumped to
+                             navigate through with the following commands:
                               - move up/down: k/j, p/n, up arrow/down arrow
                               - move up/down with a bigger jump: K/J, P/N
                               - move up/down paths: {/}, [/]
@@ -272,6 +269,11 @@ Options:
                               - move up/down a page: b/f, pageup/pagedown
                               - center cursor: z/l
                               - quit: q, ctrl + c
+      --threads <>           set the appropriate number of threads to use
+      --max-depth <>         the max depth to search
+      --prefix-len <>        number of characters to show before a match [default: 3]
+      --max-length <>        set the max length for a matched line
+      --long-branch-each <>  number of files to print on each branch [default: 5]
   -h, --help                 Print help
   -V, --version              Print version
 
