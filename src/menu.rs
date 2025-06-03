@@ -4,6 +4,7 @@ use crate::args::OpenStrategy;
 use crate::args::MENU_HELP;
 use crate::errors::SUBMIT_ISSUE;
 use crate::{config, formats, term, writer::Entry};
+use crossterm::event::MouseEventKind;
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent},
@@ -118,19 +119,14 @@ struct Window {
 }
 
 impl Window {
-    pub fn set_first(&mut self, first: usize) {
-        self.first_id = first;
+    pub fn shift_up(&mut self, amount: usize) {
+        self.first_id -= amount;
+        self.last_id -= amount;
     }
-    pub fn set_last(&mut self, last: usize) {
-        self.last_id = last;
+    pub fn shift_down(&mut self, amount: usize) {
+        self.first_id += amount;
+        self.last_id += amount;
     }
-    pub fn up_shift_last(&mut self) {
-        self.last_id -= 1;
-    }
-    pub fn down_shift_first(&mut self) {
-        self.first_id += 1;
-    }
-
     pub fn set(&mut self, first_id: usize, last_id: usize) {
         (self.first_id, self.last_id) = (first_id, last_id);
     }
@@ -174,6 +170,20 @@ impl<'a> Menu<'a> {
         self.term.height
     }
 
+    fn down_selected(&mut self, amount: usize) {
+        for i in 1..=amount {
+            self.pi.down(self.selected_id + i);
+        }
+        self.selected_id += amount;
+    }
+
+    fn up_selected(&mut self, amount: usize) {
+        for i in 1..=amount {
+            self.pi.up(self.selected_id - i);
+        }
+        self.selected_id -= amount;
+    }
+
     fn max_cursor_y(&self) -> u16 {
         self.height() - 1
     }
@@ -188,14 +198,11 @@ impl<'a> Menu<'a> {
         } else {
             (self.height() as usize).min(self.max_line_id - self.selected_id)
         };
-        if dist == 0 {
-            return Ok(());
+        if dist != 0 {
+            self.down_selected(dist);
+            self.draw()?;
         }
-        for i in 1..=dist {
-            self.pi.down(self.selected_id + i);
-        }
-        self.selected_id += dist;
-        self.draw()
+        Ok(())
     }
 
     fn up_page(&mut self) -> io::Result<()> {
@@ -204,14 +211,11 @@ impl<'a> Menu<'a> {
         } else {
             (self.height() as usize).min(self.selected_id)
         };
-        if dist == 0 {
-            return Ok(());
+        if dist != 0 {
+            self.up_selected(dist);
+            self.draw()?;
         }
-        for i in 1..=dist {
-            self.pi.up(self.selected_id - i);
-        }
-        self.selected_id -= dist;
-        self.draw()
+        Ok(())
     }
 
     fn scroll_info(num_rows: u16) -> (u16, u16, u16) {
@@ -229,85 +233,135 @@ impl<'a> Menu<'a> {
         let mut menu: Menu = Menu::new(out, lines, path_ids)?;
 
         menu.draw()?;
+        let mut down_row: u16 = 0;
 
         loop {
-            let event = event::read();
-            if let Ok(Event::Key(KeyEvent {
-                code,
-                modifiers,
-                kind: crossterm::event::KeyEventKind::Press,
-                ..
-            })) = event
-            {
-                if !menu.popup_open {
-                    match code {
-                        KeyCode::Char('j') | KeyCode::Char('n') | KeyCode::Down => {
-                            menu.down(menu.small_jump)?
-                        }
-                        KeyCode::Char('k') | KeyCode::Char('p') | KeyCode::Up => {
-                            menu.up(menu.small_jump)?
-                        }
-                        KeyCode::Char('J') | KeyCode::Char('N') => menu.down(menu.big_jump)?,
-                        KeyCode::Char('K') | KeyCode::Char('P') => menu.up(menu.big_jump)?,
-                        KeyCode::Char('}') | KeyCode::Char(']') => menu.down_path()?,
-                        KeyCode::Char('{') | KeyCode::Char('[') => menu.up_path()?,
-                        KeyCode::Char('G') | KeyCode::Char('>') | KeyCode::End => menu.bottom()?,
-                        KeyCode::Char('g') | KeyCode::Char('<') | KeyCode::Home => menu.top()?,
-                        KeyCode::Char('f') | KeyCode::PageDown => menu.down_page()?,
-                        KeyCode::Char('b') | KeyCode::PageUp => menu.up_page()?,
-                        KeyCode::Char('h') => {
-                            menu.popup(MENU_HELP.to_string() + "\npress q to quit this popup")?
-                        }
-                        KeyCode::Char('z')
-                            if !modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
-                        {
-                            menu.center_cursor()?
-                        }
-                        KeyCode::Char('l') => menu.center_cursor()?,
-                        KeyCode::Enter => {
-                            let selected = &menu.lines.get(menu.selected_id).unwrap();
-                            match selected.open_info() {
-                                Ok(info) => {
-                                    return menu.exit_and_open(
-                                        info.path.as_os_str().to_os_string(),
-                                        info.line,
-                                    )
+            let event = event::read()?;
+            match event {
+                Event::Key(KeyEvent {
+                    code,
+                    modifiers,
+                    kind: crossterm::event::KeyEventKind::Press,
+                    ..
+                }) => {
+                    if !menu.popup_open {
+                        match code {
+                            KeyCode::Char('j') | KeyCode::Char('n') | KeyCode::Down => {
+                                menu.down(menu.small_jump)?
+                            }
+                            KeyCode::Char('k') | KeyCode::Char('p') | KeyCode::Up => {
+                                menu.up(menu.small_jump)?
+                            }
+                            KeyCode::Char('J') | KeyCode::Char('N') => menu.down(menu.big_jump)?,
+                            KeyCode::Char('K') | KeyCode::Char('P') => menu.up(menu.big_jump)?,
+                            KeyCode::Char('}') | KeyCode::Char(']') => menu.down_path()?,
+                            KeyCode::Char('{') | KeyCode::Char('[') => menu.up_path()?,
+                            KeyCode::Char('G') | KeyCode::Char('>') | KeyCode::End => {
+                                menu.bottom()?
+                            }
+                            KeyCode::Char('g') | KeyCode::Char('<') | KeyCode::Home => {
+                                menu.top()?
+                            }
+                            KeyCode::Char('f') | KeyCode::PageDown => menu.down_page()?,
+                            KeyCode::Char('b') | KeyCode::PageUp => menu.up_page()?,
+                            KeyCode::Char('h') => {
+                                menu.popup(MENU_HELP.to_string() + "\npress q to quit this popup")?
+                            }
+                            KeyCode::Char('z')
+                                if !modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
+                            {
+                                menu.center_cursor()?
+                            }
+                            KeyCode::Char('l') => menu.center_cursor()?,
+                            KeyCode::Enter => {
+                                let selected = &menu.lines.get(menu.selected_id).unwrap();
+                                match selected.open_info() {
+                                    Ok(info) => {
+                                        return menu.exit_and_open(
+                                            info.path.as_os_str().to_os_string(),
+                                            info.line,
+                                        )
+                                    }
+                                    Err(mes) => menu.popup(mes.mes)?,
                                 }
-                                Err(mes) => menu.popup(mes.mes)?,
+                            }
+                            _ => {}
+                        }
+                    }
+                    match code {
+                        KeyCode::Char('q') => {
+                            if menu.popup_open {
+                                menu.popup_open = false;
+                                menu.draw()?;
+                            } else {
+                                break;
+                            }
+                        }
+                        KeyCode::Char('z') => {
+                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                                menu.suspend()?;
+                                menu.resume()?;
+                            }
+                        }
+                        KeyCode::Char('c') => {
+                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                                break;
                             }
                         }
                         _ => {}
                     }
                 }
-                match code {
-                    KeyCode::Char('q') => {
-                        if menu.popup_open {
-                            menu.popup_open = false;
-                            menu.draw()?;
-                        } else {
-                            break;
+                Event::Mouse(mouse_event) => {
+                    if !menu.popup_open {
+                        match mouse_event.kind {
+                            MouseEventKind::ScrollUp => {
+                                menu.up_scroll()?;
+                            }
+                            MouseEventKind::ScrollDown => {
+                                menu.down_scroll()?;
+                            }
+                            MouseEventKind::Down(button) => {
+                                if button.is_left() {
+                                    down_row = mouse_event.row;
+                                }
+                            }
+                            MouseEventKind::Up(button) => {
+                                if button.is_left() && mouse_event.row == down_row {
+                                    menu.click_on(down_row)?;
+                                }
+                            }
+                            _ => {}
                         }
                     }
-                    KeyCode::Char('z') => {
-                        if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                            menu.suspend()?;
-                            menu.resume()?;
-                        }
-                    }
-                    KeyCode::Char('c') => {
-                        if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                            break;
-                        }
-                    }
-                    _ => {}
                 }
-            } else if let Ok(Event::Resize(new_width, new_height)) = event {
-                if menu.height() != new_height || menu.width() != new_width {
-                    menu.resize(new_height, new_width)?;
+                Event::Resize(new_width, new_height) => {
+                    if menu.height() != new_height || menu.width() != new_width {
+                        menu.resize(new_height, new_width)?;
+                    }
                 }
+                _ => {}
             }
         }
         menu.give_up_term()
+    }
+
+    fn click_on(&mut self, row: u16) -> io::Result<()> {
+        let cursor_y = self.cursor_y as isize;
+        let selected_id = self.selected_id as isize;
+        let lines_len = self.lines.len() as isize;
+
+        let start_results = cursor_y - selected_id;
+        let end_results = cursor_y + lines_len - selected_id;
+        if (row as isize) < start_results || (row as isize) >= end_results {
+            return Ok(());
+        }
+        if self.cursor_y > row {
+            self.up_selected((self.cursor_y - row) as usize);
+        } else {
+            self.down_selected((row - self.cursor_y) as usize);
+        }
+        self.cursor_y = row;
+        self.draw()
     }
 
     fn draw(&mut self) -> io::Result<()> {
@@ -343,30 +397,66 @@ impl<'a> Menu<'a> {
         self.term.flush()
     }
 
+    fn down_scroll(&mut self) -> io::Result<()> {
+        if self.cursor_y < self.scroll_offset || self.bot_visible() {
+            self.down(self.small_jump)
+        } else {
+            let max_cursor_y = self.max_cursor_y();
+            self.destyle_selected()?;
+            self.window.shift_down(1);
+            self.down_selected(1);
+            queue!(
+                self.term,
+                terminal::ScrollUp(1),
+                cursor::MoveTo(START_X, max_cursor_y),
+                Print(self.lines.get(self.window.last_id).unwrap())
+            )?;
+            self.draw_selected()?;
+            self.term.flush()
+        }
+    }
+
+    fn up_scroll(&mut self) -> io::Result<()> {
+        if self.cursor_y + self.scroll_offset > self.max_cursor_y() || self.top_visible() {
+            self.up(self.small_jump)
+        } else {
+            self.destyle_selected()?;
+            self.window.shift_up(1);
+            self.up_selected(1);
+            queue!(
+                self.term,
+                terminal::ScrollDown(1),
+                cursor::MoveTo(START_X, START_Y),
+                Print(self.lines.get(self.window.first_id).unwrap())
+            )?;
+            self.draw_selected()?;
+            self.term.flush()
+        }
+    }
+
     fn down(&mut self, try_dist: u16) -> io::Result<()> {
         self.destyle_selected()?;
         let dist: usize = (try_dist as usize).min(self.max_line_id - self.selected_id);
         let max_cursor_y = self.max_cursor_y();
 
         for _ in 0..dist {
-            self.selected_id += 1;
-            self.pi.down(self.selected_id);
-            if self.cursor_y + self.scroll_offset < self.max_cursor_y() || self.bot_visible() {
+            self.down_selected(1);
+            if self.cursor_y + self.scroll_offset < max_cursor_y || self.bot_visible() {
                 self.cursor_y += 1;
             } else {
-                if self.top_visible() && self.first_y == 0 {
-                    self.window.down_shift_first();
-                }
+                self.window.shift_down(1);
                 if self.first_y > 0 {
                     self.first_y -= 1;
                 }
-                let id = self.selected_id + self.scroll_offset as usize;
-                self.window.set_last(id);
                 queue!(
                     self.term,
                     terminal::ScrollUp(1),
                     cursor::MoveTo(START_X, max_cursor_y),
-                    Print(self.lines.get(id).unwrap())
+                    Print(
+                        self.lines
+                            .get(self.selected_id + self.scroll_offset as usize)
+                            .unwrap()
+                    )
                 )?;
             }
         }
@@ -378,16 +468,11 @@ impl<'a> Menu<'a> {
         self.destyle_selected()?;
         let dist: usize = (try_dist as usize).min(self.selected_id);
         for _ in 0..dist {
-            self.selected_id -= 1;
-            self.pi.up(self.selected_id);
+            self.up_selected(1);
             if self.cursor_y > self.scroll_offset || self.top_visible() {
                 self.cursor_y -= 1;
             } else {
-                if self.bot_visible() && self.last_y == self.max_cursor_y() {
-                    self.window.up_shift_last();
-                }
-                let id = self.selected_id - self.cursor_y as usize;
-                self.window.set_first(id);
+                self.window.shift_up(1);
                 if self.last_y < self.max_cursor_y() {
                     self.last_y += 1;
                 }
@@ -484,9 +569,6 @@ impl<'a> Menu<'a> {
     }
 
     pub fn down_path(&mut self) -> io::Result<()> {
-        if config().long_branch {
-            return self.down(1);
-        }
         let dist = self.pi.dist_down(self.selected_id);
         if dist != 0 {
             self.down(dist)?;
@@ -495,9 +577,6 @@ impl<'a> Menu<'a> {
     }
 
     fn up_path(&mut self) -> io::Result<()> {
-        if config().long_branch {
-            return self.up(1);
-        }
         let dist = self.pi.dist_up(self.selected_id);
         if dist != 0 {
             self.up(dist)?;

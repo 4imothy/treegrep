@@ -1,7 +1,6 @@
 # Features
 ## Options
 - support for PDFs
-- "--overview": Option to print an overview at the end "X directories, X files"
 ## Config
 - different colors
 ## Menu

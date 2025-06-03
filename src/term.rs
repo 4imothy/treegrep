@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use crossterm::{
-    cursor, execute, style,
+    cursor, event, execute, style,
     terminal::{self, ClearType},
 };
 use std::io::{self, StdoutLock, Write};
@@ -42,6 +42,7 @@ impl<'a> Term<'a> {
             cursor::Hide,
             terminal::EnterAlternateScreen,
             terminal::DisableLineWrap,
+            event::EnableMouseCapture
         )?;
         self.in_alternate_screen = true;
         let default_hook = panic::take_hook();
@@ -61,6 +62,7 @@ impl<'a> Term<'a> {
             cursor::SetCursorStyle::DefaultUserShape,
             terminal::LeaveAlternateScreen,
             terminal::EnableLineWrap,
+            event::DisableMouseCapture,
             cursor::Show,
         )
     }

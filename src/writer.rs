@@ -382,7 +382,7 @@ impl Directory {
         }
         if !files.is_empty() {
             if config().long_branch {
-                self.long_branch_files_to_lines(lines, child_prefix)?;
+                self.long_branch_files_to_lines(lines, child_prefix, path_ids)?;
             } else {
                 for (i, file) in files.iter().enumerate() {
                     file.to_lines(
@@ -402,6 +402,7 @@ impl Directory {
         &'a self,
         lines: &mut Vec<Box<dyn Entry + 'a>>,
         prefix: Vec<PrefixComponent>,
+        path_ids: &mut Option<&mut Vec<usize>>,
     ) -> Result<(), Message> {
         let long_branch_files_per_line: usize = config().long_branch_each;
         let num_lines: usize =
@@ -411,6 +412,9 @@ impl Directory {
         let prefix_next = with_push(prefix, PrefixComponent::MatchWithNext);
 
         for (i, branch) in self.files.chunks(long_branch_files_per_line).enumerate() {
+            if let Some(p) = path_ids {
+                p.push(lines.len());
+            }
             lines.push(Box::new(LongBranchDisplay {
                 prefix: if i + 1 == num_lines {
                     prefix_no_next.clone()
