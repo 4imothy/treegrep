@@ -4,6 +4,7 @@ mod args;
 mod config;
 mod errors;
 mod formats;
+#[macro_use]
 mod log;
 mod match_system;
 mod matcher;
