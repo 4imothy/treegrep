@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 use crate::args::OpenStrategy;
-use crate::args::MENU_HELP;
 use crate::errors::SUBMIT_ISSUE;
 use crate::{config, formats, term, writer::Entry};
 use crossterm::event::MouseEventKind;
@@ -25,6 +24,18 @@ struct PathInfo {
     next: usize,
     passed: bool,
 }
+
+const MENU_HELP_POPUP: &str = "navigate with the following
+\u{0020}- move up/down: k/j, p/n, up arrow/down arrow
+\u{0020}- move up/down with a bigger jump: K/J, P/N
+\u{0020}- move up/down paths: {/}, [/]
+\u{0020}- move to the start/end: g/G, </>, home/end
+\u{0020}- move up/down a page: b/f, pageup/pagedown
+\u{0020}- center cursor: z/l
+\u{0020}- open selection: enter
+\u{0020}- scrolling and clicking
+\u{0020}- quit: q, ctrl + c
+press q to quit this popup";
 
 impl OpenStrategy {
     fn from(editor: &str) -> Self {
@@ -234,9 +245,7 @@ impl<'a> Menu<'a> {
                             }
                             KeyCode::Char('f') | KeyCode::PageDown => menu.down_page()?,
                             KeyCode::Char('b') | KeyCode::PageUp => menu.up_page()?,
-                            KeyCode::Char('h') => {
-                                menu.popup(MENU_HELP.to_string() + "\npress q to quit this popup")?
-                            }
+                            KeyCode::Char('h') => menu.popup(MENU_HELP_POPUP.to_string())?,
                             KeyCode::Char('z')
                                 if !modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
                             {
@@ -363,14 +372,13 @@ impl<'a> Menu<'a> {
         scroll: &C,
         y: u16,
     ) -> io::Result<()> {
-        let line_id;
-        if down {
+        let line_id = if down {
             self.window.shift_up();
-            line_id = self.window.first;
+            self.window.first
         } else {
             self.window.shift_down();
-            line_id = self.window.last;
-        }
+            self.window.last
+        };
         if let Some(line) = (line_id >= 0).then(|| self.lines.get(line_id as usize).unwrap()) {
             queue!(self.term, scroll, cursor::MoveTo(START_X, y), Print(line))?;
         }
@@ -508,7 +516,7 @@ impl<'a> Menu<'a> {
     pub fn down_path(&mut self) -> io::Result<()> {
         let dist = self.pi.dist_down(self.selected_id);
         if dist == 0 {
-            return Ok(());
+            Ok(())
         } else if self.selected_id + dist as usize > self.window.last.max(0) as usize {
             self.inc_selected(dist as usize);
             self.draw()

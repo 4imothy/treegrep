@@ -108,7 +108,12 @@ arg_info!(
 );
 arg_info!(HIDDEN, "hidden", "search hidden files", '.');
 arg_info!(LINE_NUMBER, "line-number", "show line number of match", 'n');
-arg_info!(MENU, "menu", MENU_HELP, 'm');
+arg_info!(
+    MENU,
+    "menu",
+    "show results in a menu to be jumped to, press h in menu for help",
+    'm'
+);
 arg_info!(
     FILES,
     "files",
@@ -176,16 +181,6 @@ home page: ",
 {usage}
 {all-args}{after-help}"
 );
-
-pub const MENU_HELP: &str = "show results in a menu to be jumped to
-navigate through with the following commands:
-\u{0020}- move up/down: k/j, p/n, up arrow/down arrow
-\u{0020}- move up/down with a bigger jump: K/J, P/N
-\u{0020}- move up/down paths: {/}, [/]
-\u{0020}- move to the start/end: g/G, </>, home/end
-\u{0020}- move up/down a page: b/f, pageup/pagedown
-\u{0020}- center cursor: z/l
-\u{0020}- quit: q, ctrl + c";
 
 pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
 
