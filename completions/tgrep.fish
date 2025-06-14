@@ -58,7 +58,7 @@ complete -c tgrep -n "__fish_tgrep_needs_command" -s c -l count -d 'display numb
 complete -c tgrep -n "__fish_tgrep_needs_command" -l no-color -d 'don\'t use colors'
 complete -c tgrep -n "__fish_tgrep_needs_command" -l no-bold -d 'don\'t bold anything'
 complete -c tgrep -n "__fish_tgrep_needs_command" -l overview -d 'conclude results with an overview'
-complete -c tgrep -n "__fish_tgrep_needs_command" -s m -l menu -d 'show results in a menu to be jumped to navigate through with the following commands:  - move up/down: k/j, p/n, up arrow/down arrow  - move up/down with a bigger jump: K/J, P/N  - move up/down paths: {/}, [/]  - move to the start/end: g/G, </>, home/end  - move up/down a page: b/f, pageup/pagedown  - center cursor: z/l  - quit: q, ctrl + c'
+complete -c tgrep -n "__fish_tgrep_needs_command" -s m -l menu -d 'show results in a menu to be jumped to, press h in menu for help'
 complete -c tgrep -n "__fish_tgrep_needs_command" -s h -l help -d 'Print help'
 complete -c tgrep -n "__fish_tgrep_needs_command" -s V -l version -d 'Print version'
 complete -c tgrep -n "__fish_tgrep_needs_command" -a "completions" -d 'generate completions for given shell'

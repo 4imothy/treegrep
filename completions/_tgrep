@@ -46,8 +46,8 @@ _tgrep() {
 '--no-color[don'\''t use colors]' \
 '--no-bold[don'\''t bold anything]' \
 '--overview[conclude results with an overview]' \
-'-m[show results in a menu to be jumped to navigate through with the following commands\:  - move up/down\: k/j, p/n, up arrow/down arrow  - move up/down with a bigger jump\: K/J, P/N  - move up/down paths\: {/}, \[/\]  - move to the start/end\: g/G, </>, home/end  - move up/down a page\: b/f, pageup/pagedown  - center cursor\: z/l  - quit\: q, ctrl + c]' \
-'--menu[show results in a menu to be jumped to navigate through with the following commands\:  - move up/down\: k/j, p/n, up arrow/down arrow  - move up/down with a bigger jump\: K/J, P/N  - move up/down paths\: {/}, \[/\]  - move to the start/end\: g/G, </>, home/end  - move up/down a page\: b/f, pageup/pagedown  - center cursor\: z/l  - quit\: q, ctrl + c]' \
+'-m[show results in a menu to be jumped to, press h in menu for help]' \
+'--menu[show results in a menu to be jumped to, press h in menu for help]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '-V[Print version]' \
