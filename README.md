@@ -260,15 +260,7 @@ Options:
       --no-color             don't use colors
       --no-bold              don't bold anything
       --overview             conclude results with an overview
-  -m, --menu                 show results in a menu to be jumped to
-                             navigate through with the following commands:
-                              - move up/down: k/j, p/n, up arrow/down arrow
-                              - move up/down with a bigger jump: K/J, P/N
-                              - move up/down paths: {/}, [/]
-                              - move to the start/end: g/G, </>, home/end
-                              - move up/down a page: b/f, pageup/pagedown
-                              - center cursor: z/l
-                              - quit: q, ctrl + c
+  -m, --menu                 show results in a menu to be jumped to, press h in menu for help
       --threads <>           set the appropriate number of threads to use
       --max-depth <>         the max depth to search
       --prefix-len <>        number of characters to show before a match [default: 3]
