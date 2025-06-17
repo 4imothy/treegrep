@@ -232,10 +232,6 @@ home page: https://github.com/4imothy/treegrep
 pattern matcher that displays results in a tree structure with an interface to jump to matched text
 
 tgrep [OPTIONS] [positional regexp] [positional target]
-       tgrep [OPTIONS] [positional regexp] [positional target] <COMMAND>
-Commands:
-  completions  generate completions for given shell
-
 Arguments:
   [positional regexp]  the regex expression
   [positional target]  the path to search, if not provided, search the current directory
@@ -249,6 +245,7 @@ Options:
       --editor <>            command used to open selections
       --open-like <>         command line syntax for opening a file at a line [possible values: vi, hx, code, jed, default]
       --long-branch          multiple files from the same directory are shown on the same branch
+      --completions <shell>  generate completions for given shell [possible values: bash, elvish, fish, powershell, zsh]
   -., --hidden               search hidden files
   -n, --line-number          show line number of match
   -f, --files                if a pattern is given hide matched content, otherwise show the files that would be searched
