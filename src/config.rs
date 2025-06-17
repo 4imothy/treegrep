@@ -51,6 +51,7 @@ pub struct Config {
     pub c: Characters,
     pub editor: Option<String>,
     pub open_like: Option<OpenStrategy>,
+    pub completion_target: Option<clap_complete::Shell>,
 }
 
 pub fn canonicalize(p: PathBuf) -> Result<PathBuf, Message> {
@@ -198,6 +199,10 @@ impl Config {
         let prefix_len = get_usize_option_with_default(&matches, args::PREFIX_LEN.id)?;
         let just_files = files && patterns.is_empty();
 
+        let completion_target = matches
+            .get_one::<clap_complete::Shell>(args::COMPLETIONS.id)
+            .copied();
+
         Ok((
             Config {
                 cwd,
@@ -231,6 +236,7 @@ impl Config {
                     matches.get_one::<String>(args::CHAR_STYLE.id),
                     prefix_len,
                 ),
+                completion_target,
             },
             searcher_path,
         ))

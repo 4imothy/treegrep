@@ -47,19 +47,16 @@ fn main() {
 }
 
 fn run(matches: ArgMatches, bold: bool, colors: bool) -> Result<(), Message> {
-    if let Some((c, sub_m)) = matches.subcommand() {
-        if c == args::COMPLETIONS.id {
-            let &shell = sub_m
-                .get_one::<clap_complete::Shell>(args::SHELL_ID)
-                .unwrap();
-            let mut cmd = args::generate_command();
-            let mut fd = std::io::stdout();
-            generate(shell, &mut cmd, args::names::TREEGREP_BIN, &mut fd);
-            return Ok(());
-        }
-    }
-
     let (c, searcher_path) = Config::get_config(matches, bold, colors)?;
+    if let Some(shell) = c.completion_target {
+        generate(
+            shell,
+            &mut args::generate_command(),
+            args::names::TREEGREP_BIN,
+            &mut std::io::stdout(),
+        );
+        return Ok(());
+    }
     CONFIG.set(c).ok().unwrap();
 
     let matches: Option<Matches> = if config().just_files || searcher_path.is_none() {

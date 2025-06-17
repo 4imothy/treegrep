@@ -201,14 +201,6 @@ pub fn generate_command() -> Command {
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .version(env!("CARGO_PKG_VERSION"));
 
-    command = command.subcommand(
-        Command::new(COMPLETIONS.id).about(COMPLETIONS.h).arg(
-            Arg::new(SHELL_ID)
-                .value_name(SHELL_ID)
-                .value_parser(clap::value_parser!(clap_complete::Shell))
-                .required(true),
-        ),
-    );
     command = add_expressions(command);
     command = add_targets(command);
 
@@ -246,7 +238,7 @@ fn usize_arg(info: &ArgInfo, requires_expr: bool, default_value: Option<&'static
     arg
 }
 
-fn get_args() -> [Arg; 23] {
+fn get_args() -> [Arg; 24] {
     let long = Arg::new(LONG_BRANCHES.id)
         .long(LONG_BRANCHES.id)
         .help(LONG_BRANCHES.h)
@@ -297,6 +289,13 @@ fn get_args() -> [Arg; 23] {
         .value_name("")
         .action(ArgAction::Set);
 
+    let completions = Arg::new(COMPLETIONS.id)
+        .long(COMPLETIONS.id)
+        .help(COMPLETIONS.h)
+        .value_parser(clap::value_parser!(clap_complete::Shell))
+        .value_name(SHELL_ID)
+        .action(ArgAction::Set);
+
     [
         glob,
         searcher,
@@ -304,6 +303,7 @@ fn get_args() -> [Arg; 23] {
         editor,
         open_like,
         long,
+        completions,
         bool_arg(HIDDEN),
         bool_arg(LINE_NUMBER),
         bool_arg(FILES),
@@ -329,7 +329,7 @@ fn add_expressions(command: Command) -> Command {
         .arg(
             Arg::new(EXPRESSION_POSITIONAL.id)
                 .help(EXPRESSION_POSITIONAL.h)
-                .required_unless_present_any([FILES.id, EXPRESSION.id])
+                .required_unless_present_any([FILES.id, EXPRESSION.id, COMPLETIONS.id])
                 .index(1),
         )
         .arg(
@@ -338,7 +338,7 @@ fn add_expressions(command: Command) -> Command {
                 .short(EXPRESSION.s.unwrap())
                 .help(EXPRESSION.h)
                 .value_name("")
-                .required_unless_present_any([FILES.id, EXPRESSION_POSITIONAL.id])
+                .required_unless_present_any([FILES.id, EXPRESSION_POSITIONAL.id, COMPLETIONS.id])
                 .action(ArgAction::Append),
         )
         .group(
