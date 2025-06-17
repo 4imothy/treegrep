@@ -12,9 +12,6 @@ _tgrep() {
             ",$1")
                 cmd="tgrep"
                 ;;
-            tgrep,completions)
-                cmd="tgrep__completions"
-                ;;
             *)
                 ;;
         esac
@@ -22,7 +19,7 @@ _tgrep() {
 
     case "${cmd}" in
         tgrep)
-            opts="-e -p -s -. -n -f -c -m -h -V --regexp --path --glob --searcher --char-style --editor --open-like --long-branch --hidden --line-number --files --links --trim --pcre2 --no-ignore --count --no-color --no-bold --overview --menu --threads --max-depth --prefix-len --max-length --long-branch-each --help --version [positional regexp] [positional target] completions"
+            opts="-e -p -s -. -n -f -c -m -h -V --regexp --path --glob --searcher --char-style --editor --open-like --long-branch --completions --hidden --line-number --files --links --trim --pcre2 --no-ignore --count --no-color --no-bold --overview --menu --threads --max-depth --prefix-len --max-length --long-branch-each --help --version [positional regexp] [positional target]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -68,6 +65,10 @@ _tgrep() {
                     COMPREPLY=($(compgen -W "vi hx code jed default" -- "${cur}"))
                     return 0
                     ;;
+                --completions)
+                    COMPREPLY=($(compgen -W "bash elvish fish powershell zsh" -- "${cur}"))
+                    return 0
+                    ;;
                 --threads)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
@@ -88,20 +89,6 @@ _tgrep() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
-                *)
-                    COMPREPLY=()
-                    ;;
-            esac
-            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
-            return 0
-            ;;
-        tgrep__completions)
-            opts="-h --help bash elvish fish powershell zsh"
-            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
-                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
-                return 0
-            fi
-            case "${prev}" in
                 *)
                     COMPREPLY=()
                     ;;

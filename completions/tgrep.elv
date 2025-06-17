@@ -28,6 +28,7 @@ set edit:completion:arg-completer[tgrep] = {|@words|
             cand --char-style 'style of characters to use'
             cand --editor 'command used to open selections'
             cand --open-like 'command line syntax for opening a file at a line'
+            cand --completions 'generate completions for given shell'
             cand --threads 'set the appropriate number of threads to use'
             cand --max-depth 'the max depth to search'
             cand --prefix-len 'number of characters to show before a match'
@@ -55,11 +56,6 @@ set edit:completion:arg-completer[tgrep] = {|@words|
             cand --help 'Print help'
             cand -V 'Print version'
             cand --version 'Print version'
-            cand completions 'generate completions for given shell'
-        }
-        &'tgrep;completions'= {
-            cand -h 'Print help'
-            cand --help 'Print help'
         }
     ]
     $completions[$command]

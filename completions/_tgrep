@@ -25,6 +25,7 @@ _tgrep() {
 '--char-style=[style of characters to use]::(ascii single double heavy rounded none)' \
 '--editor=[command used to open selections]::_default' \
 '--open-like=[command line syntax for opening a file at a line]::(vi hx code jed default)' \
+'--completions=[generate completions for given shell]:shell:(bash elvish fish powershell zsh)' \
 '--threads=[set the appropriate number of threads to use]::_default' \
 '--max-depth=[the max depth to search]::_default' \
 '--prefix-len=[number of characters to show before a match]::_default' \
@@ -54,38 +55,13 @@ _tgrep() {
 '--version[Print version]' \
 '::positional regexp -- the regex expression:_default' \
 '::positional target -- the path to search, if not provided, search the current directory:_files' \
-":: :_tgrep_commands" \
-"*::: :->treegrep" \
 && ret=0
-    case $state in
-    (treegrep)
-        words=($line[3] "${words[@]}")
-        (( CURRENT += 1 ))
-        curcontext="${curcontext%:*:*}:tgrep-command-$line[3]:"
-        case $line[3] in
-            (completions)
-_arguments "${_arguments_options[@]}" : \
-'-h[Print help]' \
-'--help[Print help]' \
-':shell:(bash elvish fish powershell zsh)' \
-&& ret=0
-;;
-        esac
-    ;;
-esac
 }
 
 (( $+functions[_tgrep_commands] )) ||
 _tgrep_commands() {
-    local commands; commands=(
-'completions:generate completions for given shell' \
-    )
-    _describe -t commands 'tgrep commands' commands "$@"
-}
-(( $+functions[_tgrep__completions_commands] )) ||
-_tgrep__completions_commands() {
     local commands; commands=()
-    _describe -t commands 'tgrep completions commands' commands "$@"
+    _describe -t commands 'tgrep commands' commands "$@"
 }
 
 if [ "$funcstack[1]" = "_tgrep" ]; then

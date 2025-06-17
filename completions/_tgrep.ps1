@@ -31,6 +31,7 @@ Register-ArgumentCompleter -Native -CommandName 'tgrep' -ScriptBlock {
             [CompletionResult]::new('--char-style', '--char-style', [CompletionResultType]::ParameterName, 'style of characters to use')
             [CompletionResult]::new('--editor', '--editor', [CompletionResultType]::ParameterName, 'command used to open selections')
             [CompletionResult]::new('--open-like', '--open-like', [CompletionResultType]::ParameterName, 'command line syntax for opening a file at a line')
+            [CompletionResult]::new('--completions', '--completions', [CompletionResultType]::ParameterName, 'generate completions for given shell')
             [CompletionResult]::new('--threads', '--threads', [CompletionResultType]::ParameterName, 'set the appropriate number of threads to use')
             [CompletionResult]::new('--max-depth', '--max-depth', [CompletionResultType]::ParameterName, 'the max depth to search')
             [CompletionResult]::new('--prefix-len', '--prefix-len', [CompletionResultType]::ParameterName, 'number of characters to show before a match')
@@ -58,12 +59,6 @@ Register-ArgumentCompleter -Native -CommandName 'tgrep' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
-            [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'generate completions for given shell')
-            break
-        }
-        'tgrep;completions' {
-            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
-            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
     })
