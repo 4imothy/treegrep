@@ -124,11 +124,11 @@ fn file() {
 
     let pool: &[u8] = include_bytes!("pool/alice_adventures_in_wonderland_by_lewis_carroll.txt");
     let dir = Dir::new("file");
-    let file = dir.path.join("actual_file");
+    let file = PathBuf::from("actual_file");
     dir.create_file_fill(&file, pool);
 
     let tar_path = tar_dir.join("file");
-    let (rg_results, tg_results) = get_outputs(&file, "hat --line-number");
+    let (rg_results, tg_results) = get_outputs(&dir.path.join(file), "hat --line-number");
     assert_pass(&tar_path, rg_results, tg_results);
 }
 

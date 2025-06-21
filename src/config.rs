@@ -236,14 +236,7 @@ impl Config {
             }
         }
 
-        let editor = matches
-            .get_one::<String>(args::EDITOR.id)
-            .cloned()
-            .or_else(|| {
-                cfg!(unix)
-                    .then(|| std::env::var("EDITOR").ok().filter(|s| !s.is_empty()))
-                    .flatten()
-            });
+        let editor = matches.get_one::<String>(args::EDITOR.id).cloned();
         let open_like = matches.get_one::<OpenStrategy>(args::OPEN_LIKE.id).cloned();
 
         let path = matches

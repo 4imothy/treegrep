@@ -17,8 +17,8 @@ pub struct Term<'a> {
 }
 
 impl<'a> Term<'a> {
-    pub fn new(out: StdoutLock<'a>) -> io::Result<Term<'a>> {
-        let (width, height) = terminal::size()?;
+    pub fn new(out: StdoutLock<'a>, need_ui: bool) -> io::Result<Term<'a>> {
+        let (width, height) = if need_ui { terminal::size()? } else { (0, 0) };
         TERM_WIDTH.store(width, Ordering::SeqCst);
         Ok(Term {
             out,

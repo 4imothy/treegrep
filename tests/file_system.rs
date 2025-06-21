@@ -13,6 +13,7 @@ pub struct Dir {
 impl Dir {
     pub fn new(name: &str) -> Self {
         let path = env::temp_dir().join(TEST_DIR).join(name);
+
         if path.exists() {
             fs::remove_dir_all(&path).ok().unwrap();
         }
@@ -32,6 +33,7 @@ impl Dir {
         let mut file = fs::File::create(file_path).expect("failed to create file");
 
         file.write_all(content).expect("failed to write to file");
+        file.sync_all().expect("failed to sync file");
     }
 
     pub fn link_dir(&self, target_dir: &Path, link_name: &str) {

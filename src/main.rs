@@ -81,7 +81,7 @@ fn run(
     }
 
     let out: StdoutLock = stdout().lock();
-    let mut term = Term::new(out).map_err(|e| mes!("{}", e.to_string()))?;
+    let mut term = Term::new(out, c.menu || c.select).map_err(|e| mes!("{}", e.to_string()))?;
     if c.menu {
         match args_menu::launch(&mut term, c) {
             Ok(Some(new_c)) => c = new_c,

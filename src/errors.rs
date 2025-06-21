@@ -12,7 +12,13 @@ pub struct Message {
 macro_rules! mes {
     ($($arg:tt)*) => {{
         Message {
-            mes: format!($($arg)*),
+            mes: {
+                if cfg!(debug_assertions) {
+                format!("{}:{}: {}", file!(), line!(), format!($($arg)*))
+                } else {
+                format!($($arg)*)
+                }
+            },
         }
     }};
 }

@@ -641,7 +641,8 @@ impl<'a, 'b> PickerMenu<'a, 'b> {
     }
 
     fn exit_and_open(&mut self, mut path: OsString, line_num: Option<usize>) -> io::Result<()> {
-        let mut cmd = match config().editor.as_deref() {
+        let env_editor = std::env::var("EDITOR").ok().filter(|s| !s.is_empty());
+        let mut cmd = match config().editor.as_ref().or(env_editor.as_ref()) {
             Some(editor) => {
                 let mut cmd = Command::new(editor);
                 match config()

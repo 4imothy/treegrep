@@ -1,9 +1,12 @@
+# SPDX-License-Identifier: MIT
+
 name: test
 
 on:
   push:
     paths:
       - '**.rs'
+  workflow_dispatch:
 
 jobs:
   test:
@@ -32,7 +35,13 @@ jobs:
       - name: Test
         shell: bash
         run: |
-          cargo test --features test
+          echo "max file descriptors"
+          ulimit -n
+          echo "max user processes"
+          ulimit -u
+          echo word > a_file
+          rg word a_file
+          cargo test --features=test -- --test-threads=1
 
   rustfmt:
     runs-on: ubuntu-latest

@@ -56,8 +56,8 @@ fn check_results(
 }
 
 pub fn assert_pass(tar_path: &Path, rg_results: Vec<u8>, tg_results: Vec<u8>) {
-    check_results(tar_path, &rg_results, "tgrep output", true);
-    check_results(tar_path, &tg_results, "ripgrep output", true);
+    check_results(tar_path, &rg_results, "ripgrep output", true);
+    check_results(tar_path, &tg_results, "tgrep output", true);
 }
 
 pub fn assert_pass_single(tar_path: &Path, name: &str, results: Vec<u8>) {
@@ -100,6 +100,7 @@ pub fn get_outputs(path: &Path, args: &str) -> (Vec<u8>, Vec<u8>) {
     let destlye_args = ["--no-color", "--no-bold"];
     tg.args(destlye_args);
     tg_on_rg.args(destlye_args);
+    tg_on_rg.arg("--threads=1");
 
     tg_on_rg.args(args.split_whitespace());
     tg.args(args.split_whitespace());
@@ -117,8 +118,8 @@ pub fn get_outputs(path: &Path, args: &str) -> (Vec<u8>, Vec<u8>) {
     }
 
     let tg_out = tg.output().ok().unwrap();
-    if !tg_out.status.success() && !rg_out.stderr.is_empty() {
-        panic!("cmd failed {}", String::from_utf8_lossy(&rg_out.stderr));
+    if !tg_out.status.success() && !tg_out.stderr.is_empty() {
+        panic!("cmd failed {}", String::from_utf8_lossy(&tg_out.stderr));
     }
     let mut rg_stdout: Vec<u8> = rg_out.stdout;
     let rg_stderr: Vec<u8> = rg_out.stderr;
