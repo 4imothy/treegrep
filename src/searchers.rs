@@ -5,44 +5,20 @@ use crate::config;
 use crate::errors::{mes, Message, SUBMIT_ISSUE};
 use crate::options::{Options, Rg};
 use std::env;
-use std::ffi::OsString;
-use std::ops::Deref;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-struct ShortName(String);
-
-impl ShortName {
-    fn new(name: &str) -> Self {
-        assert!(name == names::TREEGREP_BIN || name == names::RIPGREP_BIN);
-        ShortName(name.to_owned())
-    }
-}
-
-impl std::fmt::Display for ShortName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl Deref for ShortName {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-fn get_exe_path(bin: &ShortName) -> Option<OsString> {
+fn get_exe_path(bin: &str) -> Option<PathBuf> {
     env::var("PATH").ok().and_then(|path| {
         env::split_paths(&path).find_map(|mut p| {
-            p.push(&bin.0);
+            p.push(bin);
             if p.exists() {
-                return Some(p.into_os_string());
+                return Some(p);
             }
             if cfg!(windows) {
                 p.set_extension(&env::consts::EXE_SUFFIX[1..]);
                 if p.exists() {
-                    return Some(p.into_os_string());
+                    return Some(p);
                 }
             }
             None
@@ -55,66 +31,54 @@ pub enum Searchers {
     TreeGrep,
 }
 
-fn bin_name(chosen: Option<&String>) -> Result<Option<ShortName>, Message> {
-    match chosen {
-        Some(s) if s == names::TREEGREP_BIN || s == names::TREEGREP => {
-            Ok(Some(ShortName(names::TREEGREP_BIN.to_owned())))
-        }
-        Some(s) if s == names::RIPGREP_BIN || s == names::RIPGREP => {
-            Ok(Some(ShortName(names::RIPGREP_BIN.to_owned())))
-        }
-        Some(s)
-            if cfg!(windows)
-                && (s == &(names::TREEGREP_BIN.to_owned() + env::consts::EXE_SUFFIX)
-                    || s == &(names::TREEGREP.to_owned() + env::consts::EXE_SUFFIX)) =>
-        {
-            Ok(Some(ShortName(names::TREEGREP_BIN.to_owned())))
-        }
-        Some(s)
-            if cfg!(windows)
-                && (s == &(names::RIPGREP_BIN.to_owned() + env::consts::EXE_SUFFIX)
-                    || s == &(names::RIPGREP.to_owned() + env::consts::EXE_SUFFIX)) =>
-        {
-            Ok(Some(ShortName(names::RIPGREP_BIN.to_owned())))
-        }
-        Some(s) => Err(mes!(
-            "searcher `{}` is invalid, tried `{}`",
-            s,
-            Searchers::all_to_str().join(", ")
-        )),
-        _ => Ok(None),
-    }
-}
-
 impl Searchers {
-    pub fn get_searcher(chosen: Option<&String>) -> Result<(Self, Option<OsString>), Message> {
-        match bin_name(chosen)? {
-            Some(c) => match c.0.as_str() {
-                names::TREEGREP_BIN => Ok((Searchers::TreeGrep, None)),
-                _ => match get_exe_path(&c) {
-                    Some(path) => Ok((Searchers::from_str(&c), Some(path))),
-                    _ => Err(mes!("failed to find searcher `{}`", c)),
-                },
+    pub fn get_searcher_and_path(
+        chosen: Option<&String>,
+    ) -> Result<(Self, Option<PathBuf>), Message> {
+        match Searchers::from_str(chosen)? {
+            Some(Searchers::TreeGrep) => Ok((Searchers::TreeGrep, None)),
+            Some(Searchers::RipGrep) => match get_exe_path(names::RIPGREP_BIN) {
+                Some(path) => Ok((Searchers::RipGrep, Some(path))),
+                _ => Err(mes!("failed to find searcher `{}`", names::RIPGREP_BIN)),
             },
             None => {
-                for exec in Searchers::all() {
-                    match exec {
-                        Searchers::TreeGrep => return Ok((Searchers::TreeGrep, None)),
-                        _ => {
-                            if let Some(path) = get_exe_path(&exec.to_short_name()) {
-                                return Ok((exec, Some(path)));
-                            }
-                        }
-                    }
+                if let Some(p) = get_exe_path(names::RIPGREP_BIN) {
+                    Ok((Searchers::RipGrep, Some(p)))
+                } else {
+                    Ok((Searchers::TreeGrep, None))
                 }
-                panic!(
-                    "at this point in code treegrep would be found if you get this {SUBMIT_ISSUE}"
-                )
             }
         }
     }
 
-    pub fn generate_command(starter: OsString) -> Result<Command, Message> {
+    fn from_str(chosen: Option<&String>) -> Result<Option<Searchers>, Message> {
+        match chosen {
+            Some(s) => match s.as_str() {
+                s if s == names::TREEGREP
+                    || s == names::TREEGREP_BIN
+                    || (cfg!(windows)
+                        && s == format!("{}{}", names::TREEGREP, env::consts::EXE_SUFFIX))
+                    || (cfg!(windows)
+                        && s == format!("{}{}", names::TREEGREP_BIN, env::consts::EXE_SUFFIX)) =>
+                {
+                    Ok(Some(Searchers::TreeGrep))
+                }
+                s if s == names::RIPGREP
+                    || s == names::RIPGREP_BIN
+                    || (cfg!(windows)
+                        && s == format!("{}{}", names::RIPGREP, env::consts::EXE_SUFFIX))
+                    || (cfg!(windows)
+                        && s == format!("{}{}", names::RIPGREP_BIN, env::consts::EXE_SUFFIX)) =>
+                {
+                    Ok(Some(Searchers::RipGrep))
+                }
+                _ => Err(mes!("searcher `{}` is invalid", s)),
+            },
+            _ => Ok(None),
+        }
+    }
+
+    pub fn generate_command(starter: &Path) -> Result<Command, Message> {
         let mut cmd = Command::new(starter);
 
         match config().searcher {
@@ -124,43 +88,6 @@ impl Searchers {
             ),
         }
         Ok(cmd)
-    }
-
-    fn to_short_name(&self) -> ShortName {
-        ShortName::new(self.to_str())
-    }
-
-    pub fn to_str(&self) -> &str {
-        match self {
-            Searchers::RipGrep => names::RIPGREP_BIN,
-            Searchers::TreeGrep => names::TREEGREP_BIN,
-        }
-    }
-
-    fn from_str(s: &str) -> Self {
-        match s {
-            names::RIPGREP_BIN => Searchers::RipGrep,
-            _ => panic!("calling from_str only happens after knowing given str is correct, if you get this {}", SUBMIT_ISSUE)
-        }
-    }
-
-    fn all() -> Vec<Searchers> {
-        vec![Searchers::RipGrep, Searchers::TreeGrep]
-    }
-
-    fn all_to_str() -> Vec<String> {
-        Searchers::all()
-            .iter()
-            .flat_map(|e| {
-                let s = e.to_str();
-                let mut vec = Vec::new();
-                vec.push(s.to_string());
-                if cfg!(windows) {
-                    vec.push(format!("{}{}", s, env::consts::EXE_SUFFIX));
-                }
-                vec
-            })
-            .collect()
     }
 }
 
@@ -174,7 +101,7 @@ mod tests {
     #[test]
     fn test_options_add_args_rg() {
         let mut cmd = Command::new("rg");
-        let (c, _) = Config::get_config(
+        let c = Config::get_config(
             generate_command().get_matches_from([
                 "--regexp=pattern1",
                 "--regexp=pattern2",
@@ -190,6 +117,7 @@ mod tests {
                 "--links",
                 "--trim",
             ]),
+            Vec::new(),
             false,
             false,
         )
@@ -223,15 +151,5 @@ mod tests {
                 .collect::<Vec<&str>>(),
             expected_args
         );
-    }
-
-    #[test]
-    fn test_all_to_str() {
-        let res = Searchers::all_to_str();
-        if cfg!(windows) {
-            assert_eq!(res, vec!["rg", "rg.exe", "tgrep", "tgrep.exe"]);
-        } else {
-            assert_eq!(res, vec!["rg", "tgrep"]);
-        }
     }
 }

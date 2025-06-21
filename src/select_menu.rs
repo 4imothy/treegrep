@@ -2,17 +2,17 @@
 
 use crate::args::OpenStrategy;
 use crate::errors::SUBMIT_ISSUE;
-use crate::{config, formats, term, writer::Entry};
-use crossterm::event::MouseEventKind;
+use crate::term::Term;
+use crate::{config, formats, writer::Entry};
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyEvent},
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, MouseEventKind},
     queue,
     style::{Print, SetBackgroundColor},
     terminal,
 };
 use std::ffi::OsString;
-use std::io::{self, StdoutLock, Write};
+use std::io::{self, Write};
 use std::process::Command;
 
 const START_X: u16 = formats::SELECTED_INDICATOR_CLEAR.len() as u16;
@@ -93,11 +93,11 @@ impl PathInfo {
     }
 }
 
-pub struct Menu<'a> {
+pub struct PickerMenu<'a, 'b> {
     pi: PathInfo,
     selected_id: usize,
     cursor_y: u16,
-    term: term::Term<'a>,
+    term: &'a mut Term<'b>,
     max_line_id: usize,
     lines: &'a Vec<Box<dyn Entry + 'a>>,
     colors: bool,
@@ -127,19 +127,19 @@ impl Window {
     }
 }
 
-impl<'a> Menu<'a> {
+impl<'a, 'b> PickerMenu<'a, 'b> {
     fn new(
-        out: StdoutLock<'a>,
+        term: &'a mut Term<'b>,
         lines: &'a Vec<Box<dyn Entry + 'a>>,
         path_ids: Vec<usize>,
-    ) -> io::Result<Menu<'a>> {
-        let mut term = term::Term::new(out)?;
-        term.claim()?;
+    ) -> io::Result<PickerMenu<'a, 'b>> {
+        if !config().menu {
+            term.claim()?;
+        }
 
-        let (scroll_offset, big_jump, small_jump) = Menu::scroll_info(term.height);
         let max_line_id = lines.len() - 1;
 
-        Ok(Menu {
+        let mut menu = PickerMenu {
             selected_id: 0,
             cursor_y: START_Y,
             term,
@@ -148,15 +148,13 @@ impl<'a> Menu<'a> {
             lines,
             colors: config().colors,
             pi: PathInfo::new(path_ids),
-            scroll_offset,
-            big_jump,
-            small_jump,
+            scroll_offset: 0,
+            big_jump: 0,
+            small_jump: 0,
             popup_open: false,
-        })
-    }
-
-    fn height(&self) -> u16 {
-        self.term.height
+        };
+        menu.update_offsets_and_jumps();
+        Ok(menu)
     }
 
     fn inc_selected(&mut self, amount: usize) {
@@ -174,44 +172,39 @@ impl<'a> Menu<'a> {
     }
 
     fn max_cursor_y(&self) -> u16 {
-        self.height() - 1
-    }
-
-    fn width(&self) -> u16 {
-        self.term.width()
+        self.term.height - 1
     }
 
     fn down_page(&mut self) -> io::Result<()> {
-        let dist = (self.height() as usize).min(self.max_line_id - self.selected_id);
+        let dist = (self.term.height as usize).min(self.max_line_id - self.selected_id);
         if dist != 0 {
-            self.inc_selected(dist);
-            self.draw()?;
+            self.inc_jump(dist)
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     fn up_page(&mut self) -> io::Result<()> {
-        let dist = (self.height() as usize).min(self.selected_id);
+        let dist = (self.term.height as usize).min(self.selected_id);
         if dist != 0 {
-            self.dec_selected(dist);
-            self.draw()?;
+            self.dec_jump(dist)
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
-    fn scroll_info(num_rows: u16) -> (u16, u16, u16) {
-        let scroll_offset = num_rows / 5;
-        let big_jump = scroll_offset;
-        let small_jump = 1;
-        (scroll_offset, big_jump, small_jump)
+    fn update_offsets_and_jumps(&mut self) {
+        self.scroll_offset = self.term.height / 5;
+        self.big_jump = self.scroll_offset;
+        self.small_jump = 1;
     }
 
     pub fn enter(
-        out: StdoutLock<'a>,
+        term: &mut Term,
         lines: &'a Vec<Box<dyn Entry + 'a>>,
         path_ids: Vec<usize>,
     ) -> io::Result<()> {
-        let mut menu: Menu = Menu::new(out, lines, path_ids)?;
+        let mut menu: PickerMenu = PickerMenu::new(term, lines, path_ids)?;
 
         menu.draw()?;
         let mut down_row: u16 = 0;
@@ -222,7 +215,7 @@ impl<'a> Menu<'a> {
                 Event::Key(KeyEvent {
                     code,
                     modifiers,
-                    kind: crossterm::event::KeyEventKind::Press,
+                    kind: KeyEventKind::Press,
                     ..
                 }) => {
                     if !menu.popup_open {
@@ -256,10 +249,24 @@ impl<'a> Menu<'a> {
                                 let selected = &menu.lines.get(menu.selected_id).unwrap();
                                 match selected.open_info() {
                                     Ok(info) => {
-                                        return menu.exit_and_open(
-                                            info.path.as_os_str().to_os_string(),
-                                            info.line,
-                                        )
+                                        if let Some(f) = &config().selection_file {
+                                            let mut buf = Vec::new();
+                                            buf.extend_from_slice(
+                                                info.path.as_os_str().as_encoded_bytes(),
+                                            );
+                                            buf.push(formats::NEW_LINE as u8);
+                                            if let Some(l) = info.line {
+                                                buf.extend_from_slice(l.to_string().as_bytes());
+                                            }
+                                            std::fs::write(f, buf)?;
+                                            break;
+                                        } else {
+                                            menu.term.give()?;
+                                            return menu.exit_and_open(
+                                                info.path.as_os_str().to_os_string(),
+                                                info.line,
+                                            );
+                                        }
                                     }
                                     Err(mes) => menu.popup(mes.mes)?,
                                 }
@@ -314,14 +321,14 @@ impl<'a> Menu<'a> {
                     }
                 }
                 Event::Resize(new_width, new_height) => {
-                    if menu.height() != new_height || menu.width() != new_width {
+                    if menu.term.height != new_height || menu.term.width() != new_width {
                         menu.resize(new_height, new_width)?;
                     }
                 }
                 _ => {}
             }
         }
-        menu.give_up_term()
+        menu.term.give()
     }
 
     fn click_on(&mut self, row: u16) -> io::Result<()> {
@@ -350,7 +357,7 @@ impl<'a> Menu<'a> {
 
         let count_above_cursor = (self.cursor_y as usize).min(self.selected_id);
 
-        let take = (count_above_cursor + (self.height() - self.cursor_y) as usize)
+        let take = (count_above_cursor + (self.term.height - self.cursor_y) as usize)
             .min(self.max_line_id + 1);
         let skip = first.max(0) as usize;
         self.window.set(first, (skip + take - 1) as isize);
@@ -442,7 +449,7 @@ impl<'a> Menu<'a> {
     }
 
     fn center_cursor(&mut self) -> io::Result<()> {
-        let mid = self.height() / 2;
+        let mid = self.term.height / 2;
         if self.cursor_y != mid {
             self.cursor_y = mid;
             self.draw()?;
@@ -451,8 +458,9 @@ impl<'a> Menu<'a> {
     }
 
     fn resize(&mut self, new_height: u16, new_width: u16) -> io::Result<()> {
-        self.term.set_dims((new_width, new_height));
-        if self.cursor_y as usize > (self.height() / 2) as usize {
+        self.term.set_dims(new_height, new_width);
+        self.update_offsets_and_jumps();
+        if self.cursor_y as usize > (self.term.height / 2) as usize {
             self.center_cursor()
         } else {
             self.draw()
@@ -460,23 +468,27 @@ impl<'a> Menu<'a> {
     }
 
     fn suspend(&mut self) -> io::Result<()> {
-        #[cfg(not(windows))]
+        #[cfg(unix)]
         {
-            self.give_up_term()?;
+            self.term.give()?;
             signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
         }
         Ok(())
     }
 
     fn resume(&mut self) -> io::Result<()> {
-        let orig_height = self.height();
-        self.term.set_dims(terminal::size()?);
-        (self.scroll_offset, self.big_jump, self.small_jump) = Menu::scroll_info(self.height());
-        self.term.claim()?;
-        if self.height() != orig_height {
-            self.center_cursor()?;
-        } else {
-            self.draw()?;
+        #[cfg(unix)]
+        {
+            let orig_height = self.term.height;
+            let (width, height) = terminal::size()?;
+            self.term.set_dims(height, width);
+            self.update_offsets_and_jumps();
+            self.term.claim()?;
+            if self.term.height != orig_height {
+                self.center_cursor()?;
+            } else {
+                self.draw()?;
+            }
         }
         Ok(())
     }
@@ -517,15 +529,8 @@ impl<'a> Menu<'a> {
         let dist = self.pi.dist_down(self.selected_id);
         if dist == 0 {
             Ok(())
-        } else if self.selected_id + dist as usize > self.window.last.max(0) as usize {
-            self.inc_selected(dist as usize);
-            self.draw()
         } else {
-            self.destyle_selected()?;
-            self.inc_selected(dist as usize);
-            self.cursor_y += dist;
-            self.style_selected()?;
-            self.term.flush()
+            self.inc_jump(dist as usize)
         }
     }
 
@@ -533,13 +538,32 @@ impl<'a> Menu<'a> {
         let dist = self.pi.dist_up(self.selected_id);
         if dist == 0 {
             Ok(())
-        } else if (self.selected_id - dist as usize) < self.window.first.max(0) as usize {
-            self.dec_selected(dist as usize);
+        } else {
+            self.dec_jump(dist as usize)
+        }
+    }
+
+    fn dec_jump(&mut self, dist: usize) -> io::Result<()> {
+        if (self.selected_id - dist) < self.window.first.max(0) as usize {
+            self.dec_selected(dist);
             self.draw()
         } else {
             self.destyle_selected()?;
-            self.dec_selected(dist as usize);
-            self.cursor_y -= dist;
+            self.dec_selected(dist);
+            self.cursor_y -= dist as u16;
+            self.style_selected()?;
+            self.term.flush()
+        }
+    }
+
+    fn inc_jump(&mut self, dist: usize) -> io::Result<()> {
+        if self.selected_id + dist > self.window.last.max(0) as usize {
+            self.inc_selected(dist);
+            self.draw()
+        } else {
+            self.destyle_selected()?;
+            self.inc_selected(dist);
+            self.cursor_y += dist as u16;
             self.style_selected()?;
             self.term.flush()
         }
@@ -572,8 +596,8 @@ impl<'a> Menu<'a> {
         let lines: Vec<&str> = content.lines().collect();
         let content_width = lines.iter().map(|line| line.len()).max().unwrap() as u16;
         let height = lines.len() as u16 + 2;
-        let x = self.width().saturating_sub(content_width) / 2;
-        let y = self.height().saturating_sub(height) / 2;
+        let x = self.term.width().saturating_sub(content_width) / 2;
+        let y = self.term.height.saturating_sub(height) / 2;
 
         queue!(
             self.term,
@@ -596,7 +620,7 @@ impl<'a> Menu<'a> {
                     line,
                     config().c.v,
                     w = content_width as usize
-                ),),
+                )),
             )?;
         }
 
@@ -616,13 +640,7 @@ impl<'a> Menu<'a> {
         Ok(())
     }
 
-    fn give_up_term(&mut self) -> io::Result<()> {
-        self.term.give()
-    }
-
     fn exit_and_open(&mut self, mut path: OsString, line_num: Option<usize>) -> io::Result<()> {
-        self.give_up_term()?;
-
         let mut cmd = match config().editor.as_deref() {
             Some(editor) => {
                 let mut cmd = Command::new(editor);
@@ -659,8 +677,8 @@ impl<'a> Menu<'a> {
             }
             None => {
                 let mut cmd = match () {
-                    _ if cfg!(macos) => Command::new("open"),
-                    _ if cfg!(windows) => Command::new("cmd"),
+                    _ if cfg!(target_os = "macos") => Command::new("open"),
+                    _ if cfg!(target_os = "windows") => Command::new("cmd"),
                     _ if cfg!(unix) => Command::new("xdg-open"),
                     _ => panic!("unable to find opener {SUBMIT_ISSUE}"),
                 };
@@ -675,13 +693,12 @@ impl<'a> Menu<'a> {
         #[cfg(unix)]
         {
             use std::os::unix::process::CommandExt;
-            cmd.exec();
+            Err(cmd.exec())
         }
         #[cfg(not(unix))]
         {
             cmd.spawn()?;
+            Ok(())
         }
-
-        Ok(())
     }
 }

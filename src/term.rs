@@ -27,9 +27,9 @@ impl<'a> Term<'a> {
         })
     }
 
-    pub fn set_dims(&mut self, dims: (u16, u16)) {
-        TERM_WIDTH.store(dims.0, Ordering::SeqCst);
-        self.height = dims.1;
+    pub fn set_dims(&mut self, new_height: u16, new_width: u16) {
+        self.height = new_height;
+        TERM_WIDTH.store(new_width, Ordering::SeqCst);
     }
 
     pub fn clear(&mut self) -> io::Result<()> {
@@ -47,17 +47,20 @@ impl<'a> Term<'a> {
         self.in_alternate_screen = true;
         let default_hook = panic::take_hook();
         panic::set_hook(Box::new(move |info| {
-            Term::exit().ok();
+            Term::exit(&mut io::stderr()).ok();
             default_hook(info);
         }));
 
         terminal::enable_raw_mode()
     }
 
-    fn exit() -> io::Result<()> {
+    fn exit<W>(w: &mut W) -> io::Result<()>
+    where
+        W: Write,
+    {
         terminal::disable_raw_mode()?;
         execute!(
-            io::stderr(),
+            w,
             style::ResetColor,
             cursor::SetCursorStyle::DefaultUserShape,
             terminal::LeaveAlternateScreen,
@@ -73,7 +76,7 @@ impl<'a> Term<'a> {
 
     pub fn give(&mut self) -> io::Result<()> {
         self.flush()?;
-        Term::exit()?;
+        Term::exit(self)?;
         self.in_alternate_screen = false;
         let _ = panic::take_hook();
         Ok(())

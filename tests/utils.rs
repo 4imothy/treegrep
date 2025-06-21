@@ -110,7 +110,6 @@ pub fn get_outputs(path: &Path, args: &str) -> (Vec<u8>, Vec<u8>) {
     tg.arg("--searcher=tgrep");
     tg_on_rg.arg("--searcher=rg");
 
-    println!("{:?}", tg_on_rg.output());
     let rg_out = tg_on_rg.output().ok().unwrap();
 
     if !rg_out.status.success() && !rg_out.stderr.is_empty() {

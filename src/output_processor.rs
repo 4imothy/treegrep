@@ -5,6 +5,7 @@ use crate::errors::{mes, Message, SUBMIT_ISSUE};
 use crate::formats;
 use crate::match_system::{wrap_dirs, wrap_file, Directory, File, Line, Match, Matches};
 use crate::Searchers;
+use bstr::io::{BufReadExt, ByteLines};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -15,9 +16,7 @@ pub fn is_start_path(dir_path: &Path) -> bool {
 }
 
 pub fn process_results(results: Vec<u8>) -> Result<Option<Matches>, Message> {
-    let lines = results
-        .split(|&byte| byte == formats::NEW_LINE as u8)
-        .collect();
+    let lines = results.byte_lines();
     match config().searcher {
         Searchers::RipGrep => process_json_lines(lines),
         Searchers::TreeGrep => {
@@ -106,7 +105,7 @@ impl AsUsize for Value {
     }
 }
 
-pub fn process_json_lines(lines: Vec<&[u8]>) -> Result<Option<Matches>, Message> {
+pub fn process_json_lines(lines: ByteLines<&[u8]>) -> Result<Option<Matches>, Message> {
     let mut path_to_index: HashMap<OsString, usize> = HashMap::new();
     let mut dirs: Vec<Directory> = Vec::new();
 
@@ -116,14 +115,16 @@ pub fn process_json_lines(lines: Vec<&[u8]>) -> Result<Option<Matches>, Message>
     let mut d_id = 0;
     let mut f_id;
     for line in lines {
+        let line = line.map_err(|e| mes!("{}", e))?;
+
         if line.is_empty() {
             continue;
         }
-        let res: Value = serde_json::from_slice(line).map_err(|e| {
+        let res: Value = serde_json::from_slice(&line).map_err(|e| {
             mes!(
                 "error message `{}` for line `{}`",
                 e.to_string(),
-                String::from_utf8_lossy(line)
+                String::from_utf8_lossy(&line)
             )
         })?;
         match res["type"].as_str().unwrap() {

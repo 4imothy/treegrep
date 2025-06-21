@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-use crate::args::{self, generate_command, OpenStrategy};
+use crate::args::{self, generate_command, OpenStrategy, REPEAT_FILE};
 use crate::errors::{mes, Message};
 use crate::formats;
 use crate::searchers::Searchers;
-use clap::ArgMatches;
+use clap::{ArgMatches, Error};
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 
 pub struct Characters {
     pub bl: char,
@@ -23,8 +23,9 @@ pub struct Characters {
 }
 
 pub struct Config {
-    pub cwd: PathBuf,
     pub path: PathBuf,
+    pub selection_file: Option<PathBuf>,
+    pub repeat_file: Option<PathBuf>,
     pub long_branch: bool,
     pub bold: bool,
     pub colors: bool,
@@ -32,9 +33,11 @@ pub struct Config {
     pub patterns: Vec<String>,
     pub globs: Vec<String>,
     pub searcher: Searchers,
+    pub searcher_path: Option<PathBuf>,
     pub count: bool,
     pub hidden: bool,
     pub line_number: bool,
+    pub select: bool,
     pub menu: bool,
     pub files: bool,
     pub just_files: bool,
@@ -52,15 +55,45 @@ pub struct Config {
     pub editor: Option<String>,
     pub open_like: Option<OpenStrategy>,
     pub completion_target: Option<clap_complete::Shell>,
+    pub repeat: bool,
+    pub plugin_support: bool,
+    pub all_args: Vec<OsString>,
 }
 
-pub fn canonicalize(p: PathBuf) -> Result<PathBuf, Message> {
-    dunce::canonicalize(&p).map_err(|_| {
+fn canonicalize(p: &Path) -> Result<PathBuf, Message> {
+    dunce::canonicalize(p).map_err(|_| {
         mes!(
             "failed to canonicalize path `{}`",
             p.to_string_lossy().into_owned()
         )
     })
+}
+
+fn process_path(input: &Path, check_exists: bool) -> Result<PathBuf, Message> {
+    let mut components = input.components();
+    let mut path = PathBuf::new();
+    match components.next() {
+        Some(Component::Normal(c)) => {
+            if c == "~" {
+                path.push(std::env::var("HOME").map_err(|e| mes!("{}", e.to_string()))?);
+            } else {
+                path.push(c);
+            }
+        }
+        Some(c) => path.push(c),
+        _ => {}
+    }
+
+    for c in components {
+        path.push(c);
+    }
+    if check_exists {
+        path.exists()
+            .then(|| canonicalize(&path))
+            .ok_or_else(|| mes!("failed to find path `{}`", path.to_string_lossy()))?
+    } else {
+        Ok(path)
+    }
 }
 
 fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, Message> {
@@ -79,30 +112,31 @@ fn get_usize_option_with_default(matches: &ArgMatches, name: &str) -> Result<usi
     Ok(get_usize_option(matches, name)?.unwrap())
 }
 
+fn get_all_args(mut args: Vec<OsString>) -> Vec<OsString> {
+    if let Some(env_args) = std::env::var_os(args::DEFAULT_OPTS_ENV_NAME) {
+        args.splice(
+            0..0,
+            env_args
+                .into_string()
+                .unwrap_or_default()
+                .split_whitespace()
+                .map(OsString::from),
+        );
+    }
+    args
+}
+
+pub fn get_matches(
+    args: Vec<OsString>,
+    with_env: bool,
+) -> Result<(ArgMatches, Vec<OsString>), Error> {
+    let all_args = if with_env { get_all_args(args) } else { args };
+    generate_command()
+        .try_get_matches_from(&all_args)
+        .map(|m| (m, all_args))
+}
+
 impl Config {
-    pub fn fill_from(args: Vec<OsString>) -> ArgMatches {
-        let mut full_args = args;
-        if let Some(env_args) = std::env::var_os(args::DEFAULT_OPTS_ENV_NAME) {
-            if !env_args.is_empty() {
-                full_args.splice(
-                    0..0,
-                    env_args
-                        .into_string()
-                        .unwrap_or_default()
-                        .split_whitespace()
-                        .map(OsString::from)
-                        .collect::<Vec<_>>(),
-                );
-            }
-        }
-
-        generate_command().get_matches_from(full_args)
-    }
-
-    pub fn fill() -> ArgMatches {
-        Self::fill_from(std::env::args_os().skip(1).collect())
-    }
-
     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
         (
             !matches.get_flag(args::NO_BOLD.id),
@@ -110,11 +144,47 @@ impl Config {
         )
     }
 
+    pub fn handle_repeat(&self) -> Result<Option<Self>, Message> {
+        if let Some(f) = &self.repeat_file {
+            if self.repeat {
+                let data = std::fs::read(f).map_err(|e| mes!("{}", e))?;
+                unsafe {
+                    let args: Vec<OsString> = data
+                        .split(|b| b == &b' ')
+                        .map(|w| OsString::from_encoded_bytes_unchecked(w.to_vec()))
+                        .collect();
+                    let (matches, all_args) =
+                        get_matches(args, false).map_err(|e| mes!("{}", e))?;
+                    let (bold, colors) = Self::get_styling(&matches);
+
+                    Ok(Some(Self::get_config(matches, all_args, bold, colors)?))
+                }
+            } else if self.menu {
+                Ok(None)
+            } else {
+                let mut buffer = Vec::new();
+                for (i, arg) in self.all_args.iter().enumerate() {
+                    if i > 0 {
+                        buffer.push(b' ');
+                    }
+                    buffer.extend_from_slice(arg.as_encoded_bytes());
+                }
+                std::fs::write(f, buffer).map_err(|e| mes!("{}", e))?;
+                Ok(None)
+            }
+        } else if self.repeat {
+            Err(mes!("cannot repeat without a {} specified", REPEAT_FILE.id))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn get_config(
         matches: ArgMatches,
+        all_args: Vec<OsString>,
         bold: bool,
         colors: bool,
-    ) -> Result<(Self, Option<OsString>), Message> {
+    ) -> Result<Self, Message> {
         let mut patterns: Vec<String> = Vec::new();
         if let Some(expr) = matches.get_one::<String>(args::EXPRESSION_POSITIONAL.id) {
             patterns.push(expr.to_owned());
@@ -134,6 +204,7 @@ impl Config {
         let count: bool = matches.get_flag(args::COUNT.id);
         let hidden: bool = matches.get_flag(args::HIDDEN.id);
         let line_number: bool = matches.get_flag(args::LINE_NUMBER.id);
+        let picker: bool = matches.get_flag(args::SELECT.id);
         let menu: bool = matches.get_flag(args::MENU.id);
         let files: bool = matches.get_flag(args::FILES.id);
         let links: bool = matches.get_flag(args::LINKS.id);
@@ -141,6 +212,8 @@ impl Config {
         let pcre2: bool = matches.get_flag(args::PCRE2.id);
         let ignore: bool = !matches.get_flag(args::NO_IGNORE.id);
         let overview: bool = matches.get_flag(args::OVERVIEW.id);
+        let plugin_support: bool = matches.get_flag(args::PLUGIN_SUPPORT);
+        let repeat: bool = matches.get_flag(args::REPEAT.id);
 
         let max_depth: Option<usize> = get_usize_option(&matches, args::MAX_DEPTH.id)?;
         let threads: Option<usize> = get_usize_option(&matches, args::THREADS.id)?;
@@ -149,10 +222,10 @@ impl Config {
             get_usize_option_with_default(&matches, args::LONG_BRANCHES_EACH.id)?;
 
         let (searcher, searcher_path) =
-            Searchers::get_searcher(matches.get_one::<String>(args::SEARCHER.id))?;
+            Searchers::get_searcher_and_path(matches.get_one::<String>(args::SEARCHER.id))?;
 
         if let Searchers::TreeGrep = searcher {
-            if threads.map_or(false, |t| t > 1) {
+            if threads.is_some_and(|t| t > 1) {
                 return Err(mes!("treegrep searcher does not support multithreading"));
             }
         }
@@ -173,27 +246,27 @@ impl Config {
             });
         let open_like = matches.get_one::<OpenStrategy>(args::OPEN_LIKE.id).cloned();
 
-        let path: Option<String> = matches
-            .get_one::<String>(args::PATH_POSITIONAL.id)
-            .or_else(|| matches.get_one::<String>(args::PATH.id))
-            .map(|value| value.to_string());
-
-        let cwd = canonicalize(
-            std::env::current_dir().map_err(|_| mes!("failed to get current working directory"))?,
-        )?;
+        let path = matches
+            .get_one::<PathBuf>(args::PATH_POSITIONAL.id)
+            .or_else(|| matches.get_one::<PathBuf>(args::PATH.id));
 
         let path = if let Some(p) = path {
-            let path = PathBuf::from(p);
-            if !path.exists() {
-                return Err(mes!(
-                    "failed to find path `{}`",
-                    path.to_string_lossy().to_string()
-                ));
-            }
-            canonicalize(path)?
+            process_path(p, true)?
         } else {
-            cwd.clone()
+            canonicalize(
+                &std::env::current_dir()
+                    .map_err(|_| mes!("failed to get current working directory"))?,
+            )?
         };
+
+        let selection_file = matches
+            .get_one::<PathBuf>(args::SELECTION_FILE.id)
+            .map(|p| process_path(p, false))
+            .transpose()?;
+        let repeat_file = matches
+            .get_one::<PathBuf>(args::REPEAT_FILE.id)
+            .map(|p| process_path(p, false))
+            .transpose()?;
 
         let is_dir = path.is_dir();
         let prefix_len = get_usize_option_with_default(&matches, args::PREFIX_LEN.id)?;
@@ -203,43 +276,43 @@ impl Config {
             .get_one::<clap_complete::Shell>(args::COMPLETIONS.id)
             .copied();
 
-        Ok((
-            Config {
-                cwd,
-                path,
-                long_branch,
-                is_dir,
-                just_files,
-                bold,
-                searcher,
-                patterns,
-                line_number,
-                colors,
-                pcre2,
-                count,
-                hidden,
-                menu,
-                files,
-                links,
-                max_depth,
-                threads,
-                trim,
-                globs,
-                ignore,
-                prefix_len,
-                max_length,
-                long_branch_each,
-                editor,
-                open_like,
-                overview,
-                c: Config::get_characters(
-                    matches.get_one::<String>(args::CHAR_STYLE.id),
-                    prefix_len,
-                ),
-                completion_target,
-            },
+        Ok(Config {
+            path,
+            selection_file,
+            repeat_file,
+            long_branch,
+            is_dir,
+            just_files,
+            bold,
+            searcher,
             searcher_path,
-        ))
+            patterns,
+            line_number,
+            colors,
+            pcre2,
+            count,
+            hidden,
+            select: picker,
+            files,
+            links,
+            max_depth,
+            threads,
+            trim,
+            globs,
+            ignore,
+            prefix_len,
+            max_length,
+            long_branch_each,
+            editor,
+            open_like,
+            overview,
+            c: Config::get_characters(matches.get_one::<String>(args::CHAR_STYLE.id), prefix_len),
+            completion_target,
+            menu,
+            plugin_support,
+            repeat,
+            all_args,
+        })
     }
 
     fn get_characters(t: Option<&String>, spacer: usize) -> Characters {
@@ -289,7 +362,7 @@ mod tests {
         "--count",
         "--links",
         "--trim",
-        "--menu",
+        "--select",
         "--files",
         "--searcher=rg",
         "--regexp=pattern1",
@@ -303,16 +376,20 @@ mod tests {
     {
         let matches = generate_command().get_matches_from(args);
         let (bold, colors) = Config::get_styling(&matches);
-        let (config, _) = Config::get_config(matches, bold, colors).ok().unwrap();
+        let config = Config::get_config(matches, Vec::new(), bold, colors)
+            .ok()
+            .unwrap();
         config
     }
 
     #[test]
     fn test_env_opts() {
         std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" "));
-        let matches = Config::fill();
+        let (matches, all_args) = get_matches(Vec::new(), true).unwrap();
         let (bold, colors) = Config::get_styling(&matches);
-        let (config, _) = Config::get_config(matches, bold, colors).ok().unwrap();
+        let config = Config::get_config(matches, all_args, bold, colors)
+            .ok()
+            .unwrap();
         check_parsed_config_from_example_opts(config);
     }
 
@@ -321,6 +398,13 @@ mod tests {
         let config = get_config_from(["expression"]);
         assert!(
             config.c.spacer == " ".repeat(args::DEFAULT_PREFIX_LEN.parse::<usize>().ok().unwrap())
+        );
+        assert!(
+            config.long_branch_each
+                == args::DEFAULT_LONG_BRANCH_EACH
+                    .parse::<usize>()
+                    .ok()
+                    .unwrap()
         );
     }
 
@@ -342,7 +426,7 @@ mod tests {
         assert!(config.links);
         assert!(config.trim);
         assert!(config.colors);
-        assert!(config.menu);
+        assert!(config.select);
         assert!(config.files);
         match config.searcher {
             Searchers::RipGrep => {}
@@ -353,11 +437,11 @@ mod tests {
 
     #[test]
     fn test_shorts() {
-        let config = get_config_from(["posexpr", "-n.cmf", "-e=pattern1", "-e=pattern2"]);
+        let config = get_config_from(["posexpr", "-n.csf", "-e=pattern1", "-e=pattern2"]);
         assert!(config.line_number);
         assert!(config.hidden);
         assert!(config.count);
-        assert!(config.menu);
+        assert!(config.select);
         assert!(config.files);
         assert_eq!(config.patterns, vec!["posexpr", "pattern1", "pattern2"]);
     }
@@ -370,20 +454,20 @@ mod tests {
             "--no-ignore",
             "--hidden",
             "--links",
-            "--menu",
+            "--select",
         ]);
         assert_eq!(config.max_depth, Some(5));
         assert!(!config.ignore);
         assert!(config.hidden);
         assert!(config.links);
         assert!(config.colors);
-        assert!(config.menu);
+        assert!(config.select);
     }
 
     #[test]
     fn test_shorts_files() {
-        let config = get_config_from(["-.fm"]);
+        let config = get_config_from(["-.fs"]);
         assert!(config.hidden);
-        assert!(config.menu);
+        assert!(config.select);
     }
 }

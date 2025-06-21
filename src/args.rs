@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 
+use std::path::PathBuf;
+
 use clap::builder::PossibleValue;
-use clap::{Arg, ArgAction, ArgGroup, Command, ValueEnum, ValueHint};
+use clap::{value_parser, Arg, ArgAction, ArgGroup, Command, ValueEnum, ValueHint};
 
 pub const DEFAULT_PREFIX_LEN: &str = "3";
 pub const DEFAULT_LONG_BRANCH_EACH: &str = "5";
@@ -81,6 +83,7 @@ macro_rules! arg_info {
 pub const EXPRESSION_GROUP_ID: &str = "expressions";
 pub const TARGET_GROUP_ID: &str = "targets";
 pub const CHAR_STYLE_OPTIONS: [&str; 6] = ["ascii", "single", "double", "heavy", "rounded", "none"];
+pub const PLUGIN_SUPPORT: &str = "plugin-support";
 
 arg_info!(
     LONG_BRANCHES,
@@ -109,10 +112,15 @@ arg_info!(
 arg_info!(HIDDEN, "hidden", "search hidden files", '.');
 arg_info!(LINE_NUMBER, "line-number", "show line number of match", 'n');
 arg_info!(
+    SELECT,
+    "select",
+    "results are shown in a selection interface for opening",
+    's'
+);
+arg_info!(
     MENU,
     "menu",
-    "show results in a menu to be jumped to, press h in menu for help",
-    'm'
+    "provide arguments and select result through an interface"
 );
 arg_info!(
     FILES,
@@ -120,9 +128,8 @@ arg_info!(
     "if a pattern is given hide matched content, otherwise show the files that would be searched",
     'f'
 );
-
 arg_info!(MAX_DEPTH, "max-depth", "the max depth to search");
-arg_info!(SEARCHER, "searcher", "executable to do the searching", 's');
+arg_info!(SEARCHER, "searcher", "executable to do the searching");
 arg_info!(CHAR_STYLE, "char-style", "style of characters to use");
 arg_info!(EDITOR, "editor", "command used to open selections");
 arg_info!(
@@ -163,6 +170,14 @@ arg_info!(
     "completions",
     "generate completions for given shell"
 );
+arg_info!(
+    SELECTION_FILE,
+    "selection-file",
+    "file to write selection to (first line: file path, second line: line number if applicable)"
+);
+arg_info!(REPEAT, "repeat", "repeats the last saved search");
+arg_info!(REPEAT_FILE, "repeat-file", "file where arguments are saved");
+
 pub const SHELL_ID: &str = "shell";
 
 arg_info!(OVERVIEW, "overview", "conclude results with an overview");
@@ -183,6 +198,7 @@ home page: ",
 );
 
 pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
+const DONT_NEED_REGEXP: &[&str] = &[FILES.id, COMPLETIONS.id, PLUGIN_SUPPORT, MENU.id, REPEAT.id];
 
 pub fn generate_command() -> Command {
     let mut command = Command::new(env!("CARGO_PKG_NAME"))
@@ -190,10 +206,9 @@ pub fn generate_command() -> Command {
         .bin_name(names::TREEGREP_BIN)
         .help_template(HELP.to_owned())
         .args_override_self(true)
-        .subcommand_negates_reqs(true)
         .disable_help_subcommand(true)
         .after_help(
-            "any of the above can be set using the ".to_string()
+            "arguments are prefixed with the contents of the ".to_string()
                 + DEFAULT_OPTS_ENV_NAME
                 + " environment variable",
         )
@@ -202,7 +217,7 @@ pub fn generate_command() -> Command {
         .version(env!("CARGO_PKG_VERSION"));
 
     command = add_expressions(command);
-    command = add_targets(command);
+    command = add_paths(command);
 
     for opt in get_args() {
         command = command.arg(opt);
@@ -223,7 +238,7 @@ fn bool_arg(info: ArgInfo) -> Arg {
     arg
 }
 
-fn usize_arg(info: &ArgInfo, requires_expr: bool, default_value: Option<&'static str>) -> Arg {
+fn usize_arg(info: &ArgInfo, default_value: Option<&'static str>) -> Arg {
     let mut arg = Arg::new(info.id)
         .long(info.id)
         .help(info.h)
@@ -232,13 +247,10 @@ fn usize_arg(info: &ArgInfo, requires_expr: bool, default_value: Option<&'static
     if let Some(dv) = default_value {
         arg = arg.default_value(dv);
     }
-    if requires_expr {
-        arg = arg.requires(EXPRESSION_GROUP_ID);
-    }
     arg
 }
 
-fn get_args() -> [Arg; 24] {
+fn get_args() -> [Arg; 29] {
     let long = Arg::new(LONG_BRANCHES.id)
         .long(LONG_BRANCHES.id)
         .help(LONG_BRANCHES.h)
@@ -253,7 +265,6 @@ fn get_args() -> [Arg; 24] {
 
     let searcher = Arg::new(SEARCHER.id)
         .long(SEARCHER.id)
-        .short(SEARCHER.s.unwrap())
         .help(SEARCHER.h)
         .value_parser([
             PossibleValue::new(names::RIPGREP_BIN).hide(false),
@@ -276,6 +287,20 @@ fn get_args() -> [Arg; 24] {
         .value_name("")
         .action(ArgAction::Set);
 
+    let selection_file = Arg::new(SELECTION_FILE.id)
+        .long(SELECTION_FILE.id)
+        .help(SELECTION_FILE.h)
+        .value_parser(value_parser!(PathBuf))
+        .value_name("")
+        .value_hint(ValueHint::AnyPath);
+
+    let repeat_file = Arg::new(REPEAT_FILE.id)
+        .long(REPEAT_FILE.id)
+        .help(REPEAT_FILE.h)
+        .value_parser(value_parser!(PathBuf))
+        .value_name("")
+        .value_hint(ValueHint::AnyPath);
+
     let editor = Arg::new(EDITOR.id)
         .long(EDITOR.id)
         .help(EDITOR.h)
@@ -296,6 +321,11 @@ fn get_args() -> [Arg; 24] {
         .value_name(SHELL_ID)
         .action(ArgAction::Set);
 
+    let plugin_support = Arg::new(PLUGIN_SUPPORT)
+        .long(PLUGIN_SUPPORT)
+        .action(ArgAction::SetTrue)
+        .hide(true);
+
     [
         glob,
         searcher,
@@ -304,23 +334,28 @@ fn get_args() -> [Arg; 24] {
         open_like,
         long,
         completions,
+        plugin_support,
+        selection_file,
+        repeat_file,
         bool_arg(HIDDEN),
+        bool_arg(REPEAT),
         bool_arg(LINE_NUMBER),
         bool_arg(FILES),
         bool_arg(LINKS),
-        bool_arg(TRIM_LEFT).requires(EXPRESSION_GROUP_ID),
-        bool_arg(PCRE2).requires(EXPRESSION_GROUP_ID),
         bool_arg(NO_IGNORE),
         bool_arg(COUNT),
         bool_arg(NO_COLORS),
         bool_arg(NO_BOLD),
         bool_arg(OVERVIEW),
+        bool_arg(SELECT),
         bool_arg(MENU),
-        usize_arg(&THREADS, false, None),
-        usize_arg(&MAX_DEPTH, false, None),
-        usize_arg(&PREFIX_LEN, false, Some(DEFAULT_PREFIX_LEN)),
-        usize_arg(&MAX_LENGTH, true, None),
-        usize_arg(&LONG_BRANCHES_EACH, true, Some(DEFAULT_LONG_BRANCH_EACH)),
+        bool_arg(TRIM_LEFT).requires(EXPRESSION_GROUP_ID),
+        bool_arg(PCRE2).requires(EXPRESSION_GROUP_ID),
+        usize_arg(&THREADS, None),
+        usize_arg(&MAX_DEPTH, None),
+        usize_arg(&PREFIX_LEN, Some(DEFAULT_PREFIX_LEN)),
+        usize_arg(&MAX_LENGTH, None).requires(EXPRESSION_GROUP_ID),
+        usize_arg(&LONG_BRANCHES_EACH, Some(DEFAULT_LONG_BRANCH_EACH)).requires(LONG_BRANCHES.id),
     ]
 }
 
@@ -329,7 +364,8 @@ fn add_expressions(command: Command) -> Command {
         .arg(
             Arg::new(EXPRESSION_POSITIONAL.id)
                 .help(EXPRESSION_POSITIONAL.h)
-                .required_unless_present_any([FILES.id, EXPRESSION.id, COMPLETIONS.id])
+                .required_unless_present_any(DONT_NEED_REGEXP)
+                .required_unless_present(EXPRESSION.id)
                 .index(1),
         )
         .arg(
@@ -338,7 +374,8 @@ fn add_expressions(command: Command) -> Command {
                 .short(EXPRESSION.s.unwrap())
                 .help(EXPRESSION.h)
                 .value_name("")
-                .required_unless_present_any([FILES.id, EXPRESSION_POSITIONAL.id, COMPLETIONS.id])
+                .required_unless_present_any(DONT_NEED_REGEXP)
+                .required_unless_present(EXPRESSION_POSITIONAL.id)
                 .action(ArgAction::Append),
         )
         .group(
@@ -349,12 +386,13 @@ fn add_expressions(command: Command) -> Command {
         )
 }
 
-fn add_targets(command: Command) -> Command {
+fn add_paths(command: Command) -> Command {
     command
         .arg(
             Arg::new(PATH_POSITIONAL.id)
                 .help(PATH_POSITIONAL.h)
                 .value_hint(ValueHint::AnyPath)
+                .value_parser(value_parser!(PathBuf))
                 .index(2),
         )
         .arg(
@@ -363,6 +401,7 @@ fn add_targets(command: Command) -> Command {
                 .short(PATH.s.unwrap())
                 .help(PATH.h)
                 .value_name("")
+                .value_parser(value_parser!(PathBuf))
                 .value_hint(ValueHint::AnyPath),
         )
         .group(

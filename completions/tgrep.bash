@@ -1,12 +1,16 @@
 _tgrep() {
     local i cur prev opts cmd
     COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+        cur="$2"
+    else
+        cur="${COMP_WORDS[COMP_CWORD]}"
+    fi
+    prev="$3"
     cmd=""
     opts=""
 
-    for i in ${COMP_WORDS[@]}
+    for i in "${COMP_WORDS[@]:0:COMP_CWORD}"
     do
         case "${cmd},${i}" in
             ",$1")
@@ -19,7 +23,7 @@ _tgrep() {
 
     case "${cmd}" in
         tgrep)
-            opts="-e -p -s -. -n -f -c -m -h -V --regexp --path --glob --searcher --char-style --editor --open-like --long-branch --completions --hidden --line-number --files --links --trim --pcre2 --no-ignore --count --no-color --no-bold --overview --menu --threads --max-depth --prefix-len --max-length --long-branch-each --help --version [positional regexp] [positional target]"
+            opts="-e -p -. -n -f -c -s -h -V --regexp --path --glob --searcher --char-style --editor --open-like --long-branch --completions --plugin-support --selection-file --repeat-file --hidden --repeat --line-number --files --links --no-ignore --count --no-color --no-bold --overview --select --menu --trim --pcre2 --threads --max-depth --prefix-len --max-length --long-branch-each --help --version [positional regexp] [positional target]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -49,10 +53,6 @@ _tgrep() {
                     COMPREPLY=($(compgen -W "rg tgrep" -- "${cur}"))
                     return 0
                     ;;
-                -s)
-                    COMPREPLY=($(compgen -W "rg tgrep" -- "${cur}"))
-                    return 0
-                    ;;
                 --char-style)
                     COMPREPLY=($(compgen -W "ascii single double heavy rounded none" -- "${cur}"))
                     return 0
@@ -67,6 +67,14 @@ _tgrep() {
                     ;;
                 --completions)
                     COMPREPLY=($(compgen -W "bash elvish fish powershell zsh" -- "${cur}"))
+                    return 0
+                    ;;
+                --selection-file)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --repeat-file)
+                    COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
                 --threads)

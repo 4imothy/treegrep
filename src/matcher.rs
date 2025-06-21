@@ -31,7 +31,7 @@ pub fn search() -> Result<Option<Matches>, Message> {
 }
 
 fn search_dir(patterns: &[Regex]) -> Result<Vec<Directory>, Message> {
-    let mut override_builder = OverrideBuilder::new(&config().cwd);
+    let mut override_builder = OverrideBuilder::new(&config().path);
     for glob in &config().globs {
         override_builder
             .add(glob)

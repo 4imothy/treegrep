@@ -4,6 +4,7 @@ use crate::config;
 use crate::errors::{mes, Message};
 use crate::formats;
 use crate::match_system::{Directory, File, Match, Matches};
+use crate::term::Term;
 use crate::term::TERM_WIDTH;
 use core::fmt::{self, Display};
 use crossterm::style::StyledContent;
@@ -176,7 +177,7 @@ impl<'a> Display for LineDisplay<'a> {
             0
         };
 
-        if config().menu {
+        if config().select {
             let term_width = TERM_WIDTH.load(Ordering::SeqCst) as usize;
             let content_width = term_width.saturating_sub(config().prefix_len * self.prefix.len());
             let max_len = config()
@@ -240,7 +241,10 @@ struct LongBranchDisplay<'a> {
 
 impl<'a> Entry for LongBranchDisplay<'a> {
     fn open_info(&self) -> Result<OpenInfo, Message> {
-        Err(mes!("can't open a long branch"))
+        match self.files.as_slice() {
+            [file] => file.open_info(),
+            _ => Err(mes!("can't open a long branch")),
+        }
     }
 }
 
@@ -348,7 +352,7 @@ impl Directory {
                 &self.path,
                 &self.linked,
                 self.children.len() + self.files.len(),
-                !config().menu,
+                !config().select,
                 true,
             )?));
         }
@@ -405,8 +409,7 @@ impl Directory {
         path_ids: &mut Option<&mut Vec<usize>>,
     ) -> Result<(), Message> {
         let long_branch_files_per_line: usize = config().long_branch_each;
-        let num_lines: usize =
-            (self.files.len() + long_branch_files_per_line - 1) / long_branch_files_per_line;
+        let num_lines: usize = self.files.len().div_ceil(long_branch_files_per_line);
 
         let prefix_no_next = with_push(prefix.clone(), PrefixComponent::MatchNoNext);
         let prefix_next = with_push(prefix, PrefixComponent::MatchWithNext);
@@ -425,7 +428,7 @@ impl Directory {
                     .iter()
                     .map(|f| PathDisplay::new(None, &f.path, &f.linked, f.count(), false, false))
                     .collect::<Result<Vec<PathDisplay<'_>>, Message>>()?,
-                new_line: !config().menu,
+                new_line: !config().select,
             }));
         }
         Ok(())
@@ -469,7 +472,7 @@ impl File {
             &self.path,
             &self.linked,
             self.count(),
-            !config().menu,
+            !config().select,
             false,
         )?));
 
@@ -486,7 +489,7 @@ impl File {
                     path: &self.path,
                     matches: &line.matches,
                     line_num: line.line_num,
-                    new_line: !config().menu,
+                    new_line: !config().select,
                 }));
             }
         }
@@ -510,7 +513,7 @@ pub fn matches_to_display_lines<'a>(
             files: usize::from(!config().is_dir),
             lines: 0,
             count: 0,
-            new_line: !config().menu,
+            new_line: !config().select,
         })
         .map(Box::new);
     match &result {
@@ -540,10 +543,7 @@ pub fn matches_to_display_lines<'a>(
     Ok(lines)
 }
 
-pub fn write_results<'a>(
-    out: &mut io::StdoutLock,
-    lines: &[Box<dyn Entry + 'a>],
-) -> io::Result<()> {
+pub fn write_results<'a>(out: &mut Term, lines: &[Box<dyn Entry + 'a>]) -> io::Result<()> {
     for line in lines {
         write!(out, "{}", line)?;
     }

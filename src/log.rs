@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 use std::fs;
-use std::io::Write;
 use std::panic;
 use std::sync::{Mutex, OnceLock};
 
@@ -14,6 +13,7 @@ pub fn gen_log() -> Mutex<fs::File> {
 #[allow(unused_macros)]
 macro_rules! log {
     ($($arg:tt)*) => {
+        use std::io::Write;
         writeln!($crate::log::LOG.get_or_init(||
                 $crate::log::gen_log()).lock().unwrap(),
                 $($arg)*).unwrap();

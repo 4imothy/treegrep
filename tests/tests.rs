@@ -3,7 +3,7 @@
 mod file_system;
 mod utils;
 use file_system::Dir;
-use std::path::PathBuf;
+use std::{env, path::PathBuf};
 use utils::*;
 
 #[test]
@@ -307,4 +307,63 @@ fn count() {
 
     let (rg_results, tg_results) = get_outputs(&dir.path, ". --count");
     assert_pass(&tar_dir.join("count"), rg_results, tg_results);
+}
+
+#[test]
+fn repeat() {
+    let pool: &[u8] = include_bytes!("pool/alice_adventures_in_wonderland_by_lewis_carroll.txt");
+    let dir = Dir::new("repeat");
+    let repeat_file_path = env::temp_dir().join("repeat-file");
+    let repeat_file = repeat_file_path.to_string_lossy();
+
+    dir.create_file_fill(&PathBuf::from("top_file"), pool);
+
+    let inner_name = PathBuf::from("first");
+    dir.add_child(&inner_name);
+    dir.create_file_fill(&inner_name.join("first_file"), b"this is some nice text");
+
+    let second = inner_name.join("second");
+    dir.add_child(&second);
+    dir.create_file_fill(&second.join("2_file"), b"nice text in the second file");
+
+    let third = second.join("third");
+    dir.add_child(&third);
+    dir.create_file_fill(&third.join("file_3"), b"some nice text in the third file");
+
+    let fourth = third.join("4ourth");
+    dir.add_child(&fourth);
+    dir.create_file_fill(
+        &fourth.join("4ourth_nice_file"),
+        b"    some not so nice text in the 4th file <0-0> \n this text won't be matched",
+    );
+
+    let (mut rg_results_orig, mut tg_results_orig) = get_outputs(
+        &dir.path,
+        &format!(
+            "some --line-number --count --glob=!4ourth --repeat-file={} --overview --prefix-len=5 --trim",
+            repeat_file
+        ),
+    );
+    let (mut rg_results_rep, mut tg_results_rep) = get_outputs(
+        &dir.path,
+        &format!("--repeat --repeat-file={}", repeat_file),
+    );
+    assert!(rg_results_orig == tg_results_orig);
+    assert!(rg_results_orig == rg_results_rep);
+    assert!(tg_results_orig == tg_results_rep);
+
+    (rg_results_orig, tg_results_orig) = get_outputs(
+        &dir.path,
+        &format!(
+            "--files --glob=!4ourth_nice_file --repeat-file={} --overview --prefix-len=5",
+            repeat_file
+        ),
+    );
+    (rg_results_rep, tg_results_rep) = get_outputs(
+        &dir.path,
+        &format!("--repeat --repeat-file={}", repeat_file),
+    );
+    assert!(rg_results_orig == tg_results_orig);
+    assert!(rg_results_orig == rg_results_rep);
+    assert!(tg_results_orig == tg_results_rep);
 }
