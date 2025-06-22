@@ -28,7 +28,7 @@ treegrep is a pattern matcher that displays results in a tree structure with an 
 <details>
 <summary><em>neovim</em></summary>
 
-- sample function that runs treegrep in a window and open selection,
+- sample function that runs treegrep in a window and opens selection,
   with shortcuts for reusing previous arguments or searching files
 
 ```lua
@@ -108,6 +108,91 @@ C-t = [
 ```
 </details>
 
+<details>
+<summary><em>vim</em></summary>
+
+- sample function that runs treegrep in a window and opens selection,
+  with shortcuts for reusing previous arguments or searching files
+
+```vim
+vim9script
+
+const NORMAL: number = 0
+const REPEAT: number = 1
+const FILES: number = 2
+
+def g:TgrepFloat(opt: number)
+  var original_win: number = win_getid()
+
+  var select_file: string = '/tmp/tgrep-select'
+  var repeat_file: string = '/tmp/tgrep-repeat'
+  var cmd: string = 'tgrep --selection-file=' .. fnameescape(select_file) ..
+                    ' --repeat-file=' .. fnameescape(repeat_file)
+
+  if opt == NORMAL
+    cmd ..= ' --menu'
+  elseif opt == REPEAT
+    cmd ..= ' --repeat'
+  elseif opt == FILES
+    cmd ..= ' --select --files'
+  endif
+
+  var buf: number
+  var win: number
+
+  def OnTermExit(_job: job, _status: number): void
+      popup_close(win)
+      if bufexists(buf)
+          execute 'bdelete! ' .. buf
+      endif
+      call win_gotoid(original_win)
+
+      if filereadable(select_file)
+          var lines: list<string> = readfile(select_file)
+          if len(lines) == 0
+              return
+          endif
+          var edit_cmd: string = 'edit ' .. fnameescape(lines[0])
+          if len(lines) > 1
+              edit_cmd ..= ' | :' .. lines[1]
+          endif
+          execute edit_cmd .. ' | redraw'
+      endif
+  enddef
+
+  buf = term_start(cmd, {
+      term_name: 'tgrep',
+      hidden: true,
+      term_finish: 'close',
+      exit_cb: OnTermExit
+  })
+
+  var width: number = float2nr(&columns * 0.8)
+  var height: number = float2nr(&lines * 0.8)
+  var col: number = float2nr((&columns - width) / 2)
+  var row: number = float2nr((&lines - height) / 2)
+
+  win = popup_create(buf, {
+      line: row,
+      col: col,
+      minwidth: width,
+      minheight: height,
+      maxwidth: width,
+      maxheight: height,
+      border: [1, 1, 1, 1],
+      borderchars: ['─', '│', '─', '│', '╭', '╮', '╯', '╰'],
+      padding: [0, 0, 0, 0],
+      zindex: 1,
+      drag: 1,
+      pos: 'center',
+  })
+enddef
+
+nnoremap ,tt :call TgrepFloat(0)<CR>
+nnoremap ,tr :call TgrepFloat(1)<CR>
+nnoremap ,tf :call TgrepFloat(2)<CR>
+```
+</details>
 
 ### examples
 <details>

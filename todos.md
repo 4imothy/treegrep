@@ -12,9 +12,8 @@
 - builtin multithreading
 
 # Plugin
-- Add function for *vim* similar to *neovim* function
 - Make actual plugins for *vim* and *neovim*
-- TMUX and Zellij
+- *TMUX* and *Zellij*
 
 # Distribution
 - notarizing on Mac
