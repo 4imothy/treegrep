@@ -10,7 +10,7 @@ pub fn gen_log() -> Mutex<fs::File> {
     Mutex::new(fs::File::create("log").unwrap())
 }
 
-#[allow(unused_macros)]
+#[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => {
         use std::io::Write;
@@ -27,6 +27,3 @@ pub fn set_panic_hook() {
         default_hook(info);
     }));
 }
-
-#[allow(unused_imports)]
-pub(crate) use log;

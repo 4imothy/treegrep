@@ -12,7 +12,7 @@ EXAMPLES = '### examples'
 
 EXAMPLES_TO_RUN = [
     ['--regexp', r'\bstruct\s+\w+', '--regexp', r'\bimpl\s+\w+', '--path', 'src', '--line-number', '--count'],
-    ['Print', os.path.join('src', 'menu.rs'), '--trim', '--line-number', '--char-style=ascii'],
+    ['Print', os.path.join('src', 'select_menu.rs'), '--trim', '--line-number', '--char-style=ascii'],
     ['--files', '--hidden', '--glob=!.git'],
     ['--files', '--long-branch', '--hidden', '--glob=!.git']
 ]

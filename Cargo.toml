@@ -14,10 +14,10 @@ documentation = "https://github.com/4imothy/treegrep/tree/main/README.md"
 authors = ["Timothy Cronin"]
 exclude = [
   "/.github/",
-  "/README/",
-  "/benchsuite/",
-  "/example/",
+  "/benchmarks/",
+  "/completions/",
   "install.sh",
+  "todos.md",
 ]
 autotests = false
 

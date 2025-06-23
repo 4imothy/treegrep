@@ -41,7 +41,7 @@ jobs:
           ulimit -u
           echo word > a_file
           rg word a_file
-          cargo test --features=test -- --test-threads=1
+          cargo test --features=test
 
   rustfmt:
     runs-on: ubuntu-latest
