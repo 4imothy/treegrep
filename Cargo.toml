@@ -1,6 +1,6 @@
 [package]
 name = "treegrep"
-version = "0.1.4"
+version = "1.0.0"
 edition = "2021"
 build = "build.rs"
 license = "MIT"
