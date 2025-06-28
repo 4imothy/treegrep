@@ -24,64 +24,23 @@ treegrep is a pattern matcher that displays results in a tree structure with an 
 <details>
 <summary><em>neovim</em></summary>
 
-- sample function that runs treegrep in a window and opens selection,
-  with shortcuts for reusing previous arguments or searching files
-
+- example install using [lazy.nvim](https://github.com/folke/lazy.nvim)
 ```lua
-local NORMAL = 0
-local REPEAT = 1
-local FILES = 2
-local function tgrep_float(opt)
-    local buf = vim.api.nvim_create_buf(false, true)
-
-    local original_win = vim.api.nvim_get_current_win()
-
-    local win = vim.api.nvim_open_win(buf, true, {
-        relative = 'editor',
-        style = 'minimal',
-        border = 'rounded',
-        width = math.floor(vim.o.columns * 0.8),
-        height = math.floor(vim.o.lines * 0.8),
-        col = math.floor((vim.o.columns - (vim.o.columns * 0.8)) / 2),
-        row = math.floor((vim.o.lines - (vim.o.lines * 0.8)) / 2)
-    })
-
-    local select_file = '/tmp/tgrep-select'
-    local repeat_file = '/tmp/tgrep-repeat'
-    local cmd = string.format(
-        'tgrep --selection-file=%s --repeat-file=%s %s',
-        vim.fn.fnameescape(select_file),
-        vim.fn.fnameescape(repeat_file),
-        opt == NORMAL and '--menu' or
-        opt == REPEAT and '--repeat' or
-        opt == FILES and '--select --files'
-    )
-
-    vim.fn.termopen(cmd, {
-        on_exit = function()
-            vim.api.nvim_win_close(win, true)
-            vim.api.nvim_buf_delete(buf, { force = true })
-            vim.api.nvim_set_current_win(original_win)
-            if vim.fn.filereadable(select_file) == 1 then
-                local lines = vim.fn.readfile(select_file)
-                if #lines == 0 then
-                    return
-                end
-                local edit_cmd = 'edit ' .. vim.fn.fnameescape(lines[1])
-                if #lines > 1 then
-                    edit_cmd = edit_cmd .. ' | ' .. lines[2]
-                end
-                vim.cmd(edit_cmd .. ' | redraw')
-            end
-        end
-    })
-
-    vim.cmd('startinsert')
-end
-
-vim.keymap.set('n', '<leader>tt', function() tgrep_float(NORMAL) end, { noremap = true, silent = true })
-vim.keymap.set('n', '<leader>tr', function() tgrep_float(REPEAT) end, { noremap = true, silent = true })
-vim.keymap.set('n', '<leader>tf', function() tgrep_float(FILES) end, { noremap = true, silent = true })
+return {
+    '4imothy/treegrep',
+    build = function()
+        require('tgrep').build_tgrep()
+    end,
+    config = function()
+        require('tgrep').setup({
+            selection_file = '/tmp/tgrep-select',
+            repeat_file = '/tmp/tgrep-repeat',
+        })
+        vim.keymap.set('n', '<leader>tt', function() require('tgrep').tgrep_with('--menu') end)
+        vim.keymap.set('n', '<leader>tr', function() require('tgrep').tgrep_with('--repeat') end)
+        vim.keymap.set('n', '<leader>tf', function() require('tgrep').tgrep_with('--files --select') end)
+    end,
+}
 ```
 </details>
 <details>
