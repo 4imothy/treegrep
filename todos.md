@@ -5,7 +5,6 @@
 - different colors for match, file, directory, line number
 ## Menus
 - searching for text within the results
-- with z/l move cursor to top->middle->bottom->top->...
 - add a cursor and option to change the character, if we can change this
   character then we should also have the ability to change the selected
   indicator, maybe remove char style in favor of user providing the characters

@@ -21,7 +21,7 @@ use errors::{mes, Message};
 use match_system::Matches;
 use output_processor::process_results;
 use searchers::Searchers;
-use select_menu::PickerMenu;
+use select_menu::SelectMenu;
 use std::ffi::OsString;
 use std::io::{stdout, StdoutLock};
 use std::path::Path;
@@ -115,7 +115,7 @@ fn run(
     let lines: Vec<Box<dyn Entry>> = matches_to_display_lines(&m, path_ids.as_mut())?;
 
     if config().select {
-        PickerMenu::enter(
+        SelectMenu::enter(
             &mut term,
             &lines,
             path_ids

@@ -13,10 +13,12 @@ pub fn gen_log() -> Mutex<fs::File> {
 #[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => {
+        {
         use std::io::Write;
         writeln!($crate::log::LOG.get_or_init(||
                 $crate::log::gen_log()).lock().unwrap(),
                 $($arg)*).unwrap();
+        }
     };
 }
 

@@ -93,8 +93,9 @@ impl PathInfo {
     }
 }
 
-pub struct PickerMenu<'a, 'b> {
+pub struct SelectMenu<'a, 'b> {
     pi: PathInfo,
+    jump: JumpLocation,
     selected_id: usize,
     cursor_y: u16,
     term: &'a mut Term<'b>,
@@ -127,20 +128,50 @@ impl Window {
     }
 }
 
-impl<'a, 'b> PickerMenu<'a, 'b> {
+enum JumpLocation {
+    Top,
+    Middle,
+    Bottom,
+}
+impl Clone for JumpLocation {
+    fn clone(&self) -> JumpLocation {
+        *self
+    }
+}
+impl Copy for JumpLocation {}
+
+impl JumpLocation {
+    fn default() -> JumpLocation {
+        JumpLocation::Middle
+    }
+    fn reset(&mut self) {
+        *self = JumpLocation::default();
+    }
+
+    fn next(&mut self) {
+        *self = match *self {
+            JumpLocation::Middle => JumpLocation::Top,
+            JumpLocation::Top => JumpLocation::Bottom,
+            JumpLocation::Bottom => JumpLocation::Middle,
+        };
+    }
+}
+
+impl<'a, 'b> SelectMenu<'a, 'b> {
     fn new(
         term: &'a mut Term<'b>,
         lines: &'a Vec<Box<dyn Entry + 'a>>,
         path_ids: Vec<usize>,
-    ) -> io::Result<PickerMenu<'a, 'b>> {
+    ) -> io::Result<SelectMenu<'a, 'b>> {
         if !config().menu {
             term.claim()?;
         }
 
         let max_line_id = lines.len() - 1;
 
-        let mut menu = PickerMenu {
+        let mut menu = SelectMenu {
             selected_id: 0,
+            jump: JumpLocation::default(),
             cursor_y: START_Y,
             term,
             max_line_id,
@@ -204,12 +235,14 @@ impl<'a, 'b> PickerMenu<'a, 'b> {
         lines: &'a Vec<Box<dyn Entry + 'a>>,
         path_ids: Vec<usize>,
     ) -> io::Result<()> {
-        let mut menu: PickerMenu = PickerMenu::new(term, lines, path_ids)?;
+        let mut menu: SelectMenu = SelectMenu::new(term, lines, path_ids)?;
 
         menu.draw()?;
         let mut down_row: u16 = 0;
+        let mut cursor_jump;
 
         loop {
+            cursor_jump = false;
             let event = event::read()?;
             match event {
                 Event::Key(KeyEvent {
@@ -242,9 +275,15 @@ impl<'a, 'b> PickerMenu<'a, 'b> {
                             KeyCode::Char('z')
                                 if !modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
                             {
-                                menu.center_cursor()?
+                                menu.jump_cursor(menu.jump)?;
+                                menu.jump.next();
+                                cursor_jump = true;
                             }
-                            KeyCode::Char('l') => menu.center_cursor()?,
+                            KeyCode::Char('l') => {
+                                menu.jump_cursor(menu.jump)?;
+                                menu.jump.next();
+                                cursor_jump = true;
+                            }
                             KeyCode::Enter => {
                                 let selected = &menu.lines.get(menu.selected_id).unwrap();
                                 match selected.open_info() {
@@ -326,6 +365,9 @@ impl<'a, 'b> PickerMenu<'a, 'b> {
                     }
                 }
                 _ => {}
+            }
+            if !cursor_jump {
+                menu.jump.reset();
             }
         }
         menu.term.give()
@@ -455,20 +497,25 @@ impl<'a, 'b> PickerMenu<'a, 'b> {
         }
     }
 
-    fn center_cursor(&mut self) -> io::Result<()> {
-        let mid = self.term.height / 2;
-        if self.cursor_y != mid {
-            self.cursor_y = mid;
-            self.draw()?;
+    fn jump_cursor(&mut self, loc: JumpLocation) -> io::Result<()> {
+        let y = match loc {
+            JumpLocation::Middle => self.term.height / 2,
+            JumpLocation::Top => 0,
+            JumpLocation::Bottom => self.max_cursor_y(),
+        };
+        if self.cursor_y != y {
+            self.cursor_y = y;
+            self.draw()
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     fn resize(&mut self, new_height: u16, new_width: u16) -> io::Result<()> {
         self.term.set_dims(new_height, new_width);
         self.update_offsets_and_jumps();
         if self.cursor_y as usize > (self.term.height / 2) as usize {
-            self.center_cursor()
+            self.jump_cursor(JumpLocation::Middle)
         } else {
             self.draw()
         }
@@ -492,7 +539,7 @@ impl<'a, 'b> PickerMenu<'a, 'b> {
             self.update_offsets_and_jumps();
             self.term.claim()?;
             if self.term.height != orig_height {
-                self.center_cursor()?;
+                self.jump_cursor(JumpLocation::Middle)?;
             } else {
                 self.draw()?;
             }
