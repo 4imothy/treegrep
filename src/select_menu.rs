@@ -396,10 +396,9 @@ impl<'a, 'b> PickerMenu<'a, 'b> {
         if self.cursor_y < self.scroll_offset || self.bot_visible() {
             self.down(self.small_jump)
         } else {
-            let max_cursor_y = self.max_cursor_y();
             self.destyle_selected()?;
             self.inc_selected(1);
-            self.scroll_and_fill_line(false, &terminal::ScrollUp(1), max_cursor_y)?;
+            self.scroll_and_fill_line(false, &terminal::ScrollUp(1), self.max_cursor_y())?;
             self.style_selected()?;
             self.term.flush()
         }
@@ -418,34 +417,42 @@ impl<'a, 'b> PickerMenu<'a, 'b> {
     }
 
     fn down(&mut self, try_dist: u16) -> io::Result<()> {
-        self.destyle_selected()?;
         let dist: usize = (try_dist as usize).min(self.max_line_id - self.selected_id);
-        let max_cursor_y = self.max_cursor_y();
-        self.inc_selected(dist);
-        for _ in 0..dist {
-            if self.cursor_y + self.scroll_offset < max_cursor_y || self.bot_visible() {
-                self.cursor_y += 1;
-            } else {
-                self.scroll_and_fill_line(false, &terminal::ScrollUp(1), max_cursor_y)?;
+        if dist != 0 {
+            self.destyle_selected()?;
+            let max_cursor_y = self.max_cursor_y();
+            self.inc_selected(dist);
+            for _ in 0..dist {
+                if self.cursor_y + self.scroll_offset < max_cursor_y || self.bot_visible() {
+                    self.cursor_y += 1;
+                } else {
+                    self.scroll_and_fill_line(false, &terminal::ScrollUp(1), max_cursor_y)?;
+                }
             }
+            self.style_selected()?;
+            self.term.flush()
+        } else {
+            Ok(())
         }
-        self.style_selected()?;
-        self.term.flush()
     }
 
     fn up(&mut self, try_dist: u16) -> io::Result<()> {
-        self.destyle_selected()?;
         let dist: usize = (try_dist as usize).min(self.selected_id);
-        self.dec_selected(dist);
-        for _ in 0..dist {
-            if self.cursor_y > self.scroll_offset || self.top_visible() {
-                self.cursor_y -= 1;
-            } else {
-                self.scroll_and_fill_line(true, &terminal::ScrollDown(1), START_Y)?;
+        if dist != 0 {
+            self.destyle_selected()?;
+            self.dec_selected(dist);
+            for _ in 0..dist {
+                if self.cursor_y > self.scroll_offset || self.top_visible() {
+                    self.cursor_y -= 1;
+                } else {
+                    self.scroll_and_fill_line(true, &terminal::ScrollDown(1), START_Y)?;
+                }
             }
+            self.style_selected()?;
+            self.term.flush()
+        } else {
+            Ok(())
         }
-        self.style_selected()?;
-        self.term.flush()
     }
 
     fn center_cursor(&mut self) -> io::Result<()> {
