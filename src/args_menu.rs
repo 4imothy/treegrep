@@ -81,6 +81,7 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
         };
         menu.set_locations();
         menu.draw()?;
+        execute!(menu.term, cursor::Show)?;
         loop {
             let event = event::read()?;
             match event {
@@ -122,6 +123,7 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
                 _ => {}
             }
         }
+        execute!(menu.term, cursor::Hide)?;
         menu.term.clear()?;
         if quit {
             Ok(None)
@@ -130,18 +132,24 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
         }
     }
 
+    fn max_viewable_len(&self) -> u16 {
+        self.text_box_width.saturating_sub(1)
+    }
+
     fn update_window(&mut self, append: bool) -> io::Result<()> {
         if !append {
             self.start = self.start.saturating_sub(1);
         } else if self.input.len() > self.text_box_width as usize - 1 {
             self.start += 1;
         }
+        let cursor_pos_x = self.cursor_pos_x();
 
         execute!(
             self.term,
             cursor::MoveTo(self.start_x + 1, self.center_y),
             Print(&self.input[self.start..]),
-            Print(if append { "" } else { " " })
+            Print(if append { "" } else { " " }),
+            cursor::MoveTo(cursor_pos_x, self.center_y),
         )
     }
 
@@ -151,7 +159,7 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
         self.start = self
             .input
             .len()
-            .saturating_sub(self.text_box_width as usize - 1);
+            .saturating_sub(self.max_viewable_len() as usize);
         self.draw()
     }
 
@@ -175,15 +183,19 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
         #[cfg(unix)]
         {
             let (width, height) = terminal::size()?;
-            self.term.set_dims(height, width);
             self.term.claim()?;
-            self.draw()?;
+            self.resize(height, width)?;
         }
         Ok(())
     }
 
+    fn cursor_pos_x(&self) -> u16 {
+        self.start_x + self.input.len().min(self.max_viewable_len() as usize) as u16 + 1
+    }
+
     fn draw(&mut self) -> io::Result<()> {
         self.term.clear()?;
+        let cursor_pos_x = self.cursor_pos_x();
 
         execute!(
             self.term,
@@ -209,7 +221,7 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
                 formats::repeat(self.conf.c.h, self.text_box_width as usize),
                 self.conf.c.br,
             )),
-            cursor::MoveTo(self.start_x + self.input.len() as u16, self.center_y),
+            cursor::MoveTo(cursor_pos_x, self.center_y),
         )
     }
 }
