@@ -8,13 +8,13 @@ use crate::{
 };
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
-    execute, queue,
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    execute,
     style::Print,
     terminal,
 };
 use std::ffi::OsString;
-use std::io::{self, Write};
+use std::io;
 
 pub struct ArgsMenu<'a, 'b> {
     term: &'a mut term::Term<'b>,
@@ -34,7 +34,7 @@ pub fn launch(term: &mut term::Term, conf: Config) -> Result<Option<Config>, Mes
     })?;
     if let Some(i) = input {
         let mut input_vec: Vec<OsString> = shlex::split(&i)
-            .unwrap()
+            .ok_or_else(|| mes!("erroneous arguments"))?
             .into_iter()
             .map(OsString::from)
             .collect();
@@ -43,17 +43,7 @@ pub fn launch(term: &mut term::Term, conf: Config) -> Result<Option<Config>, Mes
         match res {
             Ok((matches, all_args)) => {
                 let (bold, colors) = Config::get_styling(&matches);
-                let mut c = match Config::get_config(matches, all_args, bold, colors) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        view_error(
-                            term,
-                            format!("{} {}", formats::error_prefix(bold, colors), e),
-                        )
-                        .map_err(|e| mes!("{}", e.to_string()))?;
-                        return Ok(None);
-                    }
-                };
+                let mut c = Config::get_config(matches, all_args, bold, colors)?;
                 c.repeat_file = conf.repeat_file;
                 if let Some(new_c) = c.handle_repeat()? {
                     c = new_c;
@@ -66,10 +56,10 @@ pub fn launch(term: &mut term::Term, conf: Config) -> Result<Option<Config>, Mes
                     Ok(Some(c))
                 }
             }
-            Err(e) => {
-                view_error(term, e.to_string()).map_err(|e| mes!("{}", e.to_string()))?;
-                Ok(None)
-            }
+            Err(e) => Err(mes!("{}", {
+                let s = e.to_string();
+                s.strip_prefix("error:").unwrap_or(&s).to_string()
+            })),
         }
     } else {
         Ok(None)
@@ -78,8 +68,6 @@ pub fn launch(term: &mut term::Term, conf: Config) -> Result<Option<Config>, Mes
 
 impl<'a, 'b> ArgsMenu<'a, 'b> {
     pub fn enter(term: &mut term::Term, conf: &Config) -> io::Result<Option<String>> {
-        term.claim()?;
-
         let quit;
         let mut menu = ArgsMenu {
             term,
@@ -224,26 +212,4 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
             cursor::MoveTo(self.start_x + self.input.len() as u16, self.center_y),
         )
     }
-}
-
-pub fn view_error(term: &mut term::Term, mes: String) -> io::Result<()> {
-    term.clear()?;
-    for (i, line) in mes.lines().enumerate() {
-        queue!(term, cursor::MoveTo(0, i as u16), Print(line))?;
-    }
-    term.flush()?;
-    loop {
-        if let Event::Key(KeyEvent {
-            code: KeyCode::Char(c),
-            modifiers,
-            kind: KeyEventKind::Press,
-            ..
-        }) = event::read()?
-        {
-            if c == 'q' || (c == 'c' && modifiers.contains(KeyModifiers::CONTROL)) {
-                break;
-            }
-        };
-    }
-    Ok(())
 }

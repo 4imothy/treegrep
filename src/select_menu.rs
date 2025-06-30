@@ -158,15 +158,11 @@ impl JumpLocation {
 }
 
 impl<'a, 'b> SelectMenu<'a, 'b> {
-    fn new(
+    pub fn enter(
         term: &'a mut Term<'b>,
         lines: &'a Vec<Box<dyn Entry + 'a>>,
         path_ids: Vec<usize>,
     ) -> io::Result<SelectMenu<'a, 'b>> {
-        if !config().menu {
-            term.claim()?;
-        }
-
         let max_line_id = lines.len() - 1;
 
         let mut menu = SelectMenu {
@@ -230,12 +226,12 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         self.small_jump = 1;
     }
 
-    pub fn enter(
+    pub fn launch(
         term: &mut Term,
         lines: &'a Vec<Box<dyn Entry + 'a>>,
         path_ids: Vec<usize>,
     ) -> io::Result<()> {
-        let mut menu: SelectMenu = SelectMenu::new(term, lines, path_ids)?;
+        let mut menu: SelectMenu = SelectMenu::enter(term, lines, path_ids)?;
 
         menu.draw()?;
         let mut down_row: u16 = 0;
