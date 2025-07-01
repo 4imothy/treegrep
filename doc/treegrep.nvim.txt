@@ -1,0 +1,63 @@
+==============================================================================
+INTRODUCTION                                                      *treegrep.lua*
+
+`treegrep` provides a floating terminal interface to run the `tgrep` program.
+Selections are stored in a file and opened.
+
+==============================================================================
+CONFIGURATION                                              *treegrep.lua.config*
+
+All options are set via `require('tgrep').setup({...})`.
+
+- *selection_file* (string, required)
+  Path to the file used to store selections
+
+- *repeat_file* (string, optional)
+  Path to the file used to store previous arguments
+
+- *win_width_pct* (number, optional, default: `0.7`)
+  Window width as a percentage of the editor
+
+- *win_height_pct* (number, optional, default: `0.7`)
+  Window height as a percentage of the editor
+
+- *win_border* (string, optional, default: `'rounded'`)
+  Border style for the window
+
+- *win_style* (string, optional, default: `'minimal'`)
+  Window style
+
+- *win_relative* (string, optional, default: `'editor'`)
+  Window positioning
+
+- *win_mouse* (boolean, optional, default: `true`)
+  Whether mouse events interact with this window
+
+- *win_opts_fn* (function, optional)
+  A function returning window options, ignoring other window configuration
+
+==============================================================================
+FUNCTIONS                                               *treegrep.lua.functions*
+
+*treegrep.tgrep_with()*
+>lua
+    require('treegrep').tgrep_with(...)
+
+Runs the `tgrep` binary in a floating window with the passed arguments.
+
+Example options:
+    `'--menu'`            Open a menu to input the regex expression, path, etc.
+    `'--repeat'`          Repeat the previous search (only usable if |repeat_file| specified)
+    `'--files --select'`  Show the files in a menu to select from
+
+See more options with `tgrep --help`
+
+
+*treegrep.build_tgrep()*
+>lua
+    require('treegrep').build_tgrep()
+
+Builds the `tgrep` binary using `cargo build --release`. If this function is
+not used `treegrep` will assume `tgrep` is on the path.
+
+vim:tw=78:ts=8:ft=help:norl:

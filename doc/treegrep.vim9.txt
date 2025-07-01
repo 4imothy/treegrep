@@ -1,0 +1,52 @@
+==============================================================================
+INTRODUCTION                                                     *treegrep.vim9*
+
+`treegrep` provides a floating terminal interface to run the `tgrep` program.
+Selections are stored in a file and opened.
+
+==============================================================================
+CONFIGURATION                                             *treegrep.vim9.config*
+
+- *g:tgrep_selection_file* (string, required)
+  Path to the file used to store selections
+
+- *g:tgrep_repeat_file* (string, optional)
+  Path to the file used to store previous arguments
+
+- *g:tgrep_win_width_pct* (float, optional, default: `0.7`)
+  Window width as a percentage of the editor.
+
+- *g:tgrep_win_height_pct* (float, optional, default: `0.7`)
+  Window height as a percentage of the editor.
+
+- *g:tgrep_borderchars* (list of strings, optional, default: `['─', '│', '─', '│', '╭', '╮', '╯', '╰']`)
+  Characters used to draw the popup window border.
+
+- *g:Tgrep_win_opts_fn* (function reference, optional)
+  A function returning popup options, ignoring other window configuration
+
+==============================================================================
+FUNCTIONS                                              *treegrep.vim9.functions*
+
+*g:TgrepFloat({args})*
+>
+    call g:TgrepFloat(...)
+<
+Runs the `tgrep` binary in a floating window with the passed arguments.
+
+Example arguments:
+    `'--menu'`            Open a menu to input the regex expression, path, etc.
+    `'--repeat'`          Repeat the previous search (only usable if |g:tgrep_repeat_file| is set)
+    `'--files --select'`  Show the files in a menu to select from
+
+See more options with `tgrep --help`
+
+
+*g:TgrepBuild()*
+>
+    call g:TgrepBuild()
+<
+Builds the `tgrep` binary using `cargo build --release`. If this function
+is not used `treegrep` will assume `tgrep` is on the path.
+
+vim:tw=78:ts=8:ft=help:norl:
