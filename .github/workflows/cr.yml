@@ -87,7 +87,6 @@ jobs:
           else
             cp target/${{ matrix.job.target }}/release/tgrep $RELEASE_DIR/tgrep
           fi
-          mv completions $RELEASE_DIR/
 
       - name: Codesign MacOS
         if: matrix.job.os == 'macos-latest'

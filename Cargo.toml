@@ -1,6 +1,6 @@
 [package]
 name = "treegrep"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/4imothy/treegrep"
@@ -11,12 +11,8 @@ readme = "README.md"
 description = "pattern matcher that displays results in a tree structure with an interface to jump to matched text"
 documentation = "https://github.com/4imothy/treegrep/tree/main/README.md"
 authors = ["Timothy Cronin"]
-exclude = [
-  "/.github/",
-  "/benchmarks/",
-  "/completions/",
-  "install.sh",
-  "todos.md",
+include = [
+"/src"
 ]
 autotests = false
 

@@ -275,7 +275,7 @@ treegrep
 
 ### *--help*
 ```
-treegrep 1.0.0
+treegrep 1.1.0
 
 by Timothy Cronin
 
