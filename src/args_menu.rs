@@ -28,10 +28,7 @@ pub struct ArgsMenu<'a, 'b> {
 }
 
 pub fn launch(term: &mut term::Term, conf: Config) -> Result<Option<Config>, Message> {
-    let input = ArgsMenu::enter(term, &conf).map_err(|e| {
-        let _ = term.give();
-        mes!("{}", e.to_string())
-    })?;
+    let input = ArgsMenu::enter(term, &conf).map_err(|e| mes!("{}", e.to_string()))?;
     if let Some(i) = input {
         let mut input_vec: Vec<OsString> = shlex::split(&i)
             .ok_or_else(|| mes!("erroneous arguments"))?

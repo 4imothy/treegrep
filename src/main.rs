@@ -81,12 +81,9 @@ fn run(
     }
 
     let out: StdoutLock = stdout().lock();
-    let need_ui = c.menu || c.select;
-    let mut term = Term::new(out, need_ui).map_err(|e| mes!("{}", e.to_string()))?;
-    if need_ui {
-        term.claim().map_err(|e| mes!("{}", e.to_string()))?;
-    }
+    let mut term = Term::new(out, c.menu || c.select).map_err(|e| mes!("{}", e.to_string()))?;
     if c.menu {
+        term.claim().map_err(|e| mes!("{}", e.to_string()))?;
         match args_menu::launch(&mut term, c) {
             Ok(Some(new_c)) => c = new_c,
             Ok(None) => {
@@ -111,7 +108,7 @@ fn run(
     };
 
     if matches.is_none() {
-        if need_ui {
+        if config().menu {
             term.give().map_err(|e| mes!("{}", e.to_string()))?;
         }
         return Ok(());
@@ -122,6 +119,9 @@ fn run(
     let lines: Vec<Box<dyn Entry>> = matches_to_display_lines(&m, path_ids.as_mut())?;
 
     if config().select {
+        if !config().menu {
+            term.claim().map_err(|e| mes!("{}", e.to_string()))?;
+        }
         SelectMenu::launch(
             &mut term,
             &lines,
