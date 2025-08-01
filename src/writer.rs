@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
 use crate::config;
-use crate::errors::{mes, Message};
+use crate::errors::{Message, mes};
 use crate::formats;
 use crate::match_system::{Directory, File, Match, Matches};
-use crate::term::Term;
 use crate::term::TERM_WIDTH;
+use crate::term::Term;
 use core::fmt::{self, Display};
 use crossterm::style::StyledContent;
 use std::io::{self, Write};

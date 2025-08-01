@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
 use crate::config;
-use crate::errors::{mes, Message};
+use crate::errors::{Message, mes};
 use crate::formats;
-use crate::match_system::{wrap_dirs, wrap_file, Directory, File, Line, Match, Matches};
+use crate::match_system::{Directory, File, Line, Match, Matches, wrap_dirs, wrap_file};
 use bstr::ByteSlice;
-use ignore::{overrides::OverrideBuilder, WalkBuilder};
+use ignore::{WalkBuilder, overrides::OverrideBuilder};
 use regex::bytes::Regex;
 use std::collections::HashMap;
 use std::ffi::OsString;

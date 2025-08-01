@@ -2,7 +2,7 @@
 
 use crate::config;
 use crossterm::style::{
-    style, Attribute, Color, SetAttribute, SetForegroundColor, StyledContent, Stylize,
+    Attribute, Color, SetAttribute, SetForegroundColor, StyledContent, Stylize, style,
 };
 use std::fmt::{self, Display};
 

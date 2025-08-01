@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use clap::builder::PossibleValue;
-use clap::{value_parser, Arg, ArgAction, ArgGroup, Command, ValueEnum, ValueHint};
+use clap::{Arg, ArgAction, ArgGroup, Command, ValueEnum, ValueHint, value_parser};
 
 pub const DEFAULT_PREFIX_LEN: &str = "3";
 pub const DEFAULT_LONG_BRANCH_EACH: &str = "5";

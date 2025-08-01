@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-use crate::config;
-use crate::errors::{mes, Message, SUBMIT_ISSUE};
-use crate::formats;
-use crate::match_system::{wrap_dirs, wrap_file, Directory, File, Line, Match, Matches};
 use crate::Searchers;
+use crate::config;
+use crate::errors::{Message, SUBMIT_ISSUE, mes};
+use crate::formats;
+use crate::match_system::{Directory, File, Line, Match, Matches, wrap_dirs, wrap_file};
 use bstr::io::{BufReadExt, ByteLines};
 use serde_json::Value;
 use std::collections::HashMap;

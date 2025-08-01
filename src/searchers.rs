@@ -2,7 +2,7 @@
 
 use crate::args::names;
 use crate::config;
-use crate::errors::{mes, Message, SUBMIT_ISSUE};
+use crate::errors::{Message, SUBMIT_ISSUE, mes};
 use crate::options::{Options, Rg};
 use std::env;
 use std::path::{Path, PathBuf};
@@ -94,9 +94,9 @@ impl Searchers {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CONFIG;
     use crate::args::generate_command;
     use crate::config::Config;
-    use crate::CONFIG;
 
     #[test]
     fn test_options_add_args_rg() {

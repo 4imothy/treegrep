@@ -17,18 +17,18 @@ mod writer;
 use clap::ArgMatches;
 use clap_complete::generate;
 use config::Config;
-use errors::{mes, Message};
+use errors::{Message, mes};
 use match_system::Matches;
 use output_processor::process_results;
 use searchers::Searchers;
 use select_menu::SelectMenu;
 use std::ffi::OsString;
-use std::io::{stdout, StdoutLock};
+use std::io::{StdoutLock, stdout};
 use std::path::Path;
 use std::process::Command;
 use std::sync::OnceLock;
 use term::Term;
-use writer::{matches_to_display_lines, write_results, Entry};
+use writer::{Entry, matches_to_display_lines, write_results};
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 

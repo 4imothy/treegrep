@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-use crate::args::{self, generate_command, OpenStrategy, REPEAT_FILE};
-use crate::errors::{mes, Message};
+use crate::args::{self, OpenStrategy, REPEAT_FILE, generate_command};
+use crate::errors::{Message, mes};
 use crate::formats;
 use crate::searchers::Searchers;
 use clap::{ArgMatches, Error};
@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn test_env_opts() {
-        std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" "));
+        unsafe { std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" ")) };
         let (matches, all_args) = get_matches(Vec::new(), true).unwrap();
         let (bold, colors) = Config::get_styling(&matches);
         let config = Config::get_config(matches, all_args, bold, colors)

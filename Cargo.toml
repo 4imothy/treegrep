@@ -1,7 +1,7 @@
 [package]
 name = "treegrep"
 version = "1.1.0"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 repository = "https://github.com/4imothy/treegrep"
 homepage = "https://github.com/4imothy/treegrep"

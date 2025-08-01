@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::args::{self, MENU};
-use crate::errors::{mes, Message};
+use crate::errors::{Message, mes};
 use crate::{
     config::{self, Config},
     formats, term,
@@ -122,11 +122,7 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
         }
         execute!(menu.term, cursor::Hide)?;
         menu.term.clear()?;
-        if quit {
-            Ok(None)
-        } else {
-            Ok(Some(menu.input))
-        }
+        if quit { Ok(None) } else { Ok(Some(menu.input)) }
     }
 
     fn max_viewable_len(&self) -> u16 {
