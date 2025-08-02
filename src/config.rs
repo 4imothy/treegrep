@@ -136,10 +136,12 @@ pub fn get_matches(
 }
 
 impl Config {
-    pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
+    pub fn get_ui_info(matches: &ArgMatches) -> (bool, bool, bool, bool) {
         (
             !matches.get_flag(args::NO_BOLD.id),
             !matches.get_flag(args::NO_COLORS.id),
+            matches.get_flag(args::MENU.id),
+            matches.get_flag(args::SELECT.id),
         )
     }
 
@@ -154,9 +156,11 @@ impl Config {
                         .collect();
                     let (matches, all_args) =
                         get_matches(args, false).map_err(|e| mes!("{}", e))?;
-                    let (bold, colors) = Self::get_styling(&matches);
+                    let (bold, colors, menu, select) = Self::get_ui_info(&matches);
 
-                    Ok(Some(Self::get_config(matches, all_args, bold, colors)?))
+                    Ok(Some(Self::get_config(
+                        matches, all_args, bold, colors, menu, select,
+                    )?))
                 }
             } else if self.menu {
                 Ok(None)
@@ -183,6 +187,8 @@ impl Config {
         all_args: Vec<OsString>,
         bold: bool,
         colors: bool,
+        menu: bool,
+        select: bool,
     ) -> Result<Self, Message> {
         let mut patterns: Vec<String> = Vec::new();
         if let Some(expr) = matches.get_one::<String>(args::EXPRESSION_POSITIONAL.id) {
@@ -203,8 +209,6 @@ impl Config {
         let count: bool = matches.get_flag(args::COUNT.id);
         let hidden: bool = matches.get_flag(args::HIDDEN.id);
         let line_number: bool = matches.get_flag(args::LINE_NUMBER.id);
-        let picker: bool = matches.get_flag(args::SELECT.id);
-        let menu: bool = matches.get_flag(args::MENU.id);
         let files: bool = matches.get_flag(args::FILES.id);
         let links: bool = matches.get_flag(args::LINKS.id);
         let trim: bool = matches.get_flag(args::TRIM_LEFT.id);
@@ -283,7 +287,7 @@ impl Config {
             pcre2,
             count,
             hidden,
-            select: picker,
+            select,
             files,
             links,
             max_depth,
@@ -365,8 +369,8 @@ mod tests {
         T: Into<OsString> + Clone,
     {
         let matches = generate_command().get_matches_from(args);
-        let (bold, colors) = Config::get_styling(&matches);
-        let config = Config::get_config(matches, Vec::new(), bold, colors)
+        let (bold, colors, menu, select) = Config::get_ui_info(&matches);
+        let config = Config::get_config(matches, Vec::new(), bold, colors, menu, select)
             .ok()
             .unwrap();
         config
@@ -376,8 +380,8 @@ mod tests {
     fn test_env_opts() {
         unsafe { std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" ")) };
         let (matches, all_args) = get_matches(Vec::new(), true).unwrap();
-        let (bold, colors) = Config::get_styling(&matches);
-        let config = Config::get_config(matches, all_args, bold, colors)
+        let (bold, colors, menu, select) = Config::get_ui_info(&matches);
+        let config = Config::get_config(matches, all_args, bold, colors, menu, select)
             .ok()
             .unwrap();
         check_parsed_config_from_example_opts(config);

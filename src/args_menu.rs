@@ -39,8 +39,8 @@ pub fn launch(term: &mut term::Term, conf: Config) -> Result<Option<Config>, Mes
         let res = config::get_matches(input_vec, true);
         match res {
             Ok((matches, all_args)) => {
-                let (bold, colors) = Config::get_styling(&matches);
-                let mut c = Config::get_config(matches, all_args, bold, colors)?;
+                let (bold, colors, menu, select) = Config::get_ui_info(&matches);
+                let mut c = Config::get_config(matches, all_args, bold, colors, menu, select)?;
                 c.repeat_file = conf.repeat_file;
                 if let Some(new_c) = c.handle_repeat()? {
                     c = new_c;

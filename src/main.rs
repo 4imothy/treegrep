@@ -43,20 +43,36 @@ fn main() {
     let (matches, all_args) = config::get_matches(std::env::args_os().skip(1).collect(), true)
         .unwrap_or_else(|e| e.exit());
 
-    let (bold, colors) = Config::get_styling(&matches);
-    run(matches, all_args, bold, colors).unwrap_or_else(|e| {
-        eprintln!("{} {}", formats::error_prefix(bold, colors), e);
-        std::process::exit(1);
+    let (bold, colors, menu, select) = Config::get_ui_info(&matches);
+    let out: StdoutLock = stdout().lock();
+    let err_prefix = formats::error_prefix(bold, colors);
+    let mut term = Term::new(out, menu || select)
+        .map_err(|e| mes!("{}", e.to_string()))
+        .unwrap_or_else(|e| {
+            eprintln!("{} {}", err_prefix, e);
+            std::process::exit(1);
+        });
+    run(&mut term, matches, all_args, bold, colors, menu, select).unwrap_or_else(|e| {
+        if menu {
+            let _ = errors::view_error(&mut term, format!("{} {}", err_prefix, e))
+                .map_err(|e| mes!("{}", e.to_string()));
+        } else {
+            eprintln!("{} {}", err_prefix, e);
+            std::process::exit(1);
+        }
     });
 }
 
 fn run(
+    term: &mut Term,
     matches: ArgMatches,
     all_args: Vec<OsString>,
     bold: bool,
     colors: bool,
+    menu: bool,
+    select: bool,
 ) -> Result<(), Message> {
-    let mut c = Config::get_config(matches, all_args, bold, colors)?;
+    let mut c = Config::get_config(matches, all_args, bold, colors, menu, select)?;
     if let Some(mut new_c) = c.handle_repeat()? {
         new_c.selection_file = c.selection_file;
         c = new_c;
@@ -76,22 +92,13 @@ fn run(
         return Ok(());
     }
 
-    let out: StdoutLock = stdout().lock();
-    let mut term = Term::new(out, c.menu || c.select).map_err(|e| mes!("{}", e.to_string()))?;
     if c.menu {
         term.claim().map_err(|e| mes!("{}", e.to_string()))?;
-        match args_menu::launch(&mut term, c) {
-            Ok(Some(new_c)) => c = new_c,
-            Ok(None) => {
+        match args_menu::launch(term, c)? {
+            Some(new_c) => c = new_c,
+            None => {
                 term.give().map_err(|e| mes!("{}", e.to_string()))?;
                 return Ok(());
-            }
-            Err(e) => {
-                return errors::view_error(
-                    &mut term,
-                    format!("{} {}", formats::error_prefix(bold, colors), e),
-                )
-                .map_err(|e| mes!("{}", e.to_string()));
             }
         }
     }
@@ -119,7 +126,7 @@ fn run(
             term.claim().map_err(|e| mes!("{}", e.to_string()))?;
         }
         SelectMenu::launch(
-            &mut term,
+            term,
             &lines,
             path_ids
                 .map(|mut p| {
@@ -133,7 +140,7 @@ fn run(
             mes!("{}", e.to_string())
         })?;
     } else {
-        write_results(&mut term, &lines).map_err(|e| mes!("{}", e.to_string()))?;
+        write_results(term, &lines).map_err(|e| mes!("{}", e.to_string()))?;
     }
 
     Ok(())

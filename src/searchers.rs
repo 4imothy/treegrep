@@ -120,6 +120,8 @@ mod tests {
             Vec::new(),
             false,
             false,
+            false,
+            false,
         )
         .ok()
         .unwrap();
