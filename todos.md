@@ -5,10 +5,7 @@
 - different colors for match, file, directory, line number
 ## Menus
 - searching for text within the results
-- add a cursor and option to change the character, if we can change this
-  character then we should also have the ability to change the selected
-  indicator, maybe remove char style in favor of user providing the characters
-  we could also just make the cursor from a fixed pool and set that
+- args menu use arrows to move cursor forward and backward
 ## Completions
 - *nushell:* currently outputs incorrect orderings with positional -> optional -> positional (4/28/2025)
 
@@ -16,5 +13,4 @@
 - builtin multithreading
 
 # Plugin
-- Make actual plugins for *vim* and *neovim*
 - *TMUX* and *Zellij*
