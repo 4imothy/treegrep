@@ -83,7 +83,6 @@ macro_rules! arg_info {
 pub const EXPRESSION_GROUP_ID: &str = "expressions";
 pub const TARGET_GROUP_ID: &str = "targets";
 pub const CHAR_STYLE_OPTIONS: [&str; 6] = ["ascii", "single", "double", "heavy", "rounded", "none"];
-pub const PLUGIN_SUPPORT: &str = "plugin-support";
 
 arg_info!(
     LONG_BRANCHES,
@@ -198,7 +197,7 @@ home page: ",
 );
 
 pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
-const DONT_NEED_REGEXP: &[&str] = &[FILES.id, COMPLETIONS.id, PLUGIN_SUPPORT, MENU.id, REPEAT.id];
+const DONT_NEED_REGEXP: &[&str] = &[FILES.id, COMPLETIONS.id, MENU.id, REPEAT.id];
 
 pub fn generate_command() -> Command {
     let mut command = Command::new(env!("CARGO_PKG_NAME"))
@@ -250,7 +249,7 @@ fn usize_arg(info: &ArgInfo, default_value: Option<&'static str>) -> Arg {
     arg
 }
 
-fn get_args() -> [Arg; 29] {
+fn get_args() -> [Arg; 28] {
     let long = Arg::new(LONG_BRANCHES.id)
         .long(LONG_BRANCHES.id)
         .help(LONG_BRANCHES.h)
@@ -321,11 +320,6 @@ fn get_args() -> [Arg; 29] {
         .value_name(SHELL_ID)
         .action(ArgAction::Set);
 
-    let plugin_support = Arg::new(PLUGIN_SUPPORT)
-        .long(PLUGIN_SUPPORT)
-        .action(ArgAction::SetTrue)
-        .hide(true);
-
     [
         glob,
         searcher,
@@ -334,7 +328,6 @@ fn get_args() -> [Arg; 29] {
         open_like,
         long,
         completions,
-        plugin_support,
         selection_file,
         repeat_file,
         bool_arg(HIDDEN),

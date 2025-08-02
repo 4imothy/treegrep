@@ -56,7 +56,6 @@ pub struct Config {
     pub open_like: Option<OpenStrategy>,
     pub completion_target: Option<clap_complete::Shell>,
     pub repeat: bool,
-    pub plugin_support: bool,
     pub all_args: Vec<OsString>,
 }
 
@@ -212,7 +211,6 @@ impl Config {
         let pcre2: bool = matches.get_flag(args::PCRE2.id);
         let ignore: bool = !matches.get_flag(args::NO_IGNORE.id);
         let overview: bool = matches.get_flag(args::OVERVIEW.id);
-        let plugin_support: bool = matches.get_flag(args::PLUGIN_SUPPORT);
         let repeat: bool = matches.get_flag(args::REPEAT.id);
 
         let max_depth: Option<usize> = get_usize_option(&matches, args::MAX_DEPTH.id)?;
@@ -302,7 +300,6 @@ impl Config {
             c: Config::get_characters(matches.get_one::<String>(args::CHAR_STYLE.id), prefix_len),
             completion_target,
             menu,
-            plugin_support,
             repeat,
             all_args,
         })

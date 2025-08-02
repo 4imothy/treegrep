@@ -62,10 +62,6 @@ fn run(
         c = new_c;
     }
 
-    if c.plugin_support {
-        return Ok(());
-    }
-
     if let Some(f) = &c.selection_file {
         std::fs::write(f, b"").map_err(|e| mes!("{}", e.to_string()))?;
     }
