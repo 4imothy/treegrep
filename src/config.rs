@@ -150,10 +150,17 @@ impl Config {
             if self.repeat {
                 let data = std::fs::read(f).map_err(|e| mes!("{}", e))?;
                 unsafe {
-                    let args: Vec<OsString> = data
-                        .split(|b| b == &b' ')
-                        .map(|w| OsString::from_encoded_bytes_unchecked(w.to_vec()))
-                        .collect();
+                    let mut pos = 0;
+                    let mut args = Vec::new();
+                    while pos < data.len() {
+                        let len = u32::from_le_bytes(
+                            data[pos..pos + size_of::<u32>()].try_into().unwrap(),
+                        ) as usize;
+                        pos += size_of::<u32>();
+                        let bytes = &data[pos..pos + len];
+                        pos += len;
+                        args.push(OsString::from_encoded_bytes_unchecked(bytes.to_vec()));
+                    }
                     let (matches, all_args) =
                         get_matches(args, false).map_err(|e| mes!("{}", e))?;
                     let (bold, colors, menu, select) = Self::get_ui_info(&matches);
@@ -166,11 +173,11 @@ impl Config {
                 Ok(None)
             } else {
                 let mut buffer = Vec::new();
-                for (i, arg) in self.all_args.iter().enumerate() {
-                    if i > 0 {
-                        buffer.push(b' ');
-                    }
-                    buffer.extend_from_slice(arg.as_encoded_bytes());
+                for arg in self.all_args.iter() {
+                    let bytes = arg.as_encoded_bytes();
+                    let len = bytes.len() as u32;
+                    buffer.extend_from_slice(&len.to_le_bytes());
+                    buffer.extend_from_slice(bytes);
                 }
                 std::fs::write(f, buffer).map_err(|e| mes!("{}", e))?;
                 Ok(None)
