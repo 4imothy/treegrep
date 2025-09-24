@@ -43,19 +43,20 @@ fn main() {
     let (matches, all_args) = config::get_matches(std::env::args_os().skip(1).collect(), true)
         .unwrap_or_else(|e| e.exit());
 
-    let (bold, colors, menu, select) = Config::get_ui_info(&matches);
+    let (bold, colors) = Config::get_styling(&matches);
     let out: StdoutLock = stdout().lock();
     let err_prefix = formats::error_prefix(bold, colors);
-    let mut term = Term::new(out, menu || select)
-        .map_err(|e| mes!("{}", e.to_string()))
-        .unwrap_or_else(|e| {
+    let (c, mut term) =
+        build_config_and_term(matches, all_args, out, bold, colors).unwrap_or_else(|e| {
             eprintln!("{} {}", err_prefix, e);
             std::process::exit(1);
         });
-    run(&mut term, matches, all_args, bold, colors, menu, select).unwrap_or_else(|e| {
+    let menu = c.menu;
+    run(&mut term, c).unwrap_or_else(|e| {
         if menu {
-            let _ = errors::view_error(&mut term, format!("{} {}", err_prefix, e))
-                .map_err(|e| mes!("{}", e.to_string()));
+            let _ = errors::view_error(&mut term, format!("{} {}", err_prefix, e)).map_err(|_| {
+                std::process::exit(1);
+            });
         } else {
             eprintln!("{} {}", err_prefix, e);
             std::process::exit(1);
@@ -63,21 +64,23 @@ fn main() {
     });
 }
 
-fn run(
-    term: &mut Term,
+fn build_config_and_term(
     matches: ArgMatches,
     all_args: Vec<OsString>,
+    out: StdoutLock,
     bold: bool,
     colors: bool,
-    menu: bool,
-    select: bool,
-) -> Result<(), Message> {
-    let mut c = Config::get_config(matches, all_args, bold, colors, menu, select)?;
+) -> Result<(Config, Term), Message> {
+    let mut c = Config::get_config(matches, all_args, bold, colors)?;
     if let Some(mut new_c) = c.handle_repeat()? {
         new_c.selection_file = c.selection_file;
         c = new_c;
     }
+    let term = Term::new(out, c.menu || c.select).map_err(|e| mes!("{}", e.to_string()))?;
+    Ok((c, term))
+}
 
+fn run(term: &mut Term, mut c: Config) -> Result<(), Message> {
     if let Some(f) = &c.selection_file {
         std::fs::write(f, b"").map_err(|e| mes!("{}", e.to_string()))?;
     }
