@@ -21,10 +21,18 @@ pub struct ArgsMenu<'a, 'b> {
     conf: &'a Config,
     input: String,
     start: usize,
+    cursor_index: usize,
     center_y: u16,
     center_x: u16,
     text_box_width: u16,
     start_x: u16,
+}
+
+enum Action {
+    Append,
+    Remove,
+    MoveCursor,
+    ClearForward(usize),
 }
 
 pub fn launch(term: &mut term::Term, conf: Config) -> Result<Option<Config>, Message> {
@@ -71,6 +79,7 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
             conf,
             input: String::new(),
             start: 0,
+            cursor_index: 0,
             center_y: 0,
             center_x: 0,
             text_box_width: 0,
@@ -93,22 +102,55 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
                         break;
                     }
                     KeyCode::Char(c) => {
-                        if c == 'c' && modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                            quit = true;
-                            break;
-                        } else if c == 'z'
-                            && modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
-                        {
-                            menu.suspend()?;
-                            menu.resume()?;
+                        if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                            if c == 'c' {
+                                quit = true;
+                                break;
+                            } else if c == 'z' {
+                                menu.suspend()?;
+                                menu.resume()?;
+                            } else if c == 'f' {
+                                menu.cursor_forward()?;
+                            } else if c == 'b' {
+                                menu.cursor_backward()?;
+                            } else if c == 'd' {
+                                if !menu.input.is_empty() && menu.cursor_index < menu.input.len() {
+                                    menu.input.remove(menu.cursor_index);
+                                    menu.cursor_index += 1;
+                                    menu.update_window(Action::Remove)?;
+                                }
+                            } else if c == 'a' {
+                                menu.cursor_index = 0;
+                                menu.start = 0;
+                                menu.update_window(Action::MoveCursor)?;
+                            } else if c == 'e' {
+                                menu.cursor_index = menu.input.len();
+                                menu.start = menu
+                                    .input
+                                    .len()
+                                    .saturating_sub(menu.text_box_width as usize - 1);
+                                menu.update_window(Action::MoveCursor)?;
+                            } else if c == 'k' {
+                                let removed = menu.input.len() - menu.cursor_index;
+                                menu.input.truncate(menu.cursor_index);
+                                menu.update_window(Action::ClearForward(removed))?;
+                            }
                         } else {
-                            menu.input.push(c);
-                            menu.update_window(true)?;
+                            menu.input.insert(menu.cursor_index, c);
+                            menu.update_window(Action::Append)?;
                         }
                     }
+                    KeyCode::Left => {
+                        menu.cursor_backward()?;
+                    }
+                    KeyCode::Right => {
+                        menu.cursor_forward()?;
+                    }
                     KeyCode::Backspace | KeyCode::Delete => {
-                        menu.input.pop();
-                        menu.update_window(false)?;
+                        if !menu.input.is_empty() && menu.cursor_index > 0 {
+                            menu.input.remove(menu.cursor_index - 1);
+                            menu.update_window(Action::Remove)?;
+                        }
                     }
                     _ => {}
                 },
@@ -125,23 +167,59 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
         if quit { Ok(None) } else { Ok(Some(menu.input)) }
     }
 
-    fn max_viewable_len(&self) -> u16 {
-        self.text_box_width.saturating_sub(1)
+    fn cursor_backward(&mut self) -> io::Result<()> {
+        if self.cursor_index > 0 {
+            self.cursor_index -= 1;
+            if self.cursor_index + 1 == self.start && self.start > 0 {
+                self.start -= 1;
+            }
+            self.update_window(Action::MoveCursor)?;
+        }
+        Ok(())
     }
 
-    fn update_window(&mut self, append: bool) -> io::Result<()> {
-        if !append {
-            self.start = self.start.saturating_sub(1);
-        } else if self.input.len() > self.text_box_width as usize - 1 {
-            self.start += 1;
+    fn cursor_forward(&mut self) -> io::Result<()> {
+        if self.cursor_index < self.input.len() {
+            self.cursor_index += 1;
+            if self.cursor_index - self.start == self.text_box_width as usize
+                && self.input.len() >= self.text_box_width as usize
+            {
+                self.start += 1;
+            }
+            self.update_window(Action::MoveCursor)?;
+        }
+        Ok(())
+    }
+
+    fn update_window(&mut self, action: Action) -> io::Result<()> {
+        let mut clear = "".to_string();
+        match action {
+            Action::Append => {
+                self.cursor_index += 1;
+                if self.input.len() >= self.text_box_width as usize {
+                    self.start += 1;
+                }
+            }
+            Action::Remove => {
+                self.start = self.start.saturating_sub(1);
+                self.cursor_index -= 1;
+                clear = " ".to_string();
+            }
+            Action::MoveCursor => {}
+            Action::ClearForward(c) => {
+                clear = " ".repeat(c.min(self.text_box_width as usize));
+            }
         }
         let cursor_pos_x = self.cursor_pos_x();
 
         execute!(
             self.term,
             cursor::MoveTo(self.start_x + 1, self.center_y),
-            Print(&self.input[self.start..]),
-            Print(if append { "" } else { " " }),
+            Print(
+                &self.input[self.start
+                    ..(self.start + self.text_box_width as usize - 1).min(self.input.len())]
+            ),
+            Print(clear),
             cursor::MoveTo(cursor_pos_x, self.center_y),
         )
     }
@@ -152,10 +230,9 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
         self.start = self
             .input
             .len()
-            .saturating_sub(self.max_viewable_len() as usize);
+            .saturating_sub(self.text_box_width as usize);
         self.draw()
     }
-
     fn set_locations(&mut self) {
         self.center_y = self.term.height / 2;
         self.center_x = self.term.width() / 2;
@@ -183,13 +260,12 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
     }
 
     fn cursor_pos_x(&self) -> u16 {
-        self.start_x + self.input.len().min(self.max_viewable_len() as usize) as u16 + 1
+        self.start_x + (self.cursor_index - self.start) as u16 + 1
     }
 
     fn draw(&mut self) -> io::Result<()> {
         self.term.clear()?;
         let cursor_pos_x = self.cursor_pos_x();
-
         execute!(
             self.term,
             cursor::MoveTo(self.start_x, self.center_y - 1),
