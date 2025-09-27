@@ -53,4 +53,6 @@ jobs:
       with:
         toolchain: stable
     - name: Check formatting
-      run: cargo fmt --check
+      run: |
+        rustup component add rustfmt
+        cargo fmt --check
