@@ -382,13 +382,15 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         if (row as isize) < start_results || (row as isize) >= end_results {
             return Ok(());
         }
+        self.destyle_selected()?;
         if self.cursor_y > row {
             self.dec_selected((self.cursor_y - row) as usize);
         } else {
             self.inc_selected((row - self.cursor_y) as usize);
         }
         self.cursor_y = row;
-        self.draw()
+        self.style_selected()?;
+        self.term.flush()
     }
 
     fn draw(&mut self) -> io::Result<()> {
