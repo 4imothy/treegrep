@@ -25,13 +25,11 @@ struct PathInfo {
     passed: bool,
 }
 
-// TODO jumping to next match of same depth
-// use [] for both
-
 const MENU_HELP_POPUP: &str = "navigate with the following
 \u{0020}- move up/down: k/j, p/n, up arrow/down arrow
 \u{0020}- move up/down with a bigger jump: K/J, P/N
-\u{0020}- move up/down paths: {/}, [/]
+\u{0020}- move up/down paths: {/}
+\u{0020}- move up/down the same depth: [/]
 \u{0020}- move to the start/end: g/G, </>, home/end
 \u{0020}- move up/down a page: b/f, pageup/pagedown
 \u{0020}- center cursor: z/l
@@ -67,7 +65,7 @@ impl PathInfo {
             self.prev += 1;
             self.passed = false;
         }
-        if self.next != self.paths.len() && selected_id == *self.paths.get(self.next).unwrap() {
+        if self.next != self.paths.len() && selected_id == self.paths[self.next] {
             self.next += 1;
             self.passed = true;
         }
@@ -78,7 +76,7 @@ impl PathInfo {
             self.next -= 1;
             self.passed = false;
         }
-        if self.prev != 0 && selected_id == *self.paths.get(self.prev).unwrap() {
+        if self.prev != 0 && selected_id == self.paths[self.prev] {
             self.prev -= 1;
             self.passed = true;
         }
@@ -88,11 +86,11 @@ impl PathInfo {
         if self.next == self.paths.len() {
             return 0;
         }
-        (*self.paths.get(self.next).unwrap() - selected_id) as u16
+        (self.paths[self.next] - selected_id) as u16
     }
 
     pub fn dist_up(&self, selected_id: usize) -> u16 {
-        (selected_id - *self.paths.get(self.prev).unwrap()) as u16
+        (selected_id - self.paths[self.prev]) as u16
     }
 }
 
@@ -260,8 +258,10 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                             }
                             KeyCode::Char('J') | KeyCode::Char('N') => menu.down(menu.big_jump)?,
                             KeyCode::Char('K') | KeyCode::Char('P') => menu.up(menu.big_jump)?,
-                            KeyCode::Char('}') | KeyCode::Char(']') => menu.down_path()?,
-                            KeyCode::Char('{') | KeyCode::Char('[') => menu.up_path()?,
+                            KeyCode::Char('}') => menu.down_path()?,
+                            KeyCode::Char('{') => menu.up_path()?,
+                            KeyCode::Char(']') => menu.down_same_depth()?,
+                            KeyCode::Char('[') => menu.up_same_depth()?,
                             KeyCode::Char('G') | KeyCode::Char('>') | KeyCode::End => {
                                 menu.bottom()?
                             }
@@ -284,7 +284,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                                 cursor_jump = true;
                             }
                             KeyCode::Enter => {
-                                let selected = &menu.lines.get(menu.selected_id).unwrap();
+                                let selected = &menu.lines[menu.selected_id];
                                 match selected.open_info() {
                                     Ok(info) => {
                                         if let Some(f) = &config().selection_file {
@@ -427,7 +427,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             self.window.shift_down();
             self.window.last
         };
-        if let Some(line) = (line_id >= 0).then(|| self.lines.get(line_id as usize).unwrap()) {
+        if let Some(line) = (line_id >= 0).then(|| &self.lines[line_id as usize]) {
             queue!(self.term, scroll, cursor::MoveTo(START_X, y), Print(line))?;
         }
         Ok(())
@@ -596,6 +596,35 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         }
     }
 
+    fn down_same_depth(&mut self) -> io::Result<()> {
+        let depth = self.lines[self.selected_id].depth();
+        if let Some((next, _)) = self
+            .lines
+            .iter()
+            .enumerate()
+            .find(|(i, l)| *i > self.selected_id && l.depth() == depth)
+        {
+            self.inc_jump(next - self.selected_id)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn up_same_depth(&mut self) -> io::Result<()> {
+        let depth = self.lines[self.selected_id].depth();
+        if let Some((next, _)) = self
+            .lines
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(i, l)| *i < self.selected_id && l.depth() == depth)
+        {
+            self.dec_jump(self.selected_id - next)
+        } else {
+            Ok(())
+        }
+    }
+
     fn dec_jump(&mut self, dist: usize) -> io::Result<()> {
         if (self.selected_id - dist) < self.window.first.max(0) as usize {
             self.dec_selected(dist);
@@ -631,7 +660,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             cursor::MoveTo(0, self.cursor_y),
             Print(config().c.selected_indicator),
             cursor::MoveTo(START_X, self.cursor_y),
-            Print(self.lines.get(self.selected_id).unwrap())
+            Print(&self.lines[self.selected_id])
         )
     }
 
@@ -641,7 +670,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             cursor::MoveTo(0, self.cursor_y),
             Print(formats::SELECTED_INDICATOR_CLEAR),
             cursor::MoveTo(START_X, self.cursor_y),
-            Print(self.lines.get(self.selected_id).unwrap())
+            Print(&self.lines[self.selected_id])
         )
     }
 

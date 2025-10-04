@@ -13,7 +13,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 
-enum PrefixComponent {
+pub enum PrefixComponent {
     MatchWithNext,
     MatchNoNext,
     SpacerVert,
@@ -38,6 +38,7 @@ pub struct OpenInfo<'a> {
 
 pub trait Entry: Display {
     fn open_info(&self) -> Result<OpenInfo<'_>, Message>;
+    fn depth(&self) -> usize;
 }
 
 struct PathDisplay<'a> {
@@ -85,6 +86,9 @@ impl<'a> Entry for PathDisplay<'a> {
             path: self.path,
             line: None,
         })
+    }
+    fn depth(&self) -> usize {
+        self.prefix.as_ref().map_or(0, |p| p.len())
     }
 }
 
@@ -156,6 +160,9 @@ impl<'a> Entry for LineDisplay<'a> {
             path: self.path,
             line: Some(self.line_num),
         })
+    }
+    fn depth(&self) -> usize {
+        self.prefix.len()
     }
 }
 
@@ -246,6 +253,9 @@ impl<'a> Entry for LongBranchDisplay<'a> {
             _ => Err(mes!("can't open a long branch")),
         }
     }
+    fn depth(&self) -> usize {
+        self.prefix.len()
+    }
 }
 
 impl<'a> Display for LongBranchDisplay<'a> {
@@ -279,6 +289,9 @@ struct OverviewDisplay {
 impl Entry for OverviewDisplay {
     fn open_info(&self) -> Result<OpenInfo<'_>, Message> {
         Err(mes!("can't open stats"))
+    }
+    fn depth(&self) -> usize {
+        0
     }
 }
 
@@ -363,7 +376,7 @@ impl Directory {
         }
 
         for (i, child_id) in children.iter().enumerate() {
-            let dir = dirs.get(*child_id).unwrap();
+            let dir = &dirs[*child_id];
             let (cur_prefix, new_child_prefix) = if i + 1 != clen || flen > 0 {
                 (
                     with_push(child_prefix.clone(), PrefixComponent::MatchWithNext),
