@@ -67,7 +67,12 @@ impl File {
                             break;
                         }
                         let m_id = path_to_index.get(p_parent.as_os_str());
-                        if m_id.is_none() {
+                        if let Some(m) = m_id {
+                            if let Some(id) = to_add_id {
+                                dirs.get_mut(*m).unwrap().children.push(id);
+                            }
+                            break;
+                        } else {
                             let mut n_dir = Directory::new(p_parent)?;
                             let n_id = dirs.len();
                             path_to_index.insert(n_dir.path.as_os_str().to_owned(), n_id);
@@ -76,11 +81,6 @@ impl File {
                             }
                             to_add_id = Some(n_id);
                             dirs.push(n_dir);
-                        } else {
-                            if let Some(id) = to_add_id {
-                                dirs.get_mut(*m_id.unwrap()).unwrap().children.push(id);
-                            }
-                            break;
                         }
                         dir_path = p_parent;
                     }

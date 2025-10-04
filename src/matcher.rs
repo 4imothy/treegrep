@@ -66,24 +66,24 @@ fn search_dir(patterns: &[Regex]) -> Result<Vec<Directory>, Message> {
             }
         } else if path.is_file() {
             let file = search_file(&path, patterns)?;
-            if !file.lines.is_empty() || config().just_files {
-                if let Some(mut dir_path) = file.path.parent().map(|v| v.to_path_buf()) {
-                    let mut prev_id: usize = *path_to_index.get(dir_path.as_os_str()).unwrap();
-                    let mut dir: &mut Directory = directories.get_mut(prev_id).unwrap();
-                    dir.files.push(file);
-                    let mut to_add = dir.to_add;
-                    while let Some(par_dir_path) = dir_path.parent() {
-                        if !to_add || dir_path == config().path {
-                            break;
-                        }
-                        dir.to_add = false;
-                        let p_id = *path_to_index.get(par_dir_path.as_os_str()).unwrap();
-                        dir = directories.get_mut(p_id).unwrap();
-                        dir.children.push(prev_id);
-                        prev_id = p_id;
-                        to_add = dir.to_add;
-                        dir_path = par_dir_path.to_path_buf();
+            if (!file.lines.is_empty() || config().just_files)
+                && let Some(mut dir_path) = file.path.parent().map(|v| v.to_path_buf())
+            {
+                let mut prev_id: usize = *path_to_index.get(dir_path.as_os_str()).unwrap();
+                let mut dir: &mut Directory = directories.get_mut(prev_id).unwrap();
+                dir.files.push(file);
+                let mut to_add = dir.to_add;
+                while let Some(par_dir_path) = dir_path.parent() {
+                    if !to_add || dir_path == config().path {
+                        break;
                     }
+                    dir.to_add = false;
+                    let p_id = *path_to_index.get(par_dir_path.as_os_str()).unwrap();
+                    dir = directories.get_mut(p_id).unwrap();
+                    dir.children.push(prev_id);
+                    prev_id = p_id;
+                    to_add = dir.to_add;
+                    dir_path = par_dir_path.to_path_buf();
                 }
             }
         }

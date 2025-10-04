@@ -229,16 +229,16 @@ impl Config {
         let (searcher, searcher_path) =
             Searchers::get_searcher_and_path(matches.get_one::<String>(args::SEARCHER.id))?;
 
-        if let Searchers::TreeGrep = searcher {
-            if threads.is_some_and(|t| t > 1) {
-                return Err(mes!("treegrep searcher does not support multithreading"));
-            }
+        if let Searchers::TreeGrep = searcher
+            && threads.is_some_and(|t| t > 1)
+        {
+            return Err(mes!("treegrep searcher does not support multithreading"));
         }
 
-        if let Searchers::TreeGrep = searcher {
-            if pcre2 {
-                return Err(mes!("treegrep searcher does not support pcre2"));
-            }
+        if let Searchers::TreeGrep = searcher
+            && pcre2
+        {
+            return Err(mes!("treegrep searcher does not support pcre2"));
         }
 
         let editor = matches.get_one::<String>(args::EDITOR.id).cloned();

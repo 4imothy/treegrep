@@ -37,7 +37,7 @@ pub struct OpenInfo<'a> {
 }
 
 pub trait Entry: Display {
-    fn open_info(&self) -> Result<OpenInfo, Message>;
+    fn open_info(&self) -> Result<OpenInfo<'_>, Message>;
 }
 
 struct PathDisplay<'a> {
@@ -80,7 +80,7 @@ impl<'a> PathDisplay<'a> {
 }
 
 impl<'a> Entry for PathDisplay<'a> {
-    fn open_info(&self) -> Result<OpenInfo, Message> {
+    fn open_info(&self) -> Result<OpenInfo<'_>, Message> {
         Ok(OpenInfo {
             path: self.path,
             line: None,
@@ -151,7 +151,7 @@ struct LineDisplay<'a> {
 }
 
 impl<'a> Entry for LineDisplay<'a> {
-    fn open_info(&self) -> Result<OpenInfo, Message> {
+    fn open_info(&self) -> Result<OpenInfo<'_>, Message> {
         Ok(OpenInfo {
             path: self.path,
             line: Some(self.line_num),
@@ -240,7 +240,7 @@ struct LongBranchDisplay<'a> {
 }
 
 impl<'a> Entry for LongBranchDisplay<'a> {
-    fn open_info(&self) -> Result<OpenInfo, Message> {
+    fn open_info(&self) -> Result<OpenInfo<'_>, Message> {
         match self.files.as_slice() {
             [file] => file.open_info(),
             _ => Err(mes!("can't open a long branch")),
@@ -277,7 +277,7 @@ struct OverviewDisplay {
 }
 
 impl Entry for OverviewDisplay {
-    fn open_info(&self) -> Result<OpenInfo, Message> {
+    fn open_info(&self) -> Result<OpenInfo<'_>, Message> {
         Err(mes!("can't open stats"))
     }
 }

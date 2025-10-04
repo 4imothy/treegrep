@@ -25,6 +25,9 @@ struct PathInfo {
     passed: bool,
 }
 
+// TODO jumping to next match of same depth
+// use [] for both
+
 const MENU_HELP_POPUP: &str = "navigate with the following
 \u{0020}- move up/down: k/j, p/n, up arrow/down arrow
 \u{0020}- move up/down with a bigger jump: K/J, P/N

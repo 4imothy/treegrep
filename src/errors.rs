@@ -61,10 +61,9 @@ pub fn view_error(term: &mut term::Term, mes: String) -> io::Result<()> {
             kind: KeyEventKind::Press,
             ..
         }) = event::read()?
+            && (c == 'q' || (c == 'c' && modifiers.contains(KeyModifiers::CONTROL)))
         {
-            if c == 'q' || (c == 'c' && modifiers.contains(KeyModifiers::CONTROL)) {
-                break;
-            }
+            break;
         };
     }
     term.give()
