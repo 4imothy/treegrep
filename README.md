@@ -80,66 +80,67 @@ nnoremap <leader>tf :call TgrepWith('--files --select')<cr>
 
 ```
 src: 13
-├──match_system.rs: 10
-│  ├──24: pub struct Directory {
-│  ├──32: impl Directory {
-│  ├──44: pub struct File {
-│  ├──50: impl File {
-│  ├──74: pub struct Match {
-│  ├──80: impl Match {
-│  ├──105: pub struct Line {
-│  ├──111: impl Line {
-│  ├──127:     impl PartialEq for Match {
-│  ╰──134:     impl Debug for Match {
+├──searchers.rs: 1
+│  └──34: impl Searchers {
+├──errors.rs: 4
+│  ├──17: pub struct Message {
+│  ├──37: impl Error for Message {}
+│  ├──39: impl fmt::Debug for Message {
+│  └──45: impl fmt::Display for Message {
+├──formats.rs: 2
+│  ├──19: pub struct Chars {
+│  └──99: pub struct DisplayRepeater<T>(T, usize);
+├──output_processor.rs: 2
+│  ├──28: impl File {
+│  └──99: impl AsUsize for Value {
+├──options.rs: 2
+│  ├──42: pub struct Rg;
+│  └──44: impl Options for Rg {
 ├──args.rs: 4
 │  ├──18: pub struct ArgInfo {
 │  ├──24: impl ArgInfo {
 │  ├──38: impl Clone for OpenStrategy {
-│  ╰──50: impl ValueEnum for OpenStrategy {
+│  └──50: impl ValueEnum for OpenStrategy {
+├──args_menu.rs: 1
+│  └──19: pub struct ArgsMenu<'a, 'b> {
+├──select_menu.rs: 7
+│  ├──34: impl OpenStrategy {
+│  ├──46: pub struct SelectMenu<'a, 'b> {
+│  ├──61: struct Window {
+│  ├──66: impl Window {
+│  ├──85: impl Clone for JumpLocation {
+│  ├──90: impl Copy for JumpLocation {}
+│  └──92: impl JumpLocation {
+├──term.rs: 1
+│  └──13: pub struct Term<'a> {
 ├──writer.rs: 10
 │  ├──23: impl Clone for PrefixComponent {
 │  ├──34: pub struct OpenInfo<'a> {
-│  ├──43: struct PathDisplay<'a> {
-│  ├──144: struct LineDisplay<'a> {
-│  ├──236: struct LongBranchDisplay<'a> {
-│  ├──271: struct OverviewDisplay {
-│  ├──279: impl Entry for OverviewDisplay {
-│  ├──285: impl Display for OverviewDisplay {
-│  ├──332: impl Directory {
-│  ╰──438: impl File {
-├──formats.rs: 2
-│  ├──19: pub struct Chars {
-│  ╰──99: pub struct DisplayRepeater<T>(T, usize);
-├──errors.rs: 4
-│  ├──8: pub struct Message {
-│  ├──28: impl Error for Message {}
-│  ├──30: impl fmt::Debug for Message {
-│  ╰──36: impl fmt::Display for Message {
-├──select_menu.rs: 6
-│  ├──21: struct PathInfo {
-│  ├──40: impl OpenStrategy {
-│  ├──52: impl PathInfo {
-│  ├──96: pub struct PickerMenu<'a, 'b> {
-│  ├──111: struct Window {
-│  ╰──116: impl Window {
-├──options.rs: 2
-│  ├──42: pub struct Rg;
-│  ╰──44: impl Options for Rg {
-├──output_processor.rs: 2
-│  ├──28: impl File {
-│  ╰──99: impl AsUsize for Value {
-├──term.rs: 1
-│  ╰──13: pub struct Term<'a> {
-├──matcher.rs: 1
-│  ╰──115: impl File {
-├──searchers.rs: 1
-│  ╰──34: impl Searchers {
+│  ├──45: struct PathDisplay<'a> {
+│  ├──152: struct LineDisplay<'a> {
+│  ├──250: struct LongBranchDisplay<'a> {
+│  ├──291: struct OverviewDisplay {
+│  ├──299: impl Entry for OverviewDisplay {
+│  ├──311: impl Display for OverviewDisplay {
+│  ├──358: impl Directory {
+│  └──443: impl File {
 ├──config.rs: 3
 │  ├──11: pub struct Characters {
 │  ├──25: pub struct Config {
-│  ╰──139: impl Config {
-╰──args_menu.rs: 1
-   ╰──19: pub struct ArgsMenu<'a, 'b> {
+│  └──138: impl Config {
+├──matcher.rs: 1
+│  └──115: impl File {
+└──match_system.rs: 10
+   ├──24: pub struct Directory {
+   ├──32: impl Directory {
+   ├──44: pub struct File {
+   ├──50: impl File {
+   ├──74: pub struct Match {
+   ├──80: impl Match {
+   ├──105: pub struct Line {
+   ├──111: impl Line {
+   ├──127:     impl PartialEq for Match {
+   └──134:     impl Debug for Match {
 ```
 </details>
 
@@ -149,15 +150,15 @@ src: 13
 ```
 select_menu.rs
 +--11: style::{Print, SetBackgroundColor},
-+--369: queue!(self.term, cursor::MoveTo(START_X, cursor), Print(line))?;
-+--390: queue!(self.term, scroll, cursor::MoveTo(START_X, y), Print(line))?;
-+--579: Print(config().c.selected_indicator),
-+--581: Print(self.lines.get(self.selected_id).unwrap())
-+--589: Print(formats::SELECTED_INDICATOR_CLEAR),
-+--591: Print(self.lines.get(self.selected_id).unwrap())
-+--605: Print(format!(
-+--617: Print(format!(
-+--630: Print(format!(
++--348: queue!(self.term, cursor::MoveTo(START_X, cursor), Print(line))?;
++--369: queue!(self.term, scroll, cursor::MoveTo(START_X, y), Print(line))?;
++--600: Print(config().c.selected_indicator),
++--602: Print(&self.lines[self.selected_id])
++--610: Print(formats::SELECTED_INDICATOR_CLEAR),
++--612: Print(&self.lines[self.selected_id])
++--626: Print(format!(
++--638: Print(format!(
++--651: Print(format!(
 ```
 </details>
 
@@ -166,78 +167,77 @@ select_menu.rs
 
 ```
 treegrep
-├──completions
-│  ├──tgrep.bash
-│  ├──tgrep.fish
-│  ├──tgrep.elv
-│  ├──_tgrep
-│  ╰──_tgrep.ps1
-├──tests
-│  ├──targets
-│  │  ├──files_with_expr
-│  │  ├──files_long_branch_expr_count_1
-│  │  ├──glob_inclusion
-│  │  ├──files_long_branch_2
-│  │  ├──max_depth
-│  │  ├──file
-│  │  ├──files_long_branch_expr_1
-│  │  ├──overlapping_tgrep
-│  │  ├──colon
-│  │  ├──count
-│  │  ├──links_1
-│  │  ├──deep
-│  │  ├──line_number
-│  │  ├──files_2
-│  │  ├──wide_1
-│  │  ├──files_long_branch_expr_count_2
-│  │  ├──overlapping_rg
-│  │  ├──files_long_branch_1
-│  │  ├──no_matches
-│  │  ├──glob_exclusion
-│  │  ├──files_long_branch_expr_2
-│  │  ├──links_2
-│  │  ├──links_3
-│  │  ├──links_4
-│  │  ├──wide_2
-│  │  ╰──files_1
-│  ├──pool
-│  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
-│  ├──file_system.rs
-│  ├──tests.rs
-│  ╰──utils.rs
+├──doc
+│  ├──treegrep.vim9.txt
+│  └──treegrep.nvim.txt
 ├──benchmarks
 │  ├──times
-│  ╰──runner
+│  └──runner
 ├──.github
-│  ╰──workflows
-│     ├──cr.yml
-│     ├──update_readme_and_completions.yml
+│  └──workflows
 │     ├──test.yml
-│     ╰──update_readme
+│     ├──cr.yml
+│     ├──update_readme
+│     └──update_readme.yml
+├──lua
+│  └──treegrep.lua
+├──tests
+│  ├──targets
+│  │  ├──wide_1
+│  │  ├──files_long_branch_expr_1
+│  │  ├──line_number
+│  │  ├──file
+│  │  ├──no_matches
+│  │  ├──files_2
+│  │  ├──links_1
+│  │  ├──links_2
+│  │  ├──count
+│  │  ├──links_4
+│  │  ├──files_long_branch_expr_count_1
+│  │  ├──deep
+│  │  ├──files_with_expr
+│  │  ├──overlapping_tgrep
+│  │  ├──overlapping_rg
+│  │  ├──glob_inclusion
+│  │  ├──files_long_branch_1
+│  │  ├──files_long_branch_expr_2
+│  │  ├──files_1
+│  │  ├──max_depth
+│  │  ├──files_long_branch_expr_count_2
+│  │  ├──colon
+│  │  ├──wide_2
+│  │  ├──glob_exclusion
+│  │  ├──files_long_branch_2
+│  │  └──links_3
+│  ├──pool
+│  │  └──alice_adventures_in_wonderland_by_lewis_carroll.txt
+│  ├──tests.rs
+│  ├──utils.rs
+│  └──file_system.rs
+├──plugin
+│  └──treegrep.vim
 ├──src
 │  ├──searchers.rs
-│  ├──args_menu.rs
-│  ├──term.rs
-│  ├──matcher.rs
-│  ├──config.rs
-│  ├──output_processor.rs
-│  ├──log.rs
-│  ├──options.rs
-│  ├──select_menu.rs
 │  ├──errors.rs
-│  ├──main.rs
 │  ├──formats.rs
-│  ├──writer.rs
+│  ├──log.rs
+│  ├──output_processor.rs
+│  ├──options.rs
 │  ├──args.rs
-│  ╰──match_system.rs
-├──Cargo.toml
+│  ├──args_menu.rs
+│  ├──select_menu.rs
+│  ├──term.rs
+│  ├──main.rs
+│  ├──writer.rs
+│  ├──config.rs
+│  ├──matcher.rs
+│  └──match_system.rs
 ├──LICENSE
 ├──Cargo.lock
-├──build.rs
+├──.gitignore
 ├──README.md
 ├──todos.md
-├──.gitignore
-╰──release_notes.md
+└──Cargo.toml
 ```
 </details>
 
@@ -246,30 +246,34 @@ treegrep
 
 ```
 treegrep
-├──completions
-│  ╰──tgrep.bash, tgrep.fish, tgrep.elv, _tgrep, _tgrep.ps1
+├──doc
+│  └──treegrep.vim9.txt, treegrep.nvim.txt
+├──benchmarks
+│  └──times, runner
+├──.github
+│  └──workflows
+│     └──test.yml, cr.yml, update_readme, update_readme.yml
+├──lua
+│  └──treegrep.lua
 ├──tests
 │  ├──targets
-│  │  ├──files_with_expr, files_long_branch_expr_count_1, glob_inclusion, files_long_branch_2, max_depth
-│  │  ├──file, files_long_branch_expr_1, overlapping_tgrep, colon, count
-│  │  ├──links_1, deep, line_number, files_2, wide_1
-│  │  ├──files_long_branch_expr_count_2, overlapping_rg, files_long_branch_1, no_matches, glob_exclusion
-│  │  ├──files_long_branch_expr_2, links_2, links_3, links_4, wide_2
-│  │  ╰──files_1
+│  │  ├──wide_1, files_long_branch_expr_1, line_number, file, no_matches
+│  │  ├──files_2, links_1, links_2, count, links_4
+│  │  ├──files_long_branch_expr_count_1, deep, files_with_expr, overlapping_tgrep, overlapping_rg
+│  │  ├──glob_inclusion, files_long_branch_1, files_long_branch_expr_2, files_1, max_depth
+│  │  ├──files_long_branch_expr_count_2, colon, wide_2, glob_exclusion, files_long_branch_2
+│  │  └──links_3
 │  ├──pool
-│  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
-│  ╰──file_system.rs, tests.rs, utils.rs
-├──benchmarks
-│  ╰──times, runner
-├──.github
-│  ╰──workflows
-│     ╰──cr.yml, update_readme_and_completions.yml, test.yml, update_readme
+│  │  └──alice_adventures_in_wonderland_by_lewis_carroll.txt
+│  └──tests.rs, utils.rs, file_system.rs
+├──plugin
+│  └──treegrep.vim
 ├──src
-│  ├──searchers.rs, args_menu.rs, term.rs, matcher.rs, config.rs
-│  ├──output_processor.rs, log.rs, options.rs, select_menu.rs, errors.rs
-│  ╰──main.rs, formats.rs, writer.rs, args.rs, match_system.rs
-├──Cargo.toml, LICENSE, Cargo.lock, build.rs, README.md
-╰──todos.md, .gitignore, release_notes.md
+│  ├──searchers.rs, errors.rs, formats.rs, log.rs, output_processor.rs
+│  ├──options.rs, args.rs, args_menu.rs, select_menu.rs, term.rs
+│  └──main.rs, writer.rs, config.rs, matcher.rs, match_system.rs
+├──LICENSE, Cargo.lock, .gitignore, README.md, todos.md
+└──Cargo.toml
 ```
 </details>
 
