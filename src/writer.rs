@@ -362,7 +362,6 @@ impl Directory {
         cur_prefix: Vec<PrefixComponent>,
         child_prefix: Vec<PrefixComponent>,
         dirs: &'a Vec<Directory>,
-        path_ids: &mut Option<&mut Vec<usize>>,
         overview: &mut Option<&mut Box<OverviewDisplay>>,
     ) -> Result<(), Message> {
         let children = &self.children;
@@ -370,9 +369,6 @@ impl Directory {
         let flen = files.len();
         let clen = children.len();
         if clen > 0 || flen > 0 {
-            if let Some(p) = path_ids.as_mut() {
-                p.push(lines.len())
-            }
             lines.push(Box::new(PathDisplay::new(
                 Some(cur_prefix.clone()),
                 &self.path,
@@ -401,27 +397,14 @@ impl Directory {
                     with_push(child_prefix.clone(), PrefixComponent::Spacer),
                 )
             };
-            dir.to_lines(
-                lines,
-                cur_prefix,
-                new_child_prefix,
-                dirs,
-                path_ids,
-                overview,
-            )?;
+            dir.to_lines(lines, cur_prefix, new_child_prefix, dirs, overview)?;
         }
         if !files.is_empty() {
             if config().long_branch {
-                self.long_branch_files_to_lines(lines, child_prefix, path_ids)?;
+                self.long_branch_files_to_lines(lines, child_prefix)?;
             } else {
                 for (i, file) in files.iter().enumerate() {
-                    file.to_lines(
-                        lines,
-                        child_prefix.clone(),
-                        i + 1 != flen,
-                        path_ids,
-                        overview,
-                    )?;
+                    file.to_lines(lines, child_prefix.clone(), i + 1 != flen, overview)?;
                 }
             }
         }
@@ -432,7 +415,6 @@ impl Directory {
         &'a self,
         lines: &mut Vec<Box<dyn Entry + 'a>>,
         prefix: Vec<PrefixComponent>,
-        path_ids: &mut Option<&mut Vec<usize>>,
     ) -> Result<(), Message> {
         let long_branch_files_per_line: usize = config().long_branch_each;
         let num_lines: usize = self.files.len().div_ceil(long_branch_files_per_line);
@@ -441,9 +423,6 @@ impl Directory {
         let prefix_next = with_push(prefix, PrefixComponent::MatchWithNext);
 
         for (i, branch) in self.files.chunks(long_branch_files_per_line).enumerate() {
-            if let Some(p) = path_ids {
-                p.push(lines.len());
-            }
             lines.push(Box::new(LongBranchDisplay {
                 prefix: if i + 1 == num_lines {
                     prefix_no_next.clone()
@@ -467,7 +446,6 @@ impl File {
         lines: &mut Vec<Box<dyn Entry + 'a>>,
         prefix: Vec<PrefixComponent>,
         parent_has_next: bool,
-        path_ids: &mut Option<&mut Vec<usize>>,
         overview: &mut Option<&mut Box<OverviewDisplay>>,
     ) -> Result<(), Message> {
         if let Some(o) = overview {
@@ -490,9 +468,6 @@ impl File {
             (prefix.clone(), prefix)
         };
 
-        if let Some(p) = path_ids.as_mut() {
-            p.push(lines.len())
-        }
         lines.push(Box::new(PathDisplay::new(
             Some(cur_p),
             &self.path,
@@ -529,7 +504,6 @@ impl File {
 
 pub fn matches_to_display_lines<'a>(
     result: &'a Matches,
-    mut path_ids: Option<&mut Vec<usize>>,
 ) -> Result<Vec<Box<dyn Entry + 'a>>, Message> {
     let mut lines: Vec<Box<dyn Entry + 'a>> = Vec::new();
     let mut overview: Option<Box<OverviewDisplay>> = config()
@@ -549,18 +523,11 @@ pub fn matches_to_display_lines<'a>(
                 Vec::new(),
                 Vec::new(),
                 dirs,
-                &mut path_ids,
                 &mut overview.as_mut(),
             )?;
         }
         Matches::File(file) => {
-            file.to_lines(
-                &mut lines,
-                Vec::new(),
-                false,
-                &mut path_ids,
-                &mut overview.as_mut(),
-            )?;
+            file.to_lines(&mut lines, Vec::new(), false, &mut overview.as_mut())?;
         }
     }
     if let Some(o) = overview.take() {

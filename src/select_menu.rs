@@ -18,13 +18,6 @@ use std::process::Command;
 const START_X: u16 = formats::SELECTED_INDICATOR_CLEAR.len() as u16;
 const START_Y: u16 = 0;
 
-struct PathInfo {
-    paths: Vec<usize>,
-    prev: usize,
-    next: usize,
-    passed: bool,
-}
-
 const MENU_HELP_POPUP: &str = "navigate with the following
 \u{0020}- move up/down: k/j, p/n, up arrow/down arrow
 \u{0020}- move up/down with a bigger jump: K/J, P/N
@@ -50,52 +43,7 @@ impl OpenStrategy {
     }
 }
 
-impl PathInfo {
-    pub fn new(paths: Vec<usize>) -> PathInfo {
-        PathInfo {
-            paths,
-            prev: 0,
-            next: 1,
-            passed: false,
-        }
-    }
-
-    pub fn down(&mut self, selected_id: usize) {
-        if self.passed {
-            self.prev += 1;
-            self.passed = false;
-        }
-        if self.next != self.paths.len() && selected_id == self.paths[self.next] {
-            self.next += 1;
-            self.passed = true;
-        }
-    }
-
-    pub fn up(&mut self, selected_id: usize) {
-        if self.passed {
-            self.next -= 1;
-            self.passed = false;
-        }
-        if self.prev != 0 && selected_id == self.paths[self.prev] {
-            self.prev -= 1;
-            self.passed = true;
-        }
-    }
-
-    pub fn dist_down(&self, selected_id: usize) -> u16 {
-        if self.next == self.paths.len() {
-            return 0;
-        }
-        (self.paths[self.next] - selected_id) as u16
-    }
-
-    pub fn dist_up(&self, selected_id: usize) -> u16 {
-        (selected_id - self.paths[self.prev]) as u16
-    }
-}
-
 pub struct SelectMenu<'a, 'b> {
-    pi: PathInfo,
     jump: JumpLocation,
     selected_id: usize,
     cursor_y: u16,
@@ -162,7 +110,6 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     pub fn enter(
         term: &'a mut Term<'b>,
         lines: &'a Vec<Box<dyn Entry + 'a>>,
-        path_ids: Vec<usize>,
     ) -> io::Result<SelectMenu<'a, 'b>> {
         let max_line_id = lines.len() - 1;
 
@@ -175,7 +122,6 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             window: Window { first: 0, last: 0 },
             lines,
             colors: config().colors,
-            pi: PathInfo::new(path_ids),
             scroll_offset: 0,
             big_jump: 0,
             small_jump: 0,
@@ -186,16 +132,10 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     }
 
     fn inc_selected(&mut self, amount: usize) {
-        for i in 1..=amount {
-            self.pi.down(self.selected_id + i);
-        }
         self.selected_id += amount;
     }
 
     fn dec_selected(&mut self, amount: usize) {
-        for i in 1..=amount {
-            self.pi.up(self.selected_id - i);
-        }
         self.selected_id -= amount;
     }
 
@@ -227,12 +167,8 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         self.small_jump = 1;
     }
 
-    pub fn launch(
-        term: &mut Term,
-        lines: &'a Vec<Box<dyn Entry + 'a>>,
-        path_ids: Vec<usize>,
-    ) -> io::Result<()> {
-        let mut menu: SelectMenu = SelectMenu::enter(term, lines, path_ids)?;
+    pub fn launch(term: &mut Term, lines: &'a Vec<Box<dyn Entry + 'a>>) -> io::Result<()> {
+        let mut menu: SelectMenu = SelectMenu::enter(term, lines)?;
 
         menu.draw()?;
         let mut down_row: u16 = 0;
@@ -581,21 +517,22 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     }
 
     pub fn down_path(&mut self) -> io::Result<()> {
-        let dist = self.pi.dist_down(self.selected_id);
-        if dist == 0 {
-            Ok(())
-        } else {
-            self.inc_jump(dist as usize)
-        }
+        self.lines
+            .iter()
+            .enumerate()
+            .skip(self.selected_id + 1)
+            .find(|(_, l)| l.is_path())
+            .map_or(Ok(()), |(i, _)| self.inc_jump(i - self.selected_id))
     }
 
     fn up_path(&mut self) -> io::Result<()> {
-        let dist = self.pi.dist_up(self.selected_id);
-        if dist == 0 {
-            Ok(())
-        } else {
-            self.dec_jump(dist as usize)
-        }
+        self.lines
+            .iter()
+            .enumerate()
+            .take(self.selected_id)
+            .rev()
+            .find(|(_, l)| l.is_path())
+            .map_or(Ok(()), |(i, _)| self.dec_jump(self.selected_id - i))
     }
 
     fn down_path_same_depth(&mut self) -> io::Result<()> {

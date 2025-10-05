@@ -121,24 +121,13 @@ fn run(term: &mut Term, mut c: Config) -> Result<(), Message> {
     }
 
     let m = matches.unwrap();
-    let mut path_ids = config().select.then(Vec::<usize>::new);
-    let lines: Vec<Box<dyn Entry>> = matches_to_display_lines(&m, path_ids.as_mut())?;
+    let lines: Vec<Box<dyn Entry>> = matches_to_display_lines(&m)?;
 
     if config().select {
         if !config().menu {
             term.claim().map_err(|e| mes!("{}", e.to_string()))?;
         }
-        SelectMenu::launch(
-            term,
-            &lines,
-            path_ids
-                .map(|mut p| {
-                    p.shrink_to_fit();
-                    p
-                })
-                .unwrap(),
-        )
-        .map_err(|e| {
+        SelectMenu::launch(term, &lines).map_err(|e| {
             let _ = term.give();
             mes!("{}", e.to_string())
         })?;
