@@ -7,6 +7,12 @@ on:
     paths:
       - '**.rs'
       - '.github/workflows/update_readme'
+  workflow_dispatch:
+    inputs:
+      examples:
+        description: 'whether to generate examples'
+        required: true
+        default: 'no_examples'
 
 permissions:
   contents: write
@@ -21,7 +27,7 @@ jobs:
         with:
           toolchain: stable
       - run: |
-          ./.github/workflows/update_readme no_examples
+          ./.github/workflows/update_readme "${{ github.event.inputs.examples }}"
           if git diff --exit-code README.md > /dev/null; then
             echo "no changes in readme"
           else
