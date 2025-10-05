@@ -39,6 +39,7 @@ pub struct OpenInfo<'a> {
 pub trait Entry: Display {
     fn open_info(&self) -> Result<OpenInfo<'_>, Message>;
     fn depth(&self) -> usize;
+    fn is_path(&self) -> bool;
 }
 
 struct PathDisplay<'a> {
@@ -89,6 +90,9 @@ impl<'a> Entry for PathDisplay<'a> {
     }
     fn depth(&self) -> usize {
         self.prefix.as_ref().map_or(0, |p| p.len())
+    }
+    fn is_path(&self) -> bool {
+        true
     }
 }
 
@@ -163,6 +167,9 @@ impl<'a> Entry for LineDisplay<'a> {
     }
     fn depth(&self) -> usize {
         self.prefix.len()
+    }
+    fn is_path(&self) -> bool {
+        false
     }
 }
 
@@ -256,6 +263,9 @@ impl<'a> Entry for LongBranchDisplay<'a> {
     fn depth(&self) -> usize {
         self.prefix.len()
     }
+    fn is_path(&self) -> bool {
+        true
+    }
 }
 
 impl<'a> Display for LongBranchDisplay<'a> {
@@ -293,6 +303,9 @@ impl Entry for OverviewDisplay {
     fn depth(&self) -> usize {
         0
     }
+    fn is_path(&self) -> bool {
+        false
+    }
 }
 
 impl Display for OverviewDisplay {
@@ -300,7 +313,7 @@ impl Display for OverviewDisplay {
         if config().colors || config().bold {
             write!(f, "{}", formats::RESET)?;
         }
-        if !config().just_files {
+        if !config().files {
             write!(
                 f,
                 "found {} matches in {} lines across ",

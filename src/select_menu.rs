@@ -29,7 +29,7 @@ const MENU_HELP_POPUP: &str = "navigate with the following
 \u{0020}- move up/down: k/j, p/n, up arrow/down arrow
 \u{0020}- move up/down with a bigger jump: K/J, P/N
 \u{0020}- move up/down paths: {/}
-\u{0020}- move up/down the same depth: [/]
+\u{0020}- move up/down paths of the same depth: [/]
 \u{0020}- move to the start/end: g/G, </>, home/end
 \u{0020}- move up/down a page: b/f, pageup/pagedown
 \u{0020}- center cursor: z/l
@@ -260,8 +260,8 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                             KeyCode::Char('K') | KeyCode::Char('P') => menu.up(menu.big_jump)?,
                             KeyCode::Char('}') => menu.down_path()?,
                             KeyCode::Char('{') => menu.up_path()?,
-                            KeyCode::Char(']') => menu.down_same_depth()?,
-                            KeyCode::Char('[') => menu.up_same_depth()?,
+                            KeyCode::Char(']') => menu.down_path_same_depth()?,
+                            KeyCode::Char('[') => menu.up_path_same_depth()?,
                             KeyCode::Char('G') | KeyCode::Char('>') | KeyCode::End => {
                                 menu.bottom()?
                             }
@@ -598,33 +598,33 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         }
     }
 
-    fn down_same_depth(&mut self) -> io::Result<()> {
-        let depth = self.lines[self.selected_id].depth();
-        if let Some((next, _)) = self
-            .lines
+    fn down_path_same_depth(&mut self) -> io::Result<()> {
+        let cur = &self.lines[self.selected_id];
+        if !cur.is_path() {
+            return Ok(());
+        }
+        let depth = cur.depth();
+        self.lines
             .iter()
             .enumerate()
-            .find(|(i, l)| *i > self.selected_id && l.depth() == depth)
-        {
-            self.inc_jump(next - self.selected_id)
-        } else {
-            Ok(())
-        }
+            .skip(self.selected_id + 1)
+            .find(|(_, l)| l.is_path() && l.depth() == depth)
+            .map_or(Ok(()), |(i, _)| self.inc_jump(i - self.selected_id))
     }
 
-    fn up_same_depth(&mut self) -> io::Result<()> {
-        let depth = self.lines[self.selected_id].depth();
-        if let Some((next, _)) = self
-            .lines
+    fn up_path_same_depth(&mut self) -> io::Result<()> {
+        let cur = &self.lines[self.selected_id];
+        if !cur.is_path() {
+            return Ok(());
+        }
+        let depth = cur.depth();
+        self.lines
             .iter()
             .enumerate()
+            .take(self.selected_id)
             .rev()
-            .find(|(i, l)| *i < self.selected_id && l.depth() == depth)
-        {
-            self.dec_jump(self.selected_id - next)
-        } else {
-            Ok(())
-        }
+            .find(|(_, l)| l.is_path() && l.depth() == depth)
+            .map_or(Ok(()), |(i, _)| self.dec_jump(self.selected_id - i))
     }
 
     fn dec_jump(&mut self, dist: usize) -> io::Result<()> {
