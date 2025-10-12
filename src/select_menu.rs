@@ -21,8 +21,8 @@ const START_Y: u16 = 0;
 const MENU_HELP_POPUP: &str = "navigate with the following
 \u{0020}- move up/down: k/j, p/n, up arrow/down arrow
 \u{0020}- move up/down with a bigger jump: K/J, P/N
-\u{0020}- move up/down paths: {/}
-\u{0020}- move up/down paths of the same depth: [/]
+\u{0020}- move up/down paths: {/}, [/]
+\u{0020}- move up/down paths of the same depth: (/), u/d
 \u{0020}- move to the start/end: g/G, </>, home/end
 \u{0020}- move up/down a page: b/f, pageup/pagedown
 \u{0020}- center cursor: z/l
@@ -194,10 +194,12 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                             }
                             KeyCode::Char('J') | KeyCode::Char('N') => menu.down(menu.big_jump)?,
                             KeyCode::Char('K') | KeyCode::Char('P') => menu.up(menu.big_jump)?,
-                            KeyCode::Char('}') => menu.down_path()?,
-                            KeyCode::Char('{') => menu.up_path()?,
-                            KeyCode::Char(']') => menu.down_path_same_depth()?,
-                            KeyCode::Char('[') => menu.up_path_same_depth()?,
+                            KeyCode::Char('}') | KeyCode::Char(']') => menu.down_path()?,
+                            KeyCode::Char('{') | KeyCode::Char('[') => menu.up_path()?,
+                            KeyCode::Char(')') | KeyCode::Char('d') => {
+                                menu.down_path_same_depth()?
+                            }
+                            KeyCode::Char('(') | KeyCode::Char('u') => menu.up_path_same_depth()?,
                             KeyCode::Char('G') | KeyCode::Char('>') | KeyCode::End => {
                                 menu.bottom()?
                             }
