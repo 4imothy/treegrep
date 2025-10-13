@@ -102,7 +102,7 @@ src: 13
 │  ├──38: impl Clone for OpenStrategy {
 │  └──50: impl ValueEnum for OpenStrategy {
 ├──args_menu.rs: 1
-│  └──19: pub struct ArgsMenu<'a, 'b> {
+│  └──22: pub struct ArgsMenu<'a, 'b> {
 ├──select_menu.rs: 7
 │  ├──34: impl OpenStrategy {
 │  ├──46: pub struct SelectMenu<'a, 'b> {
@@ -150,15 +150,15 @@ src: 13
 ```
 select_menu.rs
 +--11: style::{Print, SetBackgroundColor},
-+--348: queue!(self.term, cursor::MoveTo(START_X, cursor), Print(line))?;
-+--369: queue!(self.term, scroll, cursor::MoveTo(START_X, y), Print(line))?;
-+--600: Print(config().c.selected_indicator),
-+--602: Print(&self.lines[self.selected_id])
-+--610: Print(formats::SELECTED_INDICATOR_CLEAR),
-+--612: Print(&self.lines[self.selected_id])
-+--626: Print(format!(
-+--638: Print(format!(
-+--651: Print(format!(
++--350: queue!(self.term, cursor::MoveTo(START_X, cursor), Print(line))?;
++--371: queue!(self.term, scroll, cursor::MoveTo(START_X, y), Print(line))?;
++--602: Print(config().c.selected_indicator),
++--604: Print(&self.lines[self.selected_id])
++--612: Print(formats::SELECTED_INDICATOR_CLEAR),
++--614: Print(&self.lines[self.selected_id])
++--628: Print(format!(
++--640: Print(format!(
++--653: Print(format!(
 ```
 </details>
 
@@ -279,7 +279,7 @@ treegrep
 
 ### *--help*
 ```
-treegrep 1.2.0
+treegrep 1.2.1
 
 by Timothy Cronin
 
