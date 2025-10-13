@@ -3,10 +3,11 @@
 - support for PDFs
 ## Config
 - different colors for match, file, directory, line number
+- custom keybindings for the selection menu
 ## Menus
 - searching for text within the results
 ## Completions
-- *nushell:* currently outputs incorrect orderings with positional -> optional -> positional (4/28/2025)
+- nushell
 
 # Performance
 - builtin multithreading

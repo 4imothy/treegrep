@@ -6,6 +6,7 @@ use crate::{
     config::{self, Config},
     formats, term,
 };
+use clap::error::ErrorKind;
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
@@ -15,6 +16,8 @@ use crossterm::{
 };
 use std::ffi::OsString;
 use std::io;
+
+const CLAP_ERROR_PREFIX: &str = "error:";
 
 pub struct ArgsMenu<'a, 'b> {
     term: &'a mut term::Term<'b>,
@@ -63,7 +66,13 @@ pub fn launch(term: &mut term::Term, conf: Config) -> Result<Option<Config>, Mes
             }
             Err(e) => Err(mes!("{}", {
                 let s = e.to_string();
-                s.strip_prefix("error:").unwrap_or(&s).to_string()
+                if let ErrorKind::DisplayHelp = e.kind() {
+                    "can't display help in menu".to_string()
+                } else if let ErrorKind::DisplayVersion = e.kind() {
+                    "can't display version in menu".to_string()
+                } else {
+                    s.strip_prefix(CLAP_ERROR_PREFIX).unwrap_or(&s).to_string()
+                }
             })),
         }
     } else {

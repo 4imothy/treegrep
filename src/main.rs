@@ -51,6 +51,16 @@ fn main() {
             eprintln!("{} {}", err_prefix, e);
             std::process::exit(1);
         });
+    if let Some(shell) = c.completion_target {
+        generate(
+            shell,
+            &mut args::generate_command(),
+            args::names::TREEGREP_BIN,
+            &mut std::io::stdout(),
+        );
+        return;
+    }
+
     let menu = c.menu;
     run(&mut term, c).unwrap_or_else(|e| {
         if menu {
@@ -83,16 +93,6 @@ fn build_config_and_term(
 fn run(term: &mut Term, mut c: Config) -> Result<(), Message> {
     if let Some(f) = &c.selection_file {
         std::fs::write(f, b"").map_err(|e| mes!("{}", e.to_string()))?;
-    }
-
-    if let Some(shell) = c.completion_target {
-        generate(
-            shell,
-            &mut args::generate_command(),
-            args::names::TREEGREP_BIN,
-            &mut std::io::stdout(),
-        );
-        return Ok(());
     }
 
     if c.menu {

@@ -121,6 +121,8 @@ arg_info!(
     "menu",
     "provide arguments and select result through an interface"
 );
+arg_info!(HELP, "help", "print help", 'h');
+arg_info!(VERSION, "version", "print version", 'V');
 arg_info!(
     FILES,
     "files",
@@ -181,7 +183,7 @@ pub const SHELL_ID: &str = "shell";
 
 arg_info!(OVERVIEW, "overview", "conclude results with an overview");
 
-const HELP: &str = concat!(
+const HELP_TEMPLATE: &str = concat!(
     "{name} {version}
 
 by {author}
@@ -203,15 +205,16 @@ pub fn generate_command() -> Command {
     let mut command = Command::new(env!("CARGO_PKG_NAME"))
         .no_binary_name(true)
         .bin_name(names::TREEGREP_BIN)
-        .help_template(HELP.to_owned())
+        .help_template(HELP_TEMPLATE.to_owned())
         .args_override_self(true)
-        .disable_help_subcommand(true)
         .after_help(
             "arguments are prefixed with the contents of the ".to_string()
                 + DEFAULT_OPTS_ENV_NAME
                 + " environment variable",
         )
         .author(env!("CARGO_PKG_AUTHORS"))
+        .disable_help_flag(true)
+        .disable_version_flag(true)
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .version(env!("CARGO_PKG_VERSION"));
 
@@ -221,6 +224,7 @@ pub fn generate_command() -> Command {
     for opt in get_args() {
         command = command.arg(opt);
     }
+
     command
 }
 
@@ -249,7 +253,7 @@ fn usize_arg(info: &ArgInfo, default_value: Option<&'static str>) -> Arg {
     arg
 }
 
-fn get_args() -> [Arg; 28] {
+fn get_args() -> [Arg; 30] {
     let long = Arg::new(LONG_BRANCHES.id)
         .long(LONG_BRANCHES.id)
         .help(LONG_BRANCHES.h)
@@ -319,6 +323,16 @@ fn get_args() -> [Arg; 28] {
         .value_parser(clap::value_parser!(clap_complete::Shell))
         .value_name(SHELL_ID)
         .action(ArgAction::Set);
+    let help = Arg::new(HELP.id)
+        .long(HELP.id)
+        .short(HELP.s)
+        .help(HELP.h)
+        .action(ArgAction::Help);
+    let version = Arg::new(VERSION.id)
+        .long(VERSION.id)
+        .short(VERSION.s)
+        .help(VERSION.h)
+        .action(ArgAction::Version);
 
     [
         glob,
@@ -349,6 +363,8 @@ fn get_args() -> [Arg; 28] {
         usize_arg(&PREFIX_LEN, Some(DEFAULT_PREFIX_LEN)),
         usize_arg(&MAX_LENGTH, None).requires(EXPRESSION_GROUP_ID),
         usize_arg(&LONG_BRANCHES_EACH, Some(DEFAULT_LONG_BRANCH_EACH)).requires(LONG_BRANCHES.id),
+        help,
+        version,
     ]
 }
 
