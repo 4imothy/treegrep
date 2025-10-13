@@ -323,8 +323,8 @@ Options:
       --prefix-len <>        number of characters to show before a match [default: 3]
       --max-length <>        set the max length for a matched line
       --long-branch-each <>  number of files to print on each branch [default: 5]
-  -h, --help                 Print help
-  -V, --version              Print version
+  -h, --help                 print help
+  -V, --version              print version
 
 arguments are prefixed with the contents of the TREEGREP_DEFAULT_OPTS environment variable
 ```
