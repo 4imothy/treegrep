@@ -2,5 +2,4 @@
 log
 target
 benchmarks/targets/
-example/
 install.sh

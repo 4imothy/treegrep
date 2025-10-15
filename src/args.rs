@@ -375,6 +375,7 @@ fn add_expressions(command: Command) -> Command {
                 .help(EXPRESSION_POSITIONAL.h)
                 .required_unless_present_any(DONT_NEED_REGEXP)
                 .required_unless_present(EXPRESSION.id)
+                .value_hint(ValueHint::Other)
                 .index(1),
         )
         .arg(
@@ -383,6 +384,7 @@ fn add_expressions(command: Command) -> Command {
                 .short(EXPRESSION.s.unwrap())
                 .help(EXPRESSION.h)
                 .value_name("")
+                .value_hint(ValueHint::Other)
                 .required_unless_present_any(DONT_NEED_REGEXP)
                 .required_unless_present(EXPRESSION_POSITIONAL.id)
                 .action(ArgAction::Append),
