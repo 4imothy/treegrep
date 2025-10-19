@@ -10,11 +10,14 @@ pub const RESET: SetAttribute = SetAttribute(Attribute::Reset);
 const BOLD: SetAttribute = SetAttribute(Attribute::Bold);
 
 const RED_FG: SetForegroundColor = SetForegroundColor(Color::Red);
-const MATCHED_COLORS: [Color; 3] = [Color::Green, Color::Magenta, Color::Red];
-
-pub const MENU_SELECTED: Color = Color::DarkGrey;
 pub const SELECTED_INDICATOR_CLEAR: &str = "   ";
 pub const LONG_BRANCH_FILE_SEPARATOR: &str = ", ";
+
+pub const FILE_COLOR_DEFAULT: Color = Color::Cyan;
+pub const DIR_COLOR_DEFAULT: Color = Color::Blue;
+pub const LINE_NUMBER_COLOR_DEFAULT: Color = Color::Yellow;
+pub const MATCHED_COLORS_DEFAULT: [Color; 3] = [Color::Green, Color::Magenta, Color::Red];
+pub const SELECTED_BG_DEFAULT: Color = Color::DarkGrey;
 
 pub struct Chars {
     pub bl: char,
@@ -119,43 +122,23 @@ pub fn error_prefix(bold: bool, colors: bool) -> String {
     }
 }
 
-fn style_with<D>(orig: D, color: Color) -> StyledContent<D>
+pub fn style_with<D>(orig: D, color: Color) -> StyledContent<D>
 where
     D: Display,
 {
     let mut styled = style(orig);
-    if config().colors {
+    if config().with_colors {
         styled = styled.with(color);
     }
-    if config().bold {
+    if config().with_bold {
         styled = styled.bold();
     }
     styled
 }
 
-pub fn dir_name(name: String) -> StyledContent<String> {
-    style_with(name, Color::Blue)
-}
-
-pub fn file_name(name: String) -> StyledContent<String> {
-    style_with(name, Color::Cyan)
-}
-
-pub fn match_substring(orig: &str, pattern_id: usize) -> StyledContent<&str> {
-    style_with(orig, match_color(pattern_id))
-}
-
-pub fn line_number(num: usize) -> StyledContent<usize> {
-    let mut styled_num = style(num);
-    if config().colors {
-        styled_num = styled_num.with(Color::Yellow);
-    }
-    if config().bold {
-        styled_num = styled_num.attribute(Attribute::Bold);
-    }
-    styled_num
-}
-
-fn match_color(i: usize) -> Color {
-    MATCHED_COLORS[i % MATCHED_COLORS.len()]
+pub fn match_substring(orig: &str, regexp_id: usize) -> StyledContent<&str> {
+    style_with(
+        orig,
+        config().colors.matches[regexp_id % config().colors.matches.len()],
+    )
 }

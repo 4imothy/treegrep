@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT
 
-use crate::Searchers;
-use crate::config;
-use crate::errors::{Message, SUBMIT_ISSUE, mes};
-use crate::formats;
-use crate::match_system::{Directory, File, Line, Match, Matches, wrap_dirs, wrap_file};
+use crate::{
+    Searchers, config,
+    errors::{Message, SUBMIT_ISSUE},
+    match_system::{Directory, File, Line, Match, Matches, wrap_dirs, wrap_file},
+    mes, style,
+};
 use bstr::io::{BufReadExt, ByteLines};
 use serde_json::Value;
-use std::collections::HashMap;
-use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    ffi::OsString,
+    path::{Path, PathBuf},
+};
 
 pub fn is_start_path(dir_path: &Path) -> bool {
     dir_path.parent().is_none() || dir_path == config().path
@@ -92,19 +95,6 @@ impl File {
     }
 }
 
-trait AsUsize {
-    fn as_usize(&self) -> Option<usize>;
-}
-
-impl AsUsize for Value {
-    fn as_usize(&self) -> Option<usize> {
-        match self {
-            Value::Number(n) => n.as_u64().map(|v| v as usize),
-            _ => None,
-        }
-    }
-}
-
 pub fn process_json_lines(lines: ByteLines<&[u8]>) -> Result<Option<Matches>, Message> {
     let mut path_to_index: HashMap<OsString, usize> = HashMap::new();
     let mut dirs: Vec<Directory> = Vec::new();
@@ -142,28 +132,31 @@ pub fn process_json_lines(lines: ByteLines<&[u8]>) -> Result<Option<Matches>, Me
                 for m in res["data"]["submatches"].as_array().unwrap() {
                     matches.push(Match::new(
                         0,
-                        m["start"].as_usize().unwrap(),
-                        m["end"].as_usize().unwrap(),
+                        m["start"].as_u64().map(|v| v as usize).unwrap(),
+                        m["end"].as_u64().map(|v| v as usize).unwrap(),
                     ));
                 }
 
                 cur_file.as_mut().unwrap().lines.push(Line::new(
                     match res["data"]["lines"]["text"].as_str() {
                         Some(text) => text
-                            .strip_suffix(formats::CRLF)
-                            .or_else(|| text.strip_suffix(formats::NEW_LINE))
+                            .strip_suffix(style::CRLF)
+                            .or_else(|| text.strip_suffix(style::NEW_LINE))
                             .unwrap_or(text)
                             .to_string(),
                         None => {
                             let text = res["data"]["lines"]["bytes"].as_str().unwrap();
-                            text.strip_suffix(formats::CRLF)
-                                .or_else(|| text.strip_suffix(formats::NEW_LINE))
+                            text.strip_suffix(style::CRLF)
+                                .or_else(|| text.strip_suffix(style::NEW_LINE))
                                 .unwrap_or(text)
                                 .to_string()
                         }
                     },
                     matches,
-                    res["data"]["line_number"].as_usize().unwrap(),
+                    res["data"]["line_number"]
+                        .as_u64()
+                        .map(|v| v as usize)
+                        .unwrap(),
                 ));
             }
             "end" => cur_file = None,

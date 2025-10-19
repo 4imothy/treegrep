@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-use crate::args::names;
-use crate::config;
-use crate::errors::{Message, SUBMIT_ISSUE, mes};
-use crate::options::{Options, Rg};
-use std::env;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use crate::{
+    args::names,
+    config,
+    errors::{Message, SUBMIT_ISSUE},
+    mes,
+    options::{Options, Rg},
+};
+use std::{
+    env,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 fn get_exe_path(bin: &str) -> Option<PathBuf> {
     env::var("PATH").ok().and_then(|path| {
@@ -94,17 +99,15 @@ impl Searchers {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CONFIG;
-    use crate::args::generate_command;
-    use crate::config::Config;
+    use crate::{CONFIG, args::generate_command, config::Config};
 
     #[test]
     fn test_options_add_args_rg() {
         let mut cmd = Command::new("rg");
         let c = Config::get_config(
             generate_command().get_matches_from([
-                "--regexp=pattern1",
-                "--regexp=pattern2",
+                "--regexp=regexp1",
+                "--regexp=regexp2",
                 "--glob=globbing",
                 "--glob=glob2",
                 "--line-number",
@@ -129,8 +132,8 @@ mod tests {
 
         let expected_args = vec![
             "--json",
-            "--regexp=pattern1",
-            "--regexp=pattern2",
+            "--regexp=regexp1",
+            "--regexp=regexp2",
             config().path.to_str().unwrap(),
             "--glob=globbing",
             "--glob=glob2",

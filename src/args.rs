@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-use std::path::PathBuf;
-
-use clap::builder::PossibleValue;
-use clap::{Arg, ArgAction, ArgGroup, Command, ValueEnum, ValueHint, value_parser};
+use clap::{
+    Arg, ArgAction, ArgGroup, Command, Error, ValueEnum, ValueHint,
+    builder::PossibleValue,
+    error::{ContextKind, ContextValue, ErrorKind},
+    value_parser,
+};
+use std::{ffi::OsStr, path::PathBuf};
 
 pub const DEFAULT_PREFIX_LEN: &str = "3";
 pub const DEFAULT_LONG_BRANCH_EACH: &str = "5";
@@ -27,24 +30,13 @@ impl ArgInfo {
     }
 }
 
+#[derive(Clone)]
 pub enum OpenStrategy {
     Vi,
     Hx,
     Code,
     Jed,
     Default,
-}
-
-impl Clone for OpenStrategy {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Vi => Self::Vi,
-            Self::Hx => Self::Hx,
-            Self::Code => Self::Code,
-            Self::Jed => Self::Jed,
-            Self::Default => Self::Default,
-        }
-    }
 }
 
 impl ValueEnum for OpenStrategy {
@@ -71,6 +63,148 @@ impl ValueEnum for OpenStrategy {
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum Color {
+    Black,
+    White,
+    Red,
+    Green,
+    Yellow,
+    Blue,
+    Magenta,
+    Cyan,
+    Grey,
+    Rgb(u8, u8, u8),
+    Ansi(u8),
+}
+
+#[derive(Clone, Copy)]
+pub enum CharacterStyle {
+    Single,
+    Rounded,
+    Heavy,
+    Double,
+    Ascii,
+    None,
+}
+
+impl ValueEnum for CharacterStyle {
+    fn value_variants<'a>() -> &'a [Self] {
+        static VARIANTS: [CharacterStyle; 6] = [
+            CharacterStyle::Single,
+            CharacterStyle::Rounded,
+            CharacterStyle::Heavy,
+            CharacterStyle::Double,
+            CharacterStyle::Ascii,
+            CharacterStyle::None,
+        ];
+        &VARIANTS
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        let name = match self {
+            CharacterStyle::Single => "single",
+            CharacterStyle::Rounded => "rounded",
+            CharacterStyle::Heavy => "heavy",
+            CharacterStyle::Double => "double",
+            CharacterStyle::Ascii => "ascii",
+            CharacterStyle::None => "none",
+        };
+        Some(PossibleValue::new(name))
+    }
+}
+
+const COLOR_HELP: &str =
+    "black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)";
+
+#[derive(Clone)]
+struct ColorParser;
+
+impl clap::builder::TypedValueParser for ColorParser {
+    type Value = Color;
+
+    fn parse_ref(
+        &self,
+        cmd: &Command,
+        arg: Option<&Arg>,
+        value: &OsStr,
+    ) -> Result<Self::Value, Error> {
+        let s = value.to_string_lossy().trim().to_lowercase();
+
+        let color = match s.as_str() {
+            "black" => Color::Black,
+            "white" => Color::White,
+            "red" => Color::Red,
+            "green" => Color::Green,
+            "yellow" => Color::Yellow,
+            "blue" => Color::Blue,
+            "magenta" => Color::Magenta,
+            "cyan" => Color::Cyan,
+            "grey" | "gray" => Color::Grey,
+            _ if s.starts_with("rgb(") && s.ends_with(')') => {
+                let inner = &s[4..s.len() - 1];
+                let nums: Vec<_> = inner
+                    .split('.')
+                    .map(|x| x.trim().parse::<u8>())
+                    .collect::<Result<_, _>>()
+                    .map_err(|_| {
+                        let mut err = Error::new(ErrorKind::ValueValidation).with_cmd(cmd);
+                        err.insert(
+                            ContextKind::InvalidArg,
+                            ContextValue::String("rgb".to_string()),
+                        );
+                        err.insert(
+                            ContextKind::InvalidValue,
+                            ContextValue::String(inner.to_string()),
+                        );
+                        err
+                    })?;
+                if nums.len() == 3 {
+                    Color::Rgb(nums[0], nums[1], nums[2])
+                } else {
+                    let mut err = Error::new(ErrorKind::ValueValidation).with_cmd(cmd);
+                    err.insert(
+                        ContextKind::InvalidArg,
+                        ContextValue::String("rgb".to_string()),
+                    );
+                    err.insert(
+                        ContextKind::InvalidValue,
+                        ContextValue::String(inner.to_string()),
+                    );
+                    return Err(err);
+                }
+            }
+            _ if s.starts_with("ansi(") && s.ends_with(')') => {
+                let inner = &s[5..s.len() - 1];
+                let v = inner.parse::<u8>().map_err(|_| {
+                    let mut err = Error::new(ErrorKind::ValueValidation).with_cmd(cmd);
+                    err.insert(
+                        ContextKind::InvalidArg,
+                        ContextValue::String("ansi".to_string()),
+                    );
+                    err.insert(
+                        ContextKind::InvalidValue,
+                        ContextValue::String(inner.to_string()),
+                    );
+                    err
+                })?;
+                Color::Ansi(v)
+            }
+            _ => {
+                let mut err = Error::new(ErrorKind::InvalidValue).with_cmd(cmd);
+                err.insert(
+                    ContextKind::InvalidArg,
+                    ContextValue::String(arg.unwrap().to_string()),
+                );
+                err.insert(ContextKind::InvalidValue, ContextValue::String(s.clone()));
+                return Err(err);
+            }
+        };
+
+        Ok(color)
+    }
+}
+
 macro_rules! arg_info {
     ($var_name:ident, $name:expr, $description:expr) => {
         pub const $var_name: ArgInfo = ArgInfo::new($name, $description, None);
@@ -82,13 +216,7 @@ macro_rules! arg_info {
 
 pub const EXPRESSION_GROUP_ID: &str = "expressions";
 pub const TARGET_GROUP_ID: &str = "targets";
-pub const CHAR_STYLE_OPTIONS: [&str; 6] = ["ascii", "single", "double", "heavy", "rounded", "none"];
 
-arg_info!(
-    LONG_BRANCHES,
-    "long-branch",
-    "multiple files from the same directory are shown on the same branch"
-);
 arg_info!(
     LONG_BRANCHES_EACH,
     "long-branch-each",
@@ -119,14 +247,14 @@ arg_info!(
 arg_info!(
     MENU,
     "menu",
-    "provide arguments and select result through an interface"
+    "provide arguments and select results through an interface"
 );
 arg_info!(HELP, "help", "print help", 'h');
 arg_info!(VERSION, "version", "print version", 'V');
 arg_info!(
     FILES,
     "files",
-    "if a pattern is given hide matched content, otherwise show the files that would be searched",
+    "if an expression is given, hide matched content, otherwise, show the files that would be searched",
     'f'
 );
 arg_info!(MAX_DEPTH, "max-depth", "the max depth to search");
@@ -178,10 +306,24 @@ arg_info!(
 );
 arg_info!(REPEAT, "repeat", "repeats the last saved search");
 arg_info!(REPEAT_FILE, "repeat-file", "file where arguments are saved");
-
-pub const SHELL_ID: &str = "shell";
-
 arg_info!(OVERVIEW, "overview", "conclude results with an overview");
+arg_info!(
+    LONG_BRANCHES,
+    "long-branch",
+    "multiple files from the same directory are shown on the same branch"
+);
+arg_info!(FILE_COLOR, "file-color", COLOR_HELP);
+arg_info!(DIR_COLOR, "dir-color", COLOR_HELP);
+arg_info!(TEXT_COLOR, "text-color", COLOR_HELP);
+arg_info!(BRANCH_COLOR, "branch-color", COLOR_HELP);
+arg_info!(LINE_NUMBER_COLOR, "line-number-color", COLOR_HELP);
+arg_info!(
+    SELECTED_INDICATOR_COLOR,
+    "selected-indicator-color",
+    COLOR_HELP
+);
+arg_info!(SELECTED_BG_COLOR, "selected-bg-color", COLOR_HELP);
+arg_info!(MATCH_COLORS, "match-colors", COLOR_HELP);
 
 const HELP_TEMPLATE: &str = concat!(
     "{name} {version}
@@ -241,6 +383,15 @@ fn bool_arg(info: ArgInfo) -> Arg {
     arg
 }
 
+fn color_arg(info: ArgInfo) -> Arg {
+    Arg::new(info.id)
+        .long(info.id)
+        .help(info.h)
+        .value_name("")
+        .value_parser(ColorParser)
+        .action(ArgAction::Set)
+}
+
 fn usize_arg(info: &ArgInfo, default_value: Option<&'static str>) -> Arg {
     let mut arg = Arg::new(info.id)
         .long(info.id)
@@ -253,8 +404,8 @@ fn usize_arg(info: &ArgInfo, default_value: Option<&'static str>) -> Arg {
     arg
 }
 
-fn get_args() -> [Arg; 30] {
-    let long = Arg::new(LONG_BRANCHES.id)
+fn get_args() -> [Arg; 38] {
+    let long_branches = Arg::new(LONG_BRANCHES.id)
         .long(LONG_BRANCHES.id)
         .help(LONG_BRANCHES.h)
         .requires(FILES.id)
@@ -281,12 +432,7 @@ fn get_args() -> [Arg; 30] {
     let char_style = Arg::new(CHAR_STYLE.id)
         .long(CHAR_STYLE.id)
         .help(CHAR_STYLE.h)
-        .value_parser(
-            CHAR_STYLE_OPTIONS
-                .iter()
-                .map(|&s| PossibleValue::new(s).hide(false))
-                .collect::<Vec<_>>(),
-        )
+        .value_parser(value_parser!(CharacterStyle))
         .value_name("")
         .action(ArgAction::Set);
 
@@ -313,7 +459,7 @@ fn get_args() -> [Arg; 30] {
     let open_like = Arg::new(OPEN_LIKE.id)
         .long(OPEN_LIKE.id)
         .help(OPEN_LIKE.h)
-        .value_parser(clap::builder::EnumValueParser::<OpenStrategy>::new())
+        .value_parser(value_parser!(OpenStrategy))
         .value_name("")
         .action(ArgAction::Set);
 
@@ -321,7 +467,7 @@ fn get_args() -> [Arg; 30] {
         .long(COMPLETIONS.id)
         .help(COMPLETIONS.h)
         .value_parser(clap::value_parser!(clap_complete::Shell))
-        .value_name(SHELL_ID)
+        .value_name("")
         .action(ArgAction::Set);
     let help = Arg::new(HELP.id)
         .long(HELP.id)
@@ -335,34 +481,42 @@ fn get_args() -> [Arg; 30] {
         .action(ArgAction::Version);
 
     [
+        bool_arg(MENU),
+        bool_arg(SELECT),
         glob,
-        searcher,
-        char_style,
-        editor,
-        open_like,
-        long,
-        completions,
-        selection_file,
-        repeat_file,
-        bool_arg(HIDDEN),
-        bool_arg(REPEAT),
-        bool_arg(LINE_NUMBER),
         bool_arg(FILES),
+        bool_arg(HIDDEN),
+        bool_arg(LINE_NUMBER),
         bool_arg(LINKS),
         bool_arg(NO_IGNORE),
         bool_arg(COUNT),
         bool_arg(NO_COLORS),
         bool_arg(NO_BOLD),
         bool_arg(OVERVIEW),
-        bool_arg(SELECT),
-        bool_arg(MENU),
-        bool_arg(TRIM_LEFT).requires(EXPRESSION_GROUP_ID),
-        bool_arg(PCRE2).requires(EXPRESSION_GROUP_ID),
-        usize_arg(&THREADS, None),
         usize_arg(&MAX_DEPTH, None),
         usize_arg(&PREFIX_LEN, Some(DEFAULT_PREFIX_LEN)),
         usize_arg(&MAX_LENGTH, None).requires(EXPRESSION_GROUP_ID),
+        bool_arg(TRIM_LEFT).requires(EXPRESSION_GROUP_ID),
+        bool_arg(PCRE2).requires(EXPRESSION_GROUP_ID),
+        usize_arg(&THREADS, None),
+        long_branches,
         usize_arg(&LONG_BRANCHES_EACH, Some(DEFAULT_LONG_BRANCH_EACH)).requires(LONG_BRANCHES.id),
+        editor,
+        open_like,
+        char_style,
+        color_arg(FILE_COLOR),
+        color_arg(DIR_COLOR),
+        color_arg(TEXT_COLOR),
+        color_arg(LINE_NUMBER_COLOR),
+        color_arg(BRANCH_COLOR),
+        color_arg(MATCH_COLORS).value_delimiter(','),
+        color_arg(SELECTED_INDICATOR_COLOR),
+        color_arg(SELECTED_BG_COLOR),
+        completions,
+        searcher,
+        selection_file,
+        repeat_file,
+        bool_arg(REPEAT),
         help,
         version,
     ]

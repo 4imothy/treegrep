@@ -1,34 +1,26 @@
 // SPDX-License-Identifier: MIT
 
-use crate::config;
-use crate::errors::{Message, mes};
-use crate::formats;
-use crate::match_system::{Directory, File, Match, Matches};
-use crate::term::TERM_WIDTH;
-use crate::term::Term;
+use crate::{
+    config,
+    errors::Message,
+    match_system::{Directory, File, Match, Matches},
+    mes, style,
+    term::{TERM_WIDTH, Term},
+};
 use core::fmt::{self, Display};
 use crossterm::style::StyledContent;
-use std::io::{self, Write};
-use std::path::Path;
-use std::path::PathBuf;
-use std::sync::atomic::Ordering;
+use std::{
+    io::{self, Write},
+    path::{Path, PathBuf},
+    sync::atomic::Ordering,
+};
 
+#[derive(Clone)]
 pub enum PrefixComponent {
     MatchWithNext,
     MatchNoNext,
     SpacerVert,
     Spacer,
-}
-
-impl Clone for PrefixComponent {
-    fn clone(&self) -> Self {
-        match self {
-            Self::MatchWithNext => Self::MatchWithNext,
-            Self::MatchNoNext => Self::MatchNoNext,
-            Self::SpacerVert => Self::SpacerVert,
-            Self::Spacer => Self::Spacer,
-        }
-    }
 }
 
 pub struct OpenInfo<'a> {
@@ -63,11 +55,12 @@ impl<'a> PathDisplay<'a> {
         let (name, linked) = {
             let p = path_name(path)?;
             let l = linked.as_ref().map(|l| path_name(l.as_ref())).transpose()?;
-            if dir {
-                (formats::dir_name(p), l.map(formats::dir_name))
+            let c = if dir {
+                config().colors.dir
             } else {
-                (formats::file_name(p), l.map(formats::file_name))
-            }
+                config().colors.file
+            };
+            (style::style_with(p, c), l.map(|v| style::style_with(v, c)))
         };
 
         Ok(PathDisplay {
@@ -126,8 +119,8 @@ fn write_path(
     if config().count && count > 0 {
         write!(f, ": {}", count)?;
     }
-    if config().colors || config().bold {
-        write!(f, "{}", formats::RESET)?;
+    if config().with_colors || config().with_bold {
+        write!(f, "{}", style::RESET)?;
     }
 
     if new_line {
@@ -137,16 +130,21 @@ fn write_path(
 }
 
 fn write_prefix(f: &mut fmt::Formatter, prefix_components: &[PrefixComponent]) -> fmt::Result {
+    let mut prefix: String = String::new();
+    prefix.reserve(config().chars.spacer.len() * prefix_components.len());
     for c in prefix_components {
-        let s = match c {
-            PrefixComponent::MatchWithNext => &config().c.match_with_next,
-            PrefixComponent::MatchNoNext => &config().c.match_no_next,
-            PrefixComponent::SpacerVert => &config().c.spacer_vert,
-            PrefixComponent::Spacer => &config().c.spacer,
-        };
-        f.write_str(s)?;
+        prefix.push_str(match c {
+            PrefixComponent::MatchWithNext => &config().chars.match_with_next,
+            PrefixComponent::MatchNoNext => &config().chars.match_no_next,
+            PrefixComponent::SpacerVert => &config().chars.spacer_vert,
+            PrefixComponent::Spacer => &config().chars.spacer,
+        });
     }
-    Ok(())
+    if let Some(c) = config().colors.branch {
+        write!(f, "{}", style::style_with(&prefix, c))
+    } else {
+        f.write_str(&prefix)
+    }
 }
 
 struct LineDisplay<'a> {
@@ -176,8 +174,8 @@ impl<'a> Entry for LineDisplay<'a> {
 impl<'a> Display for LineDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
         write_prefix(f, &self.prefix)?;
-        if config().colors || config().bold {
-            write!(f, "{}", formats::RESET)?;
+        if config().with_colors || config().with_bold {
+            write!(f, "{}", style::RESET)?;
         }
 
         let mut content: &str = self.content;
@@ -205,7 +203,11 @@ impl<'a> Display for LineDisplay<'a> {
         }
 
         if config().line_number {
-            write!(f, "{}: ", formats::line_number(self.line_num))?;
+            write!(
+                f,
+                "{}: ",
+                style::style_with(self.line_num, config().colors.line_number)
+            )?;
         }
 
         let mut last = 0;
@@ -222,12 +224,17 @@ impl<'a> Display for LineDisplay<'a> {
             }
 
             if last < m_start {
-                f.write_str(&content[last..m_start])?;
+                let text = &content[last..m_start];
+                if let Some(c) = config().colors.text {
+                    write!(f, "{}", style::style_with(text, c))?;
+                } else {
+                    f.write_str(text)?;
+                }
             }
 
-            let styled = formats::match_substring(&content[m_start..m_end], m.pattern_id);
+            let styled = style::match_substring(&content[m_start..m_end], m.regexp_id);
             if cfg!(feature = "test") {
-                write!(f, "[m{}s]{}[m{}e]", m.pattern_id, styled, m.pattern_id)?;
+                write!(f, "[m{}s]{}[m{}e]", m.regexp_id, styled, m.regexp_id)?;
             } else {
                 write!(f, "{}", styled)?;
             }
@@ -236,7 +243,12 @@ impl<'a> Display for LineDisplay<'a> {
         }
 
         if last < content.len() {
-            f.write_str(&content[last..])?;
+            let text = &content[last..];
+            if let Some(c) = config().colors.text {
+                write!(f, "{}", style::style_with(text, c))?;
+            } else {
+                f.write_str(text)?;
+            }
         }
 
         if self.new_line {
@@ -271,14 +283,14 @@ impl<'a> Entry for LongBranchDisplay<'a> {
 impl<'a> Display for LongBranchDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
         write_prefix(f, &self.prefix)?;
-        if config().colors || config().bold {
-            write!(f, "{}", formats::RESET)?;
+        if config().with_colors || config().with_bold {
+            write!(f, "{}", style::RESET)?;
         }
 
         for (i, file) in self.files.iter().enumerate() {
             write_path(f, &file.name, &file.linked, file.count, false)?;
             if i + 1 != self.files.len() {
-                f.write_str(formats::LONG_BRANCH_FILE_SEPARATOR)?;
+                f.write_str(style::LONG_BRANCH_FILE_SEPARATOR)?;
             }
         }
         if self.new_line {
@@ -310,8 +322,8 @@ impl Entry for OverviewDisplay {
 
 impl Display for OverviewDisplay {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
-        if config().colors || config().bold {
-            write!(f, "{}", formats::RESET)?;
+        if config().with_colors || config().with_bold {
+            write!(f, "{}", style::RESET)?;
         }
         if !config().files {
             write!(

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use crate::config;
-use crate::errors::Message;
+use crate::{config, errors::Message};
 use std::path::{Path, PathBuf};
 
 pub fn wrap_dirs(dirs: Vec<Directory>) -> Option<Matches> {
@@ -71,16 +70,17 @@ fn get_linked(path: &Path) -> Option<PathBuf> {
     })
 }
 
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct Match {
-    pub pattern_id: usize,
+    pub regexp_id: usize,
     pub start: usize,
     pub end: usize,
 }
 
 impl Match {
-    pub fn new(pattern_id: usize, start: usize, end: usize) -> Self {
+    pub fn new(regexp_id: usize, start: usize, end: usize) -> Self {
         Match {
-            pattern_id,
+            regexp_id,
             start,
             end,
         }
@@ -122,24 +122,6 @@ impl Line {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fmt::{Debug, Error, Formatter};
-
-    impl PartialEq for Match {
-        fn eq(&self, other: &Self) -> bool {
-            self.pattern_id == other.pattern_id
-                && self.start == other.start
-                && self.end == other.end
-        }
-    }
-    impl Debug for Match {
-        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-            f.debug_struct("Match")
-                .field("pattern_id", &self.pattern_id)
-                .field("start", &self.start)
-                .field("end", &self.end)
-                .finish()
-        }
-    }
 
     #[test]
     fn test_remove_overlapping() {

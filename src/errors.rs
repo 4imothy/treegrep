@@ -7,17 +7,16 @@ use crossterm::{
     queue,
     style::Print,
 };
-use std::error::Error;
-use std::fmt;
-use std::io;
-use std::io::Write;
+use std::{error::Error, fmt, io, io::Write};
 
 pub const SUBMIT_ISSUE: &str = "please submit an issue, github.com/4imothy/treegrep/issues";
 
 pub struct Message {
     pub mes: String,
 }
+impl Error for Message {}
 
+#[macro_export]
 macro_rules! mes {
     ($($arg:tt)*) => {{
         Message {
@@ -31,10 +30,6 @@ macro_rules! mes {
         }
     }};
 }
-
-pub(crate) use mes;
-
-impl Error for Message {}
 
 impl fmt::Debug for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

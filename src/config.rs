@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: MIT
 
-use crate::args::{self, OpenStrategy, REPEAT_FILE, generate_command};
-use crate::errors::{Message, mes};
-use crate::formats;
-use crate::searchers::Searchers;
+use crate::{
+    args::{self, OpenStrategy, REPEAT_FILE, generate_command},
+    errors::Message,
+    mes,
+    searchers::Searchers,
+    style,
+};
 use clap::{ArgMatches, Error};
-use std::ffi::OsString;
-use std::path::{Component, Path, PathBuf};
+use crossterm::style::Color;
+use std::{
+    ffi::OsString,
+    path::{Component, Path, PathBuf},
+};
 
 pub struct Characters {
     pub bl: char,
@@ -22,15 +28,44 @@ pub struct Characters {
     pub selected_indicator: &'static str,
 }
 
+pub struct Colors {
+    pub file: Color,
+    pub dir: Color,
+    pub line_number: Color,
+    pub text: Option<Color>,
+    pub branch: Option<Color>,
+    pub selected_indicator: Option<Color>,
+    pub selected_bg: Color,
+    pub matches: Vec<Color>,
+}
+
+impl args::Color {
+    fn get(&self) -> Color {
+        match *self {
+            args::Color::Black => Color::Black,
+            args::Color::White => Color::White,
+            args::Color::Red => Color::Red,
+            args::Color::Green => Color::Green,
+            args::Color::Yellow => Color::Yellow,
+            args::Color::Blue => Color::Blue,
+            args::Color::Magenta => Color::Magenta,
+            args::Color::Cyan => Color::Cyan,
+            args::Color::Grey => Color::Grey,
+            args::Color::Rgb(r, g, b) => Color::Rgb { r, g, b },
+            args::Color::Ansi(value) => Color::AnsiValue(value),
+        }
+    }
+}
+
 pub struct Config {
     pub path: PathBuf,
     pub selection_file: Option<PathBuf>,
     pub repeat_file: Option<PathBuf>,
     pub long_branch: bool,
-    pub bold: bool,
-    pub colors: bool,
+    pub with_bold: bool,
+    pub with_colors: bool,
     pub is_dir: bool,
-    pub patterns: Vec<String>,
+    pub regexps: Vec<String>,
     pub globs: Vec<String>,
     pub searcher: Searchers,
     pub searcher_path: Option<PathBuf>,
@@ -51,12 +86,13 @@ pub struct Config {
     pub prefix_len: usize,
     pub long_branch_each: usize,
     pub trim: bool,
-    pub c: Characters,
     pub editor: Option<String>,
     pub open_like: Option<OpenStrategy>,
     pub completion_target: Option<clap_complete::Shell>,
     pub repeat: bool,
     pub all_args: Vec<OsString>,
+    pub chars: Characters,
+    pub colors: Colors,
 }
 
 fn canonicalize(p: &Path) -> Result<PathBuf, Message> {
@@ -191,13 +227,13 @@ impl Config {
         bold: bool,
         colors: bool,
     ) -> Result<Self, Message> {
-        let mut patterns: Vec<String> = Vec::new();
+        let mut regexps: Vec<String> = Vec::new();
         if let Some(expr) = matches.get_one::<String>(args::EXPRESSION_POSITIONAL.id) {
-            patterns.push(expr.to_owned());
+            regexps.push(expr.to_owned());
         }
         if let Some(exprs) = matches.get_many::<String>(args::EXPRESSION.id) {
             for expr in exprs.into_iter() {
-                patterns.push(expr.to_owned());
+                regexps.push(expr.to_owned());
             }
         }
 
@@ -268,7 +304,7 @@ impl Config {
 
         let is_dir = path.is_dir();
         let prefix_len = get_usize_option_with_default(&matches, args::PREFIX_LEN.id)?;
-        let just_files = files && patterns.is_empty();
+        let just_files = files && regexps.is_empty();
 
         let completion_target = matches
             .get_one::<clap_complete::Shell>(args::COMPLETIONS.id)
@@ -281,12 +317,12 @@ impl Config {
             long_branch,
             is_dir,
             just_files,
-            bold,
+            with_bold: bold,
             searcher,
             searcher_path,
-            patterns,
+            regexps,
             line_number,
-            colors,
+            with_colors: colors,
             pcre2,
             count,
             hidden,
@@ -304,28 +340,61 @@ impl Config {
             editor,
             open_like,
             overview,
-            c: Config::get_characters(matches.get_one::<String>(args::CHAR_STYLE.id), prefix_len),
             completion_target,
             menu,
             repeat,
             all_args,
+            chars: Config::get_characters(
+                matches.get_one::<args::CharacterStyle>(args::CHAR_STYLE.id),
+                prefix_len,
+            ),
+            colors: Config::get_colors(&matches),
         })
     }
 
-    fn get_characters(t: Option<&String>, spacer: usize) -> Characters {
-        let chars = match t.map(|s| s.as_str()) {
-            Some("single") | None => formats::SINGLE,
-            Some("ascii") => formats::ASCII,
-            Some("double") => formats::DOUBLE,
-            Some("heavy") => formats::HEAVY,
-            Some("rounded") => formats::ROUNDED,
-            Some("none") => formats::NONE,
-            _ => panic!(
-                "{} option {} not implemented",
-                args::CHAR_STYLE.id,
-                t.unwrap()
-            ),
-        };
+    fn get_colors(matches: &ArgMatches) -> Colors {
+        Colors {
+            file: matches
+                .get_one::<args::Color>(args::FILE_COLOR.id)
+                .map(|v| v.get())
+                .unwrap_or(style::FILE_COLOR_DEFAULT),
+            dir: matches
+                .get_one::<args::Color>(args::DIR_COLOR.id)
+                .map(|v| v.get())
+                .unwrap_or(style::DIR_COLOR_DEFAULT),
+            line_number: matches
+                .get_one::<args::Color>(args::LINE_NUMBER_COLOR.id)
+                .map(|v| v.get())
+                .unwrap_or(style::LINE_NUMBER_COLOR_DEFAULT),
+            text: matches
+                .get_one::<args::Color>(args::TEXT_COLOR.id)
+                .map(|v| v.get()),
+            branch: matches
+                .get_one::<args::Color>(args::BRANCH_COLOR.id)
+                .map(|v| v.get()),
+            selected_bg: matches
+                .get_one::<args::Color>(args::SELECTED_BG_COLOR.id)
+                .map(|v| v.get())
+                .unwrap_or(style::SELECTED_BG_DEFAULT),
+            selected_indicator: matches
+                .get_one::<args::Color>(args::SELECTED_INDICATOR_COLOR.id)
+                .map(|v| v.get()),
+            matches: matches
+                .get_many::<args::Color>(args::MATCH_COLORS.id)
+                .map(|vals| vals.cloned().map(|v| v.get()).collect::<Vec<_>>())
+                .unwrap_or_else(|| style::MATCHED_COLORS_DEFAULT.to_vec()),
+        }
+    }
+
+    fn get_characters(t: Option<&args::CharacterStyle>, spacer: usize) -> Characters {
+        let chars = t.map_or(style::SINGLE, |c| match c {
+            args::CharacterStyle::Single => style::SINGLE,
+            args::CharacterStyle::Ascii => style::ASCII,
+            args::CharacterStyle::Double => style::DOUBLE,
+            args::CharacterStyle::Heavy => style::HEAVY,
+            args::CharacterStyle::Rounded => style::ROUNDED,
+            args::CharacterStyle::None => style::NONE,
+        });
         Characters {
             bl: chars.bl,
             br: chars.br,
@@ -334,9 +403,9 @@ impl Config {
             v: chars.v,
             h: chars.h,
             selected_indicator: chars.selected_indicator,
-            match_with_next: format!("{}{}", chars.tee, formats::repeat(chars.h, spacer - 1),),
-            match_no_next: format!("{}{}", chars.bl, formats::repeat(chars.h, spacer - 1),),
-            spacer_vert: format!("{}{}", chars.v, formats::repeat(' ', spacer - 1)),
+            match_with_next: format!("{}{}", chars.tee, style::repeat(chars.h, spacer - 1),),
+            match_no_next: format!("{}{}", chars.bl, style::repeat(chars.h, spacer - 1),),
+            spacer_vert: format!("{}{}", chars.v, style::repeat(' ', spacer - 1)),
             spacer: " ".repeat(spacer),
         }
     }
@@ -362,8 +431,8 @@ mod tests {
         "--select",
         "--files",
         "--searcher=rg",
-        "--regexp=pattern1",
-        "--regexp=pattern2",
+        "--regexp=regexp1",
+        "--regexp=regexp2",
     ];
 
     pub fn get_config_from<I, T>(args: I) -> Config
@@ -394,7 +463,8 @@ mod tests {
     fn test_default_opts() {
         let config = get_config_from(["expression"]);
         assert!(
-            config.c.spacer == " ".repeat(args::DEFAULT_PREFIX_LEN.parse::<usize>().ok().unwrap())
+            config.chars.spacer
+                == " ".repeat(args::DEFAULT_PREFIX_LEN.parse::<usize>().ok().unwrap())
         );
         assert!(
             config.long_branch_each
@@ -422,25 +492,25 @@ mod tests {
         assert!(config.count);
         assert!(config.links);
         assert!(config.trim);
-        assert!(config.colors);
+        assert!(config.with_colors);
         assert!(config.select);
         assert!(config.files);
         match config.searcher {
             Searchers::RipGrep => {}
             _ => panic!("wrong searcher"),
         }
-        assert_eq!(config.patterns, vec!["posexpr", "pattern1", "pattern2"]);
+        assert_eq!(config.regexps, vec!["posexpr", "regexp1", "regexp2"]);
     }
 
     #[test]
     fn test_shorts() {
-        let config = get_config_from(["posexpr", "-n.csf", "-e=pattern1", "-e=pattern2"]);
+        let config = get_config_from(["posexpr", "-n.csf", "-e=regexp1", "-e=regexp2"]);
         assert!(config.line_number);
         assert!(config.hidden);
         assert!(config.count);
         assert!(config.select);
         assert!(config.files);
-        assert_eq!(config.patterns, vec!["posexpr", "pattern1", "pattern2"]);
+        assert_eq!(config.regexps, vec!["posexpr", "regexp1", "regexp2"]);
     }
 
     #[test]
@@ -457,7 +527,7 @@ mod tests {
         assert!(!config.ignore);
         assert!(config.hidden);
         assert!(config.links);
-        assert!(config.colors);
+        assert!(config.with_colors);
         assert!(config.select);
     }
 

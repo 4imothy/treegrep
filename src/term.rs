@@ -4,9 +4,11 @@ use crossterm::{
     cursor, event, execute, style,
     terminal::{self, ClearType},
 };
-use std::io::{self, StdoutLock, Write};
-use std::panic;
-use std::sync::atomic::{AtomicU16, Ordering};
+use std::{
+    io::{self, StdoutLock, Write},
+    panic,
+    sync::atomic::{AtomicU16, Ordering},
+};
 
 pub static TERM_WIDTH: AtomicU16 = AtomicU16::new(0);
 

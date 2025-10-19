@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-use crate::args::{self, MENU};
-use crate::errors::{Message, mes};
 use crate::{
+    args::{self, MENU},
     config::{self, Config},
-    formats, term,
+    errors::Message,
+    mes, style, term,
 };
 use clap::error::ErrorKind;
 use crossterm::{
@@ -14,8 +14,7 @@ use crossterm::{
     style::Print,
     terminal,
 };
-use std::ffi::OsString;
-use std::io;
+use std::{ffi::OsString, io};
 
 const CLAP_ERROR_PREFIX: &str = "error:";
 
@@ -280,24 +279,24 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
             cursor::MoveTo(self.start_x, self.center_y - 1),
             Print(format!(
                 "{}{}{}",
-                self.conf.c.tl,
-                formats::repeat(self.conf.c.h, self.text_box_width as usize),
-                self.conf.c.tr
+                self.conf.chars.tl,
+                style::repeat(self.conf.chars.h, self.text_box_width as usize),
+                self.conf.chars.tr
             )),
             cursor::MoveTo(self.start_x, self.center_y),
             Print(format!(
                 "{}{:w$}{}",
-                self.conf.c.v,
+                self.conf.chars.v,
                 &self.input[self.start..],
-                self.conf.c.v,
+                self.conf.chars.v,
                 w = self.text_box_width as usize
             )),
             cursor::MoveTo(self.start_x, self.center_y + 1),
             Print(format!(
                 "{}{}{}",
-                self.conf.c.bl,
-                formats::repeat(self.conf.c.h, self.text_box_width as usize),
-                self.conf.c.br,
+                self.conf.chars.bl,
+                style::repeat(self.conf.chars.h, self.text_box_width as usize),
+                self.conf.chars.br,
             )),
             cursor::MoveTo(cursor_pos_x, self.center_y),
         )

@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use crate::args::OpenStrategy;
-use crate::errors::SUBMIT_ISSUE;
-use crate::term::Term;
-use crate::{config, formats, writer::Entry};
+use crate::{args::OpenStrategy, config, errors::SUBMIT_ISSUE, style, term::Term, writer::Entry};
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, MouseEventKind},
@@ -11,11 +8,13 @@ use crossterm::{
     style::{Print, SetBackgroundColor},
     terminal,
 };
-use std::ffi::OsString;
-use std::io::{self, Write};
-use std::process::Command;
+use std::{
+    ffi::OsString,
+    io::{self, Write},
+    process::Command,
+};
 
-const START_X: u16 = formats::SELECTED_INDICATOR_CLEAR.len() as u16;
+const START_X: u16 = style::SELECTED_INDICATOR_CLEAR.len() as u16;
 const START_Y: u16 = 0;
 
 const MENU_HELP_POPUP: &str = "navigate with the following
@@ -77,17 +76,12 @@ impl Window {
     }
 }
 
+#[derive(Clone, Copy)]
 enum JumpLocation {
     Top,
     Middle,
     Bottom,
 }
-impl Clone for JumpLocation {
-    fn clone(&self) -> JumpLocation {
-        *self
-    }
-}
-impl Copy for JumpLocation {}
 
 impl JumpLocation {
     fn default() -> JumpLocation {
@@ -121,7 +115,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             max_line_id,
             window: Window { first: 0, last: 0 },
             lines,
-            colors: config().colors,
+            colors: config().with_colors,
             scroll_offset: 0,
             big_jump: 0,
             small_jump: 0,
@@ -230,7 +224,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                                             buf.extend_from_slice(
                                                 info.path.as_os_str().as_encoded_bytes(),
                                             );
-                                            buf.push(formats::NEW_LINE as u8);
+                                            buf.push(style::NEW_LINE as u8);
                                             if let Some(l) = info.line {
                                                 buf.extend_from_slice(l.to_string().as_bytes());
                                             }
@@ -593,13 +587,23 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     }
 
     fn style_selected(&mut self) -> io::Result<()> {
+        queue!(self.term, cursor::MoveTo(0, self.cursor_y),)?;
         if self.colors {
-            queue!(self.term, SetBackgroundColor(formats::MENU_SELECTED))?;
+            queue!(self.term, SetBackgroundColor(config().colors.selected_bg))?;
+        }
+        if self.colors
+            && let Some(c) = config().colors.selected_indicator
+        {
+            queue!(
+                self.term,
+                Print(style::style_with(config().chars.selected_indicator, c)),
+                SetBackgroundColor(config().colors.selected_bg)
+            )?;
+        } else {
+            queue!(self.term, Print(config().chars.selected_indicator),)?;
         }
         queue!(
             self.term,
-            cursor::MoveTo(0, self.cursor_y),
-            Print(config().c.selected_indicator),
             cursor::MoveTo(START_X, self.cursor_y),
             Print(&self.lines[self.selected_id])
         )
@@ -609,7 +613,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         queue!(
             self.term,
             cursor::MoveTo(0, self.cursor_y),
-            Print(formats::SELECTED_INDICATOR_CLEAR),
+            Print(style::SELECTED_INDICATOR_CLEAR),
             cursor::MoveTo(START_X, self.cursor_y),
             Print(&self.lines[self.selected_id])
         )
@@ -627,9 +631,9 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             cursor::MoveTo(x, y),
             Print(format!(
                 "{}{}{}",
-                config().c.tl,
-                formats::repeat(config().c.h, content_width as usize),
-                config().c.tr,
+                config().chars.tl,
+                style::repeat(config().chars.h, content_width as usize),
+                config().chars.tr,
             ))
         )?;
 
@@ -639,9 +643,9 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                 cursor::MoveTo(x, y + i as u16 + 1),
                 Print(format!(
                     "{}{:w$}{}",
-                    config().c.v,
+                    config().chars.v,
                     line,
-                    config().c.v,
+                    config().chars.v,
                     w = content_width as usize
                 )),
             )?;
@@ -652,9 +656,9 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             cursor::MoveTo(x, y + height - 1),
             Print(format!(
                 "{}{}{}",
-                config().c.bl,
-                formats::repeat(config().c.h, content_width as usize),
-                config().c.br,
+                config().chars.bl,
+                style::repeat(config().chars.h, content_width as usize),
+                config().chars.br,
             ))
         )?;
         self.popup_open = true;

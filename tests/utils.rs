@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 
 use core::panic;
-use std::env;
-use std::fs;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::{
+    env, fs,
+    io::Write,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 fn normalize_newlines(content: &mut Vec<u8>) {
     let mut i = 0;

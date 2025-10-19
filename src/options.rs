@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-use crate::config;
-use crate::errors::Message;
-use std::path::Path;
-use std::process::Command;
+use crate::{config, errors::Message};
+use std::{path::Path, process::Command};
 
 pub trait Options {
     fn json(cmd: &mut Command);
@@ -16,17 +14,17 @@ pub trait Options {
     fn ignore(cmd: &mut Command, want: bool) -> Result<(), Message>;
     fn max_depth(cmd: &mut Command, md: Option<usize>) -> Result<(), Message>;
     fn threads(cmd: &mut Command, threads: Option<usize>) -> Result<(), Message>;
-    fn patterns(cmd: &mut Command, patterns: &[String]);
+    fn regexps(cmd: &mut Command, regexps: &[String]);
     fn path(cmd: &mut Command, path: &Path);
     fn globs(cmd: &mut Command, globs: &[String]);
 
     fn add_options(cmd: &mut Command) -> Result<(), Message> {
         let config = config();
         Self::json(cmd);
-        Self::patterns(cmd, &config.patterns);
+        Self::regexps(cmd, &config.regexps);
         Self::path(cmd, &config.path);
         Self::globs(cmd, &config.globs);
-        Self::colors(cmd, config.colors)?;
+        Self::colors(cmd, config.with_colors)?;
         Self::line_num(cmd, config.line_number)?;
         Self::pcre2(cmd, config.pcre2)?;
         Self::hidden(cmd, config.hidden)?;
@@ -52,9 +50,9 @@ impl Options for Rg {
         }
     }
 
-    fn patterns(cmd: &mut Command, patterns: &[String]) {
-        for p in patterns {
-            cmd.arg(format!("--regexp={}", p));
+    fn regexps(cmd: &mut Command, regexps: &[String]) {
+        for r in regexps {
+            cmd.arg(format!("--regexp={}", r));
         }
     }
 

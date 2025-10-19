@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-use std::fs;
-use std::panic;
-use std::sync::{Mutex, OnceLock};
+use std::{
+    fs, panic,
+    sync::{Mutex, OnceLock},
+};
 
 pub static LOG: OnceLock<Mutex<fs::File>> = OnceLock::new();
 

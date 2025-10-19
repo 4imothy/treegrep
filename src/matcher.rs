@@ -1,36 +1,35 @@
 // SPDX-License-Identifier: MIT
 
-use crate::config;
-use crate::errors::{Message, mes};
-use crate::formats;
-use crate::match_system::{Directory, File, Line, Match, Matches, wrap_dirs, wrap_file};
+use crate::{
+    config,
+    errors::Message,
+    match_system::{Directory, File, Line, Match, Matches, wrap_dirs, wrap_file},
+    mes, style,
+};
 use bstr::ByteSlice;
 use ignore::{WalkBuilder, overrides::OverrideBuilder};
 use regex::bytes::Regex;
-use std::collections::HashMap;
-use std::ffi::OsString;
-use std::fs;
-use std::path::PathBuf;
+use std::{collections::HashMap, ffi::OsString, fs, path::PathBuf};
 
 pub fn search() -> Result<Option<Matches>, Message> {
-    let mut patterns: Vec<Regex> = Vec::new();
-    for expr in &config().patterns {
-        patterns.push(
+    let mut regexps: Vec<Regex> = Vec::new();
+    for expr in &config().regexps {
+        regexps.push(
             Regex::new(expr)
                 .map_err(|_| mes!("regex expression `{}` is invalid", expr.to_string()))?,
         );
     }
     if config().is_dir {
-        Ok(wrap_dirs(search_dir(&patterns)?))
+        Ok(wrap_dirs(search_dir(&regexps)?))
     } else {
         Ok(wrap_file(
-            Some(search_file(&config().path, &patterns)?),
+            Some(search_file(&config().path, &regexps)?),
             config().just_files,
         ))
     }
 }
 
-fn search_dir(patterns: &[Regex]) -> Result<Vec<Directory>, Message> {
+fn search_dir(regexps: &[Regex]) -> Result<Vec<Directory>, Message> {
     let mut override_builder = OverrideBuilder::new(&config().path);
     for glob in &config().globs {
         override_builder
@@ -65,7 +64,7 @@ fn search_dir(patterns: &[Regex]) -> Result<Vec<Directory>, Message> {
                 directories.push(dir);
             }
         } else if path.is_file() {
-            let file = search_file(&path, patterns)?;
+            let file = search_file(&path, regexps)?;
             if (!file.lines.is_empty() || config().just_files)
                 && let Some(mut dir_path) = file.path.parent().map(|v| v.to_path_buf())
             {
@@ -91,7 +90,7 @@ fn search_dir(patterns: &[Regex]) -> Result<Vec<Directory>, Message> {
     Ok(directories)
 }
 
-fn search_file(pb: &PathBuf, patterns: &[Regex]) -> Result<File, Message> {
+fn search_file(pb: &PathBuf, regexps: &[Regex]) -> Result<File, Message> {
     let mut file = File::new(pb)?;
     if config().just_files {
         return Ok(file);
@@ -107,20 +106,20 @@ fn search_file(pb: &PathBuf, patterns: &[Regex]) -> Result<File, Message> {
         return Ok(file);
     }
 
-    file.add_matches(content_bytes, patterns);
+    file.add_matches(content_bytes, regexps);
 
     Ok(file)
 }
 
 impl File {
-    fn add_matches(&mut self, content: Vec<u8>, patterns: &[Regex]) {
-        let lines = content.split(|&byte| byte == formats::NEW_LINE as u8);
+    fn add_matches(&mut self, content: Vec<u8>, regexps: &[Regex]) {
+        let lines = content.split(|&byte| byte == style::NEW_LINE as u8);
 
         for (line_num, line) in lines.enumerate() {
             let mut matches: Vec<Match> = Vec::new();
             let mut was_match = false;
-            for (j, pattern) in patterns.iter().enumerate() {
-                let mut it = pattern.find_iter(line).peekable();
+            for (j, regexp) in regexps.iter().enumerate() {
+                let mut it = regexp.find_iter(line).peekable();
                 if it.peek().is_none() {
                     continue;
                 }

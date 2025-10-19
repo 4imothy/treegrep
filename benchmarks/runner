@@ -56,18 +56,18 @@ def download_eng_subs():
 
 
 def get_commands(to_search):
-    patterns = [
+    regexps = [
             "-e 'int'",
             "-e 'hello'",
             "-e 'expression'",
             "-e 'ben'"
             ]
     commands = {
-            'rg': ['rg', *patterns, to_search],
-            'grep': ['grep', *patterns, "-R", to_search],
-            'tgrep_with_rg': ['tgrep', *patterns, "--searcher=rg",
+            'rg': ['rg', *regexps, to_search],
+            'grep': ['grep', *regexps, "-R", to_search],
+            'tgrep_with_rg': ['tgrep', *regexps, "--searcher=rg",
                               "--path", to_search],
-            'tgrep_with_tgrep': ['tgrep', *patterns,
+            'tgrep_with_tgrep': ['tgrep', *regexps,
                                  "--searcher=tgrep", "--path", to_search],
         }
     return commands

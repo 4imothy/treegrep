@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::{env, fs};
+use std::{
+    env, fs,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 static TEST_DIR: &str = "treegrep_tests";
 

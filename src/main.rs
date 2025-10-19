@@ -4,7 +4,6 @@ mod args;
 mod args_menu;
 mod config;
 mod errors;
-mod formats;
 mod log;
 mod match_system;
 mod matcher;
@@ -12,21 +11,24 @@ mod options;
 mod output_processor;
 mod searchers;
 mod select_menu;
+mod style;
 mod term;
 mod writer;
 use clap::ArgMatches;
 use clap_complete::generate;
 use config::Config;
-use errors::{Message, mes};
+use errors::Message;
 use match_system::Matches;
 use output_processor::process_results;
 use searchers::Searchers;
 use select_menu::SelectMenu;
-use std::ffi::OsString;
-use std::io::{StdoutLock, stdout};
-use std::path::Path;
-use std::process::Command;
-use std::sync::OnceLock;
+use std::{
+    ffi::OsString,
+    io::{StdoutLock, stdout},
+    path::Path,
+    process::Command,
+    sync::OnceLock,
+};
 use term::Term;
 use writer::{Entry, matches_to_display_lines, write_results};
 
@@ -45,7 +47,7 @@ fn main() {
 
     let (bold, colors) = Config::get_styling(&matches);
     let out: StdoutLock = stdout().lock();
-    let err_prefix = formats::error_prefix(bold, colors);
+    let err_prefix = style::error_prefix(bold, colors);
     let (c, mut term) =
         build_config_and_term(matches, all_args, out, bold, colors).unwrap_or_else(|e| {
             eprintln!("{} {}", err_prefix, e);
