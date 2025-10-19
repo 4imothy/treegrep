@@ -285,7 +285,7 @@ by Timothy Cronin
 
 home page: https://github.com/4imothy/treegrep
 
-pattern matcher that displays results in a tree structure with an interface to jump to matched text
+regex pattern matcher that displays results in a tree structure with an interface to jump to matched text
 
 tgrep [OPTIONS] [positional regexp] [positional target]
 Arguments:
@@ -293,38 +293,46 @@ Arguments:
   [positional target]  the path to search, if not provided, search the current directory
 
 Options:
-  -e, --regexp <>            the regex expression
-  -p, --path <>              the path to search, if not provided, search the current directory
-      --glob <>              rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic
-      --searcher <>          executable to do the searching [possible values: rg, tgrep]
-      --char-style <>        style of characters to use [possible values: ascii, single, double, heavy, rounded, none]
-      --editor <>            command used to open selections
-      --open-like <>         command line syntax for opening a file at a line [possible values: vi, hx, code, jed, default]
-      --long-branch          multiple files from the same directory are shown on the same branch
-      --completions <shell>  generate completions for given shell [possible values: bash, elvish, fish, powershell, zsh]
-      --selection-file <>    file to write selection to (first line: file path, second line: line number if applicable)
-      --repeat-file <>       file where arguments are saved
-  -., --hidden               search hidden files
-      --repeat               repeats the last saved search
-  -n, --line-number          show line number of match
-  -f, --files                if a pattern is given hide matched content, otherwise show the files that would be searched
-      --links                search linked paths
-      --no-ignore            don't use ignore files
-  -c, --count                display number of files matched in directory and number of lines matched in a file
-      --no-color             don't use colors
-      --no-bold              don't bold anything
-      --overview             conclude results with an overview
-  -s, --select               results are shown in a selection interface for opening
-      --menu                 provide arguments and select result through an interface
-      --trim                 trim whitespace at the beginning of lines
-      --pcre2                enable PCRE2
-      --threads <>           set the appropriate number of threads to use
-      --max-depth <>         the max depth to search
-      --prefix-len <>        number of characters to show before a match [default: 3]
-      --max-length <>        set the max length for a matched line
-      --long-branch-each <>  number of files to print on each branch [default: 5]
-  -h, --help                 print help
-  -V, --version              print version
+  -e, --regexp <>                    the regex expression
+  -p, --path <>                      the path to search, if not provided, search the current directory
+      --menu                         provide arguments and select results through an interface
+  -s, --select                       results are shown in a selection interface for opening
+      --glob <>                      rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic
+  -f, --files                        if an expression is given, hide matched content, otherwise, show the files that would be searched
+  -., --hidden                       search hidden files
+  -n, --line-number                  show line number of match
+      --links                        search linked paths
+      --no-ignore                    don't use ignore files
+  -c, --count                        display number of files matched in directory and number of lines matched in a file
+      --no-color                     don't use colors
+      --no-bold                      don't bold anything
+      --overview                     conclude results with an overview
+      --max-depth <>                 the max depth to search
+      --prefix-len <>                number of characters to show before a match [default: 3]
+      --max-length <>                set the max length for a matched line
+      --trim                         trim whitespace at the beginning of lines
+      --pcre2                        enable PCRE2
+      --threads <>                   set the appropriate number of threads to use
+      --long-branch                  multiple files from the same directory are shown on the same branch
+      --long-branch-each <>          number of files to print on each branch [default: 5]
+      --editor <>                    command used to open selections
+      --open-like <>                 command line syntax for opening a file at a line [possible values: vi, hx, code, jed, default]
+      --char-style <>                style of characters to use [possible values: single, rounded, heavy, double, ascii, none]
+      --file-color <>                black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
+      --dir-color <>                 black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
+      --text-color <>                black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
+      --line-number-color <>         black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
+      --branch-color <>              black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
+      --match-colors <>              black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
+      --selected-indicator-color <>  black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
+      --selected-bg-color <>         black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
+      --completions <>               generate completions for given shell [possible values: bash, elvish, fish, powershell, zsh]
+      --searcher <>                  executable to do the searching [possible values: rg, tgrep]
+      --selection-file <>            file to write selection to (first line: file path, second line: line number if applicable)
+      --repeat-file <>               file where arguments are saved
+      --repeat                       repeats the last saved search
+  -h, --help                         print help
+  -V, --version                      print version
 
 arguments are prefixed with the contents of the TREEGREP_DEFAULT_OPTS environment variable
 ```
