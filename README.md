@@ -1,6 +1,6 @@
 ## treegrep
 
-treegrep is a pattern matcher that displays results in a tree structure with an interface to jump to matched text.
+treegrep is a regex pattern matcher that displays results in a tree structure with an interface to jump to matched text.
 
 [![test](https://github.com/4imothy/treegrep/actions/workflows/test.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
 [![release](https://github.com/4imothy/treegrep/actions/workflows/cr.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
