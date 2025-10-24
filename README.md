@@ -290,12 +290,13 @@ home page: https://github.com/4imothy/treegrep
 regex pattern matcher that displays results in a tree structure with an interface to jump to matched text
 
 tgrep [OPTIONS] [positional regexp] [positional target]
+
 Arguments:
-  [positional regexp]  the regex expression
+  [positional regexp]  a regex expression to search for
   [positional target]  the path to search, if not provided, search the current directory
 
 Options:
-  -e, --regexp <>                    the regex expression
+  -e, --regexp <>                    a regex expression to search for
   -p, --path <>                      the path to search, if not provided, search the current directory
       --menu                         provide arguments and select results through an interface
   -s, --select                       results are shown in a selection interface for opening
