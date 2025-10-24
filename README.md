@@ -5,6 +5,8 @@ treegrep is a regex pattern matcher that displays results in a tree structure wi
 [![test](https://github.com/4imothy/treegrep/actions/workflows/test.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
 [![release](https://github.com/4imothy/treegrep/actions/workflows/cr.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
 
+[introduction video](https://youtu.be/lRMwCE6Zwuw?si=m9SRypN6_NxgW6K4)
+
 [examples](#examples), [editor integrations](#editor-integrations), and [help](#--help).
 
 ### links

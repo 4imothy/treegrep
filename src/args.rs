@@ -114,6 +114,8 @@ impl ValueEnum for CharacterStyle {
     }
 }
 
+pub const EXPR_HELP: &str = "a regex expression to search for";
+pub const PATH_HELP: &str = "the path to search, if not provided, search the current directory";
 const COLOR_HELP: &str =
     "black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)";
 
@@ -223,10 +225,8 @@ arg_info!(
     "number of files to print on each branch"
 );
 arg_info!(NO_BOLD, "no-bold", "don't bold anything");
-pub const PATH_HELP: &str = "the path to search, if not provided, search the current directory";
 arg_info!(PATH_POSITIONAL, "positional target", PATH_HELP);
 arg_info!(PATH, "path", PATH_HELP, 'p');
-pub const EXPR_HELP: &str = "the regex expression";
 arg_info!(EXPRESSION_POSITIONAL, "positional regexp", EXPR_HELP);
 arg_info!(EXPRESSION, "regexp", EXPR_HELP, 'e');
 arg_info!(NO_COLORS, "no-color", "don't use colors");
@@ -337,6 +337,7 @@ home page: ",
 {about}
 
 {usage}
+
 {all-args}{after-help}"
 );
 

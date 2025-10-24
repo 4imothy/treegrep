@@ -1,6 +1,7 @@
 # Features
 ## Options
 - support for PDFs
+- context around matches
 ## Config
 - custom keybindings for the selection menu
 ## Menus
