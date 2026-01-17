@@ -362,7 +362,8 @@ fn path_name(path: &Path) -> Result<String, Message> {
     })
 }
 
-fn with_push(mut v: Vec<PrefixComponent>, item: PrefixComponent) -> Vec<PrefixComponent> {
+fn with_push(prefix: &[PrefixComponent], item: PrefixComponent) -> Vec<PrefixComponent> {
+    let mut v = prefix.to_vec();
     v.push(item);
     v
 }
@@ -371,8 +372,8 @@ impl Directory {
     fn to_lines<'a>(
         &'a self,
         lines: &mut Vec<Box<dyn Entry + 'a>>,
-        cur_prefix: Vec<PrefixComponent>,
-        child_prefix: Vec<PrefixComponent>,
+        cur_prefix: &[PrefixComponent],
+        child_prefix: &[PrefixComponent],
         dirs: &'a Vec<Directory>,
         overview: &mut Option<&mut Box<OverviewDisplay>>,
     ) -> Result<(), Message> {
@@ -382,7 +383,7 @@ impl Directory {
         let clen = children.len();
         if clen > 0 || flen > 0 {
             lines.push(Box::new(PathDisplay::new(
-                Some(cur_prefix.clone()),
+                Some(cur_prefix.to_vec()),
                 &self.path,
                 &self.linked,
                 self.children.len() + self.files.len(),
@@ -400,23 +401,23 @@ impl Directory {
             let dir = &dirs[*child_id];
             let (cur_prefix, new_child_prefix) = if i + 1 != clen || flen > 0 {
                 (
-                    with_push(child_prefix.clone(), PrefixComponent::MatchWithNext),
-                    with_push(child_prefix.clone(), PrefixComponent::SpacerVert),
+                    with_push(child_prefix, PrefixComponent::MatchWithNext),
+                    with_push(child_prefix, PrefixComponent::SpacerVert),
                 )
             } else {
                 (
-                    with_push(child_prefix.clone(), PrefixComponent::MatchNoNext),
-                    with_push(child_prefix.clone(), PrefixComponent::Spacer),
+                    with_push(child_prefix, PrefixComponent::MatchNoNext),
+                    with_push(child_prefix, PrefixComponent::Spacer),
                 )
             };
-            dir.to_lines(lines, cur_prefix, new_child_prefix, dirs, overview)?;
+            dir.to_lines(lines, &cur_prefix, &new_child_prefix, dirs, overview)?;
         }
         if !files.is_empty() {
             if config().long_branch {
                 self.long_branch_files_to_lines(lines, child_prefix)?;
             } else {
                 for (i, file) in files.iter().enumerate() {
-                    file.to_lines(lines, child_prefix.clone(), i + 1 != flen, overview)?;
+                    file.to_lines(lines, child_prefix, i + 1 != flen, overview)?;
                 }
             }
         }
@@ -426,12 +427,12 @@ impl Directory {
     fn long_branch_files_to_lines<'a>(
         &'a self,
         lines: &mut Vec<Box<dyn Entry + 'a>>,
-        prefix: Vec<PrefixComponent>,
+        prefix: &[PrefixComponent],
     ) -> Result<(), Message> {
         let long_branch_files_per_line: usize = config().long_branch_each;
         let num_lines: usize = self.files.len().div_ceil(long_branch_files_per_line);
 
-        let prefix_no_next = with_push(prefix.clone(), PrefixComponent::MatchNoNext);
+        let prefix_no_next = with_push(prefix, PrefixComponent::MatchNoNext);
         let prefix_next = with_push(prefix, PrefixComponent::MatchWithNext);
 
         for (i, branch) in self.files.chunks(long_branch_files_per_line).enumerate() {
@@ -456,7 +457,7 @@ impl File {
     fn to_lines<'a>(
         &'a self,
         lines: &mut Vec<Box<dyn Entry + 'a>>,
-        prefix: Vec<PrefixComponent>,
+        prefix: &[PrefixComponent],
         parent_has_next: bool,
         overview: &mut Option<&mut Box<OverviewDisplay>>,
     ) -> Result<(), Message> {
@@ -467,17 +468,17 @@ impl File {
         let (cur_p, line_p) = if config().is_dir {
             if parent_has_next {
                 (
-                    with_push(prefix.clone(), PrefixComponent::MatchWithNext),
+                    with_push(prefix, PrefixComponent::MatchWithNext),
                     with_push(prefix, PrefixComponent::SpacerVert),
                 )
             } else {
                 (
-                    with_push(prefix.clone(), PrefixComponent::MatchNoNext),
+                    with_push(prefix, PrefixComponent::MatchNoNext),
                     with_push(prefix, PrefixComponent::Spacer),
                 )
             }
         } else {
-            (prefix.clone(), prefix)
+            (prefix.to_vec(), prefix.to_vec())
         };
 
         lines.push(Box::new(PathDisplay::new(
@@ -492,9 +493,9 @@ impl File {
         if !config().files {
             for (i, line) in self.lines.iter().enumerate() {
                 let prefix = if i + 1 != self.lines.len() {
-                    with_push(line_p.clone(), PrefixComponent::MatchWithNext)
+                    with_push(&line_p, PrefixComponent::MatchWithNext)
                 } else {
-                    with_push(line_p.clone(), PrefixComponent::MatchNoNext)
+                    with_push(&line_p, PrefixComponent::MatchNoNext)
                 };
                 lines.push(Box::new(LineDisplay {
                     prefix,
@@ -532,14 +533,14 @@ pub fn matches_to_display_lines<'a>(
         Matches::Dir(dirs) => {
             dirs.first().unwrap().to_lines(
                 &mut lines,
-                Vec::new(),
-                Vec::new(),
+                &[],
+                &[],
                 dirs,
                 &mut overview.as_mut(),
             )?;
         }
         Matches::File(file) => {
-            file.to_lines(&mut lines, Vec::new(), false, &mut overview.as_mut())?;
+            file.to_lines(&mut lines, &[], false, &mut overview.as_mut())?;
         }
     }
     if let Some(o) = overview.take() {

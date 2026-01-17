@@ -7,6 +7,6 @@
 │  │  └──[ps]file in first inner[pe]
 │  │     └──[m0s]text[m0e] in something else
 │  └──[ps]file_in_first[pe]
-│     └──this is some nice [m0s]text[m0e]
+│     └──[m1s]this[m1e] is some nice [m0s]text[m0e]
 └──[ps]top_file[pe]
    └──[m0s]text[m0e] in top level file

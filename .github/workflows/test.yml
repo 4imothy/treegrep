@@ -27,20 +27,9 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Install ripgrep
-        shell: bash
-        run: |
-          cargo install ripgrep
-
       - name: Test
         shell: bash
         run: |
-          echo "max file descriptors"
-          ulimit -n
-          echo "max user processes"
-          ulimit -u
-          echo word > a_file
-          rg word a_file
           cargo test --features=test
 
   rustfmt:

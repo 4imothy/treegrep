@@ -3,112 +3,145 @@
 import subprocess
 import pathlib
 import time
-import os
-import os.path as path
 import datetime
+import statistics
 
-TARGETS_DIR = path.join(pathlib.Path(__file__).parent.resolve(), "targets")
-LINUX_LINK = 'https://github.com/torvalds/linux.git'
-LINUX_DIR_NAME = 'linux'
-ENG_SUBS_DIR_NAME = 'eng_subs'
-ENG_SUBS_LINK = 'https://object.pouta.csc.fi/OPUS-OpenSubtitles/v2016/mono/en.txt.gz'
-ENG_SUBS_NAME = 'en.txt'
-ENG_SUBS_GZ_NAME = '%s.gz' % ENG_SUBS_NAME
+BASE_DIR = pathlib.Path(__file__).parent.resolve()
+TARGETS_DIR = BASE_DIR / 'targets'
+WARMUP_RUNS = 2
+BENCHMARK_RUNS = 5
+THREAD_COUNTS = [1, 10]
+LINUX = {
+    'dir': 'linux',
+    'url': 'https://github.com/torvalds/linux.git',
+}
+
+SUBS = {
+    'dir': 'eng_subs',
+    'url': 'https://object.pouta.csc.fi/OPUS-OpenSubtitles/v2016/mono/en.txt.gz',
+    'file': 'en.txt',
+}
+
+
+
+# ---------------- helpers ----------------
 
 def run_cmd(cmd):
-    start_time = time.time()
-    subprocess.call(cmd,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.STDOUT)
-    end_time = time.time()
-    execution_time = end_time - start_time
-    return execution_time
+    start = time.perf_counter()
+    subprocess.call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    return time.perf_counter() - start
 
 
-def run_benchmarks(commands):
+def stats(times):
+    return {
+        'min': min(times),
+        'mean': statistics.mean(times),
+        'stdev': statistics.stdev(times) if len(times) > 1 else 0.0,
+        'times': times,
+    }
+
+
+def run_benchmark(commands):
+    for _ in range(WARMUP_RUNS):
+        for cmd in commands.values():
+            run_cmd(cmd)
+
     results = {}
     for name, cmd in commands.items():
-        execution_time = run_cmd(cmd)
-
-    for name, cmd in commands.items():
-        print(f"Running {str(cmd)[1:-1]}")
-        execution_time = run_cmd(cmd)
-        results[name] = execution_time
+        times = [run_cmd(cmd) for _ in range(BENCHMARK_RUNS)]
+        results[name] = stats(times)
     return results
 
 
-def download_linux_source():
-    target_dir = path.join(TARGETS_DIR, LINUX_DIR_NAME)
-    if not path.isdir(target_dir):
-        subprocess.run(["git", "clone", "--depth",
-                       "1", LINUX_LINK, target_dir])
+def ensure_linux():
+    target = TARGETS_DIR / LINUX['dir']
+    if not target.exists():
+        subprocess.run(['git', 'clone', '--depth', '1', LINUX['url'], str(target)])
+
+def ensure_subs():
+    target_dir = TARGETS_DIR / SUBS['dir']
+    target_file = target_dir / SUBS['file']
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    if not target_file.exists():
+        gz = target_file.with_suffix('.txt.gz')
+        subprocess.run(['curl', SUBS['url'], '--output', str(gz)])
+        subprocess.run(['gunzip', str(gz)])
 
 
-def download_eng_subs():
-    target_dir = path.join(TARGETS_DIR, ENG_SUBS_DIR_NAME)
-    target_zip = path.join(target_dir, ENG_SUBS_GZ_NAME)
-    target = path.join(target_dir, ENG_SUBS_NAME)
-    if not path.isdir(target_dir):
-        os.makedirs(target_dir)
-    if not path.exists(target):
-        subprocess.run(["curl", ENG_SUBS_LINK, '--output', target_zip])
-        subprocess.run(['gunzip', target_zip])
+def build_commands(tool_args, search_path, threads):
+    common = ['--threads', str(threads)]
+    return {
+        'rg': ['rg', *tool_args, *common, str(search_path)],
+        'tgrep': ['tgrep', *tool_args, *common, f'--path={search_path}'],
+    }
 
 
-def get_commands(to_search):
-    regexps = [
-            "-e 'int'",
-            "-e 'hello'",
-            "-e 'expression'",
-            "-e 'ben'"
-            ]
-    commands = {
-            'rg': ['rg', *regexps, to_search],
-            'grep': ['grep', *regexps, "-R", to_search],
-            'tgrep_with_rg': ['tgrep', *regexps, "--searcher=rg",
-                              "--path", to_search],
-            'tgrep_with_tgrep': ['tgrep', *regexps,
-                                 "--searcher=tgrep", "--path", to_search],
-        }
-    return commands
+BENCHMARKS = {
+    'subtitles': {
+        'path': lambda: TARGETS_DIR / SUBS['dir'] / SUBS['file'],
+        'args': [
+            '-e', r'[Ww]hat are you',
+            '-e', r'[Ii] don\'t know',
+            '-e', r'[Gg]et out of here',
+        ],
+    },
+    'linux': {
+        'path': lambda: TARGETS_DIR / LINUX['dir'],
+        'args': [
+            '-e', 'TODO',
+            '-e', 'EXPORT_SYMBOL',
+            '-e', r'static\s+int',
+            '-e', r'#ifdef\s+CONFIG_',
+        ],
+    },
+    'files': {
+        'path': lambda: TARGETS_DIR / LINUX['dir'],
+        'args': ['--files'],
+    },
+}
 
-def get_files_commands(to_search):
-    commands = {
-            'rg': ['rg', '--files', to_search],
-            'tgrep': ['tgrep', '--files', '--path', to_search]
-        }
-    return commands
 
-if __name__ == "__main__":
-    download_linux_source()
-    download_eng_subs()
+def format_results(results, indent):
+    return '\n'.join(
+        f'{indent}{name}: {s['mean']:.3f}s +- {s['stdev']:.3f}s '
+        f'(min {s['min']:.3f}s)'
+        for name, s in results.items()
+    )
+
+
+if __name__ == '__main__':
+    ensure_linux()
+    ensure_subs()
+
     results = {}
 
-    to_search = path.join(TARGETS_DIR, ENG_SUBS_DIR_NAME, ENG_SUBS_NAME)
-    commands = get_commands(to_search)
-    results[to_search] = run_benchmarks(commands)
+    for name, info in BENCHMARKS.items():
+        print(f'\n=== {name} ===')
+        results[name] = {}
 
-    to_search = path.join(TARGETS_DIR, LINUX_DIR_NAME,)
-    commands = get_commands(to_search)
-    results[to_search] = run_benchmarks(commands)
+        for threads in THREAD_COUNTS:
+            print(f'\n-- threads={threads} --')
+            cmds = build_commands(
+                info['args'],
+                info['path'](),
+                threads,
+            )
+            res = run_benchmark(cmds)
+            results[name][threads] = res
+            print(format_results(res, '  '))
 
-    to_search = path.join(TARGETS_DIR, LINUX_DIR_NAME,)
-    commands = get_files_commands(to_search)
-    results[to_search + " with just printing files"] = run_benchmarks(commands)
+    out = pathlib.Path('benchmarks')
+    out.mkdir(exist_ok=True)
 
-    for directory_name, directory_results in results.items():
-        print(f"Results for path: {path.relpath(directory_name)}")
-        for command, execution_time in directory_results.items():
-            print(f"{command} execution time: {execution_time} seconds")
+    with open(out / 'times', 'a') as f:
+        f.write(f'{datetime.datetime.now().strftime('%Y-%m-%d')}: {BENCHMARK_RUNS} runs after {WARMUP_RUNS} warmup\n\n')
+        for name, data in results.items():
+            f.write(f'{name}:\n')
+            for threads, res in data.items():
+                f.write(f'  threads={threads}\n')
+                f.write(format_results(res, indent='    ') + '\n')
+            f.write('\n')
 
-    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-    with open('benchmarks/times', "a") as file:
-        file.write(f"Benchmark Results - {current_date}\n\n")
-        for directory_name, directory_results in results.items():
-            file.write(
-                f"Results for directory: {path.relpath(directory_name)}\n")
-            for command, execution_time in directory_results.items():
-                file.write(
-                    f"{command} execution time: {execution_time} seconds\n")
-            file.write("\n")
-        file.write("------------------\n")
+        f.write('-' * 20 + '\n')

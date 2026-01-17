@@ -224,7 +224,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                                             buf.extend_from_slice(
                                                 info.path.as_os_str().as_encoded_bytes(),
                                             );
-                                            buf.push(style::NEW_LINE as u8);
+                                            buf.push(b'\n');
                                             if let Some(l) = info.line {
                                                 buf.extend_from_slice(l.to_string().as_bytes());
                                             }

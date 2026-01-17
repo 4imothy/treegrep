@@ -31,11 +31,11 @@ fn wide_directory() {
     dir.add_child(&second);
     dir.create_file_fill(&second.join("file_in_second"), b"text in second directory");
 
-    let (rg_results, tg_results) = get_outputs(&dir.path, "text");
+    let result = get_output(&dir.path, "text -e this");
     let tar_12 = tar_dir.join("wide_1");
     let tar_21 = tar_dir.join("wide_2");
     let tars = [tar_12.as_path(), tar_21.as_path()];
-    assert_pass_pool(&tars, rg_results, tg_results);
+    assert_pass_pool(&tars, result);
 }
 
 #[test]
@@ -66,8 +66,8 @@ fn deep_directory() {
     );
 
     let tar_path = tar_dir.join("deep");
-    let (rg_results, tg_results) = get_outputs(&dir.path, "nice");
-    assert_pass(&tar_path, rg_results, tg_results);
+    let result = get_output(&dir.path, "nice");
+    assert_pass(&tar_path, result);
 }
 
 #[test]
@@ -81,8 +81,8 @@ fn line_numbers() {
     dir.create_file_fill(&inner_name.join("alice_two"), pool);
 
     let tar_path = tar_dir.join("line_number");
-    let (rg_results, tg_results) = get_outputs(&dir.path, "Alice --line-number");
-    assert_pass(&tar_path, rg_results, tg_results);
+    let result = get_output(&dir.path, "Alice --line-number");
+    assert_pass(&tar_path, result);
 }
 
 #[test]
@@ -95,8 +95,8 @@ fn max_depth() {
     dir.create_file_fill(&PathBuf::from("valid_file"), b"should show");
 
     let tar_path = tar_dir.join("max_depth");
-    let (rg_results, tg_results) = get_outputs(&dir.path, ". --max-depth=1");
-    assert_pass(&tar_path, rg_results, tg_results);
+    let result = get_output(&dir.path, ". --max-depth=1");
+    assert_pass(&tar_path, result);
 }
 
 #[test]
@@ -111,11 +111,11 @@ fn glob_exclusion() {
     dir.create_file_fill(&excluded.join("one_file"), b"shouldn't show");
     dir.create_file_fill(&included.join("one_file"), b"should show");
 
-    let (rg_results, tg_results) = get_outputs(
+    let result = get_output(
         &dir.path,
         &format!(". --glob=!{}", excluded.to_string_lossy()),
     );
-    assert_pass(&tar_path, rg_results, tg_results);
+    assert_pass(&tar_path, result);
 }
 
 #[test]
@@ -128,8 +128,8 @@ fn file() {
     dir.create_file_fill(&file, pool);
 
     let tar_path = tar_dir.join("file");
-    let (rg_results, tg_results) = get_outputs(&dir.path.join(file), "hat --line-number");
-    assert_pass(&tar_path, rg_results, tg_results);
+    let result = get_output(&dir.path.join(file), "hat --line-number");
+    assert_pass(&tar_path, result);
 }
 
 #[test]
@@ -145,7 +145,7 @@ fn links() {
     dir.create_file_fill(&linked_dir.join("file"), b"child file content");
     dir.link_dir(&linked_dir, "link_to_dir");
 
-    let (rg_results, tg_results) = get_outputs(&dir.path, ". --links");
+    let result = get_output(&dir.path, ". --links");
     let tar_1 = tar_dir.join("links_1");
     let tar_2 = tar_dir.join("links_2");
     let tar_3 = tar_dir.join("links_3");
@@ -156,7 +156,7 @@ fn links() {
         tar_3.as_path(),
         tar_4.as_path(),
     ];
-    assert_pass_pool(&tars, rg_results, tg_results);
+    assert_pass_pool(&tars, result);
 }
 
 #[test]
@@ -169,11 +169,11 @@ fn no_matches() {
     dir.create_file_fill(&sub.join("two"), b"some text");
 
     let tar_path = tar_dir.join("no_matches");
-    let (rg_results, tg_results) = get_outputs(&dir.path, "nomatches");
-    assert_pass(&tar_path, rg_results, tg_results);
+    let result = get_output(&dir.path, "nomatches");
+    assert_pass(&tar_path, result);
 
-    let (rg_results, tg_results) = get_outputs(&dir.path.join("one"), "nomatches --line-number");
-    assert_pass(&tar_path, rg_results, tg_results);
+    let result = get_output(&dir.path.join("one"), "nomatches --line-number");
+    assert_pass(&tar_path, result);
 }
 
 #[test]
@@ -191,24 +191,23 @@ fn files() {
     dir.create_file_fill(&sub.join("file with some text"), text.as_bytes());
     dir.create_file_fill(&sub.join("another file"), b"won't be matched");
 
-    let (rg_results, tg_results) = get_outputs(&dir.path, &format!("{} --files", text));
+    let results = get_output(&dir.path, &format!("{} --files", text));
     let tar = tar_dir.join("files_with_expr");
-    assert_pass(&tar, rg_results, tg_results);
+    assert_pass(&tar, results);
 
-    let (rg_results, tg_results) = get_outputs(&dir.path, "--files");
+    let result = get_output(&dir.path, "--files");
     let tar_1 = tar_dir.join("files_1");
     let tar_2 = tar_dir.join("files_2");
     let tars = [tar_1.as_path(), tar_2.as_path()];
-    assert_pass_pool(&tars, rg_results, tg_results);
+    assert_pass_pool(&tars, result);
 
-    let (rg_results, tg_results) = get_outputs(&dir.path, "--files --long-branch");
+    let result = get_output(&dir.path, "--files --long-branch");
     assert_pass_pool(
         &[
             tar_dir.join("files_long_branch_1").as_path(),
             tar_dir.join("files_long_branch_2").as_path(),
         ],
-        rg_results,
-        tg_results,
+        result,
     );
 }
 
@@ -232,18 +231,16 @@ fn long_branch_with_expr() {
     dir.create_file_fill(&sub.join("one"), b"ausntha");
     dir.create_file_fill(&sub.join("two"), b"ausntha");
 
-    let (rg_results, tg_results) =
-        get_outputs(&dir.path, &format!("{} --files --long-branch", text));
+    let result = get_output(&dir.path, &format!("{} --files --long-branch", text));
     assert_pass_pool(
         &[
             tar_dir.join("files_long_branch_expr_1").as_path(),
             tar_dir.join("files_long_branch_expr_2").as_path(),
         ],
-        rg_results,
-        tg_results,
+        result,
     );
 
-    let (rg_results, tg_results) = get_outputs(
+    let result = get_output(
         &dir.path,
         &format!("{} --files --long-branch --count", text),
     );
@@ -252,8 +249,7 @@ fn long_branch_with_expr() {
             tar_dir.join("files_long_branch_expr_count_1").as_path(),
             tar_dir.join("files_long_branch_expr_count_2").as_path(),
         ],
-        rg_results,
-        tg_results,
+        result,
     );
 }
 
@@ -271,18 +267,8 @@ fn overlapping() {
     dir.add_child(&second);
     dir.create_file_fill(&second.join("2_file"), b"overlapping over");
 
-    let (rg_results, tg_results) =
-        get_outputs(&dir.path, "--regexp overlapping --regexp over --count");
-    assert_pass_single(
-        &tar_dir.join("overlapping_rg"),
-        "ripgrep output",
-        rg_results,
-    );
-    assert_pass_single(
-        &tar_dir.join("overlapping_tgrep"),
-        "tgrep output",
-        tg_results,
-    );
+    let result = get_output(&dir.path, "--regexp overlapping --regexp over --count");
+    assert_pass_single(&tar_dir.join("overlapping"), result);
 }
 
 #[test]
@@ -305,8 +291,8 @@ fn count() {
     dir.add_child(&sub_sub_dir);
     dir.create_file_fill(&sub_sub_dir.join("2_file"), b"even more text but one line");
 
-    let (rg_results, tg_results) = get_outputs(&dir.path, ". --count");
-    assert_pass(&tar_dir.join("count"), rg_results, tg_results);
+    let result = get_output(&dir.path, ". --count");
+    assert_pass(&tar_dir.join("count"), result);
 }
 
 #[test]
@@ -337,33 +323,29 @@ fn repeat() {
         b"    some not so nice text in the 4th file <0-0> \n this text won't be matched",
     );
 
-    let (mut rg_results_orig, mut tg_results_orig) = get_outputs(
+    let mut orig_result = get_output(
         &dir.path,
         &format!(
             "some --line-number --count --glob=!4ourth --repeat-file={} --overview --prefix-len=5 --trim",
             repeat_file
         ),
     );
-    let (mut rg_results_rep, mut tg_results_rep) = get_outputs(
+    let mut rep_result = get_output(
         &dir.path,
         &format!("--repeat --repeat-file={}", repeat_file),
     );
-    assert!(rg_results_orig == tg_results_orig);
-    assert!(rg_results_orig == rg_results_rep);
-    assert!(tg_results_orig == tg_results_rep);
+    assert!(orig_result == rep_result);
 
-    (rg_results_orig, tg_results_orig) = get_outputs(
+    (orig_result) = get_output(
         &dir.path,
         &format!(
             "--files --glob=!4ourth_nice_file --repeat-file={} --overview --prefix-len=5",
             repeat_file
         ),
     );
-    (rg_results_rep, tg_results_rep) = get_outputs(
+    (rep_result) = get_output(
         &dir.path,
         &format!("--repeat --repeat-file={}", repeat_file),
     );
-    assert!(rg_results_orig == tg_results_orig);
-    assert!(rg_results_orig == rg_results_rep);
-    assert!(tg_results_orig == tg_results_rep);
+    assert!(orig_result == rep_result);
 }

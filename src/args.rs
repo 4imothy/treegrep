@@ -12,10 +12,7 @@ pub const DEFAULT_PREFIX_LEN: &str = "3";
 pub const DEFAULT_LONG_BRANCH_EACH: &str = "5";
 
 pub mod names {
-    pub const TREEGREP: &str = "treegrep";
     pub const TREEGREP_BIN: &str = "tgrep";
-    pub const RIPGREP: &str = "ripgrep";
-    pub const RIPGREP_BIN: &str = "rg";
 }
 
 pub struct ArgInfo {
@@ -258,7 +255,6 @@ arg_info!(
     'f'
 );
 arg_info!(MAX_DEPTH, "max-depth", "the max depth to search");
-arg_info!(SEARCHER, "searcher", "executable to do the searching");
 arg_info!(CHAR_STYLE, "char-style", "style of characters to use");
 arg_info!(EDITOR, "editor", "command used to open selections");
 arg_info!(
@@ -277,7 +273,6 @@ arg_info!(
     "trim",
     "trim whitespace at the beginning of lines"
 );
-arg_info!(PCRE2, "pcre2", "enable PCRE2");
 arg_info!(
     THREADS,
     "threads",
@@ -405,7 +400,7 @@ fn usize_arg(info: &ArgInfo, default_value: Option<&'static str>) -> Arg {
     arg
 }
 
-fn get_args() -> [Arg; 38] {
+fn get_args() -> [Arg; 36] {
     let long_branches = Arg::new(LONG_BRANCHES.id)
         .long(LONG_BRANCHES.id)
         .help(LONG_BRANCHES.h)
@@ -417,18 +412,6 @@ fn get_args() -> [Arg; 38] {
         .help(GLOB.h)
         .value_name("")
         .action(ArgAction::Append);
-
-    let searcher = Arg::new(SEARCHER.id)
-        .long(SEARCHER.id)
-        .help(SEARCHER.h)
-        .value_parser([
-            PossibleValue::new(names::RIPGREP_BIN).hide(false),
-            PossibleValue::new(names::TREEGREP_BIN).hide(false),
-            PossibleValue::new(names::RIPGREP).hide(true),
-            PossibleValue::new(names::TREEGREP).hide(true),
-        ])
-        .value_name("")
-        .action(ArgAction::Set);
 
     let char_style = Arg::new(CHAR_STYLE.id)
         .long(CHAR_STYLE.id)
@@ -498,7 +481,6 @@ fn get_args() -> [Arg; 38] {
         usize_arg(&PREFIX_LEN, Some(DEFAULT_PREFIX_LEN)),
         usize_arg(&MAX_LENGTH, None).requires(EXPRESSION_GROUP_ID),
         bool_arg(TRIM_LEFT).requires(EXPRESSION_GROUP_ID),
-        bool_arg(PCRE2).requires(EXPRESSION_GROUP_ID),
         usize_arg(&THREADS, None),
         long_branches,
         usize_arg(&LONG_BRANCHES_EACH, Some(DEFAULT_LONG_BRANCH_EACH)).requires(LONG_BRANCHES.id),
@@ -514,7 +496,6 @@ fn get_args() -> [Arg; 38] {
         color_arg(SELECTED_INDICATOR_COLOR),
         color_arg(SELECTED_BG_COLOR),
         completions,
-        searcher,
         selection_file,
         repeat_file,
         bool_arg(REPEAT),

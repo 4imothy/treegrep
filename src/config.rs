@@ -3,9 +3,7 @@
 use crate::{
     args::{self, OpenStrategy, REPEAT_FILE, generate_command},
     errors::Message,
-    mes,
-    searchers::Searchers,
-    style,
+    mes, style,
 };
 use clap::{ArgMatches, Error};
 use crossterm::style::Color;
@@ -67,8 +65,6 @@ pub struct Config {
     pub is_dir: bool,
     pub regexps: Vec<String>,
     pub globs: Vec<String>,
-    pub searcher: Searchers,
-    pub searcher_path: Option<PathBuf>,
     pub count: bool,
     pub hidden: bool,
     pub line_number: bool,
@@ -79,9 +75,8 @@ pub struct Config {
     pub overview: bool,
     pub links: bool,
     pub ignore: bool,
-    pub pcre2: bool,
     pub max_depth: Option<usize>,
-    pub threads: Option<usize>,
+    pub threads: usize,
     pub max_length: Option<usize>,
     pub prefix_len: usize,
     pub long_branch_each: usize,
@@ -249,7 +244,6 @@ impl Config {
         let files: bool = matches.get_flag(args::FILES.id);
         let links: bool = matches.get_flag(args::LINKS.id);
         let trim: bool = matches.get_flag(args::TRIM_LEFT.id);
-        let pcre2: bool = matches.get_flag(args::PCRE2.id);
         let ignore: bool = !matches.get_flag(args::NO_IGNORE.id);
         let overview: bool = matches.get_flag(args::OVERVIEW.id);
         let repeat: bool = matches.get_flag(args::REPEAT.id);
@@ -257,25 +251,16 @@ impl Config {
         let select: bool = matches.get_flag(args::SELECT.id);
 
         let max_depth: Option<usize> = get_usize_option(&matches, args::MAX_DEPTH.id)?;
-        let threads: Option<usize> = get_usize_option(&matches, args::THREADS.id)?;
+        let threads: usize = get_usize_option(&matches, args::THREADS.id).map(|v| {
+            v.unwrap_or_else(|| {
+                std::thread::available_parallelism()
+                    .map_or(1, |n| n.get())
+                    .min(12)
+            })
+        })?;
         let max_length: Option<usize> = get_usize_option(&matches, args::MAX_LENGTH.id)?;
         let long_branch_each: usize =
             get_usize_option_with_default(&matches, args::LONG_BRANCHES_EACH.id)?;
-
-        let (searcher, searcher_path) =
-            Searchers::get_searcher_and_path(matches.get_one::<String>(args::SEARCHER.id))?;
-
-        if let Searchers::TreeGrep = searcher
-            && threads.is_some_and(|t| t > 1)
-        {
-            return Err(mes!("treegrep searcher does not support multithreading"));
-        }
-
-        if let Searchers::TreeGrep = searcher
-            && pcre2
-        {
-            return Err(mes!("treegrep searcher does not support pcre2"));
-        }
 
         let editor = matches.get_one::<String>(args::EDITOR.id).cloned();
         let open_like = matches.get_one::<OpenStrategy>(args::OPEN_LIKE.id).cloned();
@@ -318,12 +303,9 @@ impl Config {
             is_dir,
             just_files,
             with_bold: bold,
-            searcher,
-            searcher_path,
             regexps,
             line_number,
             with_colors: colors,
-            pcre2,
             count,
             hidden,
             select,
@@ -421,7 +403,6 @@ mod tests {
         "--line-number",
         "--max-depth=5",
         "--max-length=20",
-        "--pcre2",
         "--no-ignore",
         "--hidden",
         "--threads=8",
@@ -430,7 +411,6 @@ mod tests {
         "--trim",
         "--select",
         "--files",
-        "--searcher=rg",
         "--regexp=regexp1",
         "--regexp=regexp2",
     ];
@@ -485,20 +465,15 @@ mod tests {
         assert!(config.line_number);
         assert_eq!(config.max_depth, Some(5));
         assert_eq!(config.max_length, Some(20));
-        assert!(config.pcre2);
         assert!(!config.ignore);
         assert!(config.hidden);
-        assert!(config.threads == Some(8));
+        assert!(config.threads == 8);
         assert!(config.count);
         assert!(config.links);
         assert!(config.trim);
         assert!(config.with_colors);
         assert!(config.select);
         assert!(config.files);
-        match config.searcher {
-            Searchers::RipGrep => {}
-            _ => panic!("wrong searcher"),
-        }
         assert_eq!(config.regexps, vec!["posexpr", "regexp1", "regexp2"]);
     }
 

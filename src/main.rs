@@ -7,9 +7,6 @@ mod errors;
 mod log;
 mod match_system;
 mod matcher;
-mod options;
-mod output_processor;
-mod searchers;
 mod select_menu;
 mod style;
 mod term;
@@ -19,14 +16,10 @@ use clap_complete::generate;
 use config::Config;
 use errors::Message;
 use match_system::Matches;
-use output_processor::process_results;
-use searchers::Searchers;
 use select_menu::SelectMenu;
 use std::{
     ffi::OsString,
     io::{StdoutLock, stdout},
-    path::Path,
-    process::Command,
     sync::OnceLock,
 };
 use term::Term;
@@ -109,11 +102,7 @@ fn run(term: &mut Term, mut c: Config) -> Result<(), Message> {
     }
     CONFIG.set(c).ok().unwrap();
 
-    let matches: Option<Matches> = if config().just_files || config().searcher_path.is_none() {
-        matcher::search()?
-    } else {
-        get_matches_from_cmd(config().searcher_path.as_ref().unwrap())?
-    };
+    let matches: Option<Matches> = matcher::search()?;
 
     if matches.is_none() {
         if config().menu {
@@ -138,26 +127,4 @@ fn run(term: &mut Term, mut c: Config) -> Result<(), Message> {
     }
 
     Ok(())
-}
-
-fn get_matches_from_cmd(searcher_path: &Path) -> Result<Option<Matches>, Message> {
-    let mut cmd: Command = Searchers::generate_command(searcher_path)?;
-
-    let output = cmd.output().map_err(|e| {
-        mes!(
-            "searcher `{}` didn't run message, `{}`",
-            cmd.get_program().to_string_lossy().to_string(),
-            e.to_string()
-        )
-    })?;
-
-    if !output.status.success() && !output.stderr.is_empty() {
-        return Err(mes!(
-            "{} had errors:\n{}",
-            cmd.get_program().to_string_lossy(),
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-
-    process_results(output.stdout)
 }

@@ -96,9 +96,6 @@ pub const DOUBLE: Chars = Chars {
     selected_indicator: "═❱ ",
 };
 
-pub const NEW_LINE: char = '\n';
-pub const CRLF: &str = "\r\n";
-
 pub struct DisplayRepeater<T>(T, usize);
 impl<T: Display> Display for DisplayRepeater<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

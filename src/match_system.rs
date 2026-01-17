@@ -25,7 +25,6 @@ pub struct Directory {
     pub linked: Option<PathBuf>,
     pub children: Vec<usize>,
     pub files: Vec<File>,
-    pub to_add: bool,
 }
 
 impl Directory {
@@ -35,7 +34,6 @@ impl Directory {
             linked: get_linked(path),
             children: Vec::new(),
             files: Vec::new(),
-            to_add: true,
         })
     }
 }
@@ -47,10 +45,11 @@ pub struct File {
 }
 
 impl File {
-    pub fn new(path: &Path) -> Result<Self, Message> {
+    pub fn from_pathbuf(path: PathBuf) -> Result<Self, Message> {
+        let linked = get_linked(&path);
         Ok(File {
-            linked: get_linked(path),
-            path: path.to_path_buf(),
+            linked,
+            path,
             lines: Vec::new(),
         })
     }
