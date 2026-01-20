@@ -81,56 +81,51 @@ nnoremap <leader>tf :call TgrepWith('--files --select')<cr>
 <summary><code>tgrep --regexp \bstruct\s+\w+ --regexp \bimpl\s+\w+ --path src --line-number --count</code></summary>
 
 ```
-src: 13
-├──args.rs: 6
-│  ├──21: pub struct ArgInfo {
-│  ├──27: impl ArgInfo {
-│  ├──42: impl ValueEnum for OpenStrategy {
-│  ├──91: impl ValueEnum for CharacterStyle {
-│  ├──121: struct ColorParser;
-│  └──123: impl clap::builder::TypedValueParser for ColorParser {
+src: 10
+├──term.rs: 1
+│  └──15: pub struct Term<'a> {
+├──matcher.rs: 3
+│  ├──18: struct Matcher {
+│  ├──23: impl Matcher {
+│  └──42: struct MatchSink<'a> {
+├──match_system.rs: 8
+│  ├──23: pub struct Directory {
+│  ├──30: impl Directory {
+│  ├──41: pub struct File {
+│  ├──47: impl File {
+│  ├──73: pub struct Match {
+│  ├──79: impl Match {
+│  ├──104: pub struct Line {
+│  └──110: impl Line {
+├──style.rs: 2
+│  ├──22: pub struct Chars {
+│  └──99: pub struct DisplayRepeater<T>(T, usize);
+├──config.rs: 5
+│  ├──15: pub struct Characters {
+│  ├──29: pub struct Colors {
+│  ├──40: impl args::Color {
+│  ├──58: pub struct Config {
+│  └──169: impl Config {
 ├──errors.rs: 4
 │  ├──14: pub struct Message {
 │  ├──17: impl Error for Message {}
 │  ├──34: impl fmt::Debug for Message {
 │  └──40: impl fmt::Display for Message {
-├──match_system.rs: 8
-│  ├──23: pub struct Directory {
-│  ├──31: impl Directory {
-│  ├──43: pub struct File {
-│  ├──49: impl File {
-│  ├──74: pub struct Match {
-│  ├──80: impl Match {
-│  ├──105: pub struct Line {
-│  └──111: impl Line {
-├──options.rs: 2
-│  ├──40: pub struct Rg;
-│  └──42: impl Options for Rg {
-├──matcher.rs: 1
-│  └──114: impl File {
-├──output_processor.rs: 1
-│  └──31: impl File {
-├──searchers.rs: 1
-│  └──39: impl Searchers {
-├──args_menu.rs: 1
-│  └──21: pub struct ArgsMenu<'a, 'b> {
-├──style.rs: 2
-│  ├──22: pub struct Chars {
-│  └──102: pub struct DisplayRepeater<T>(T, usize);
-├──term.rs: 1
-│  └──15: pub struct Term<'a> {
-├──config.rs: 5
-│  ├──17: pub struct Characters {
-│  ├──31: pub struct Colors {
-│  ├──42: impl args::Color {
-│  ├──60: pub struct Config {
-│  └──174: impl Config {
 ├──select_menu.rs: 5
 │  ├──33: impl OpenStrategy {
 │  ├──45: pub struct SelectMenu<'a, 'b> {
 │  ├──60: struct Window {
 │  ├──65: impl Window {
 │  └──86: impl JumpLocation {
+├──args_menu.rs: 1
+│  └──21: pub struct ArgsMenu<'a, 'b> {
+├──args.rs: 6
+│  ├──18: pub struct ArgInfo {
+│  ├──24: impl ArgInfo {
+│  ├──39: impl ValueEnum for OpenStrategy {
+│  ├──88: impl ValueEnum for CharacterStyle {
+│  ├──120: struct ColorParser;
+│  └──122: impl clap::builder::TypedValueParser for ColorParser {
 └──writer.rs: 9
    ├──26: pub struct OpenInfo<'a> {
    ├──37: struct PathDisplay<'a> {
@@ -139,8 +134,8 @@ src: 13
    ├──303: struct OverviewDisplay {
    ├──311: impl Entry for OverviewDisplay {
    ├──323: impl Display for OverviewDisplay {
-   ├──370: impl Directory {
-   └──455: impl File {
+   ├──371: impl Directory {
+   └──456: impl File {
 ```
 </details>
 
@@ -152,14 +147,14 @@ select_menu.rs
 +--8: style::{Print, SetBackgroundColor},
 +--344: queue!(self.term, cursor::MoveTo(START_X, cursor), Print(line))?;
 +--365: queue!(self.term, scroll, cursor::MoveTo(START_X, y), Print(line))?;
-+--599: Print(style::style_with(config().chars.selected_indicator, c)),
-+--603: queue!(self.term, Print(config().chars.selected_indicator),)?;
-+--608: Print(&self.lines[self.selected_id])
-+--616: Print(style::SELECTED_INDICATOR_CLEAR),
-+--618: Print(&self.lines[self.selected_id])
-+--632: Print(format!(
-+--644: Print(format!(
-+--657: Print(format!(
++--590: Print(style::style_with(config().chars.selected_indicator, c)),
++--594: queue!(self.term, Print(config().chars.selected_indicator),)?;
++--599: Print(&self.lines[self.selected_id])
++--607: Print(style::SELECTED_INDICATOR_CLEAR),
++--609: Print(&self.lines[self.selected_id])
++--623: Print(format!(
++--635: Print(format!(
++--648: Print(format!(
 ```
 </details>
 
@@ -168,78 +163,74 @@ select_menu.rs
 
 ```
 treegrep
-├──tests
-│  ├──pool
-│  │  └──alice_adventures_in_wonderland_by_lewis_carroll.txt
-│  ├──targets
-│  │  ├──wide_2
-│  │  ├──files_long_branch_expr_1
-│  │  ├──deep
-│  │  ├──overlapping_tgrep
-│  │  ├──line_number
-│  │  ├──no_matches
-│  │  ├──files_1
-│  │  ├──links_1
-│  │  ├──files_with_expr
-│  │  ├──max_depth
-│  │  ├──files_long_branch_expr_count_2
-│  │  ├──overlapping_rg
-│  │  ├──files_2
-│  │  ├──files_long_branch_expr_2
-│  │  ├──links_3
-│  │  ├──files_long_branch_1
-│  │  ├──links_4
-│  │  ├──count
-│  │  ├──file
-│  │  ├──wide_1
-│  │  ├──links_2
-│  │  ├──files_long_branch_expr_count_1
-│  │  ├──glob_inclusion
-│  │  ├──files_long_branch_2
-│  │  ├──colon
-│  │  └──glob_exclusion
-│  ├──utils.rs
-│  ├──file_system.rs
-│  └──tests.rs
-├──benchmarks
-│  ├──times
-│  └──runner
 ├──doc
-│  ├──treegrep.vim9.txt
-│  └──treegrep.nvim.txt
+│  ├──treegrep.nvim.txt
+│  └──treegrep.vim9.txt
 ├──src
-│  ├──args.rs
-│  ├──errors.rs
 │  ├──match_system.rs
-│  ├──options.rs
-│  ├──matcher.rs
-│  ├──output_processor.rs
-│  ├──searchers.rs
-│  ├──args_menu.rs
 │  ├──style.rs
-│  ├──term.rs
+│  ├──matcher.rs
 │  ├──config.rs
-│  ├──select_menu.rs
-│  ├──log.rs
+│  ├──writer.rs
 │  ├──main.rs
-│  └──writer.rs
+│  ├──term.rs
+│  ├──select_menu.rs
+│  ├──args_menu.rs
+│  ├──args.rs
+│  ├──log.rs
+│  └──errors.rs
 ├──.github
 │  └──workflows
 │     ├──update_readme.yml
 │     ├──update_readme
-│     ├──test.yml
-│     └──cr.yml
+│     ├──cr.yml
+│     └──test.yml
 ├──plugin
 │  └──treegrep.vim
+├──benchmarks
+│  ├──runner
+│  └──times
 ├──lua
 │  └──treegrep.lua
+├──tests
+│  ├──pool
+│  │  └──alice_adventures_in_wonderland_by_lewis_carroll.txt
+│  ├──targets
+│  │  ├──wide_1
+│  │  ├──links_3
+│  │  ├──files_long_branch_2
+│  │  ├──glob_exclusion
+│  │  ├──wide_2
+│  │  ├──colon
+│  │  ├──overlapping
+│  │  ├──files_long_branch_expr_count_2
+│  │  ├──max_depth
+│  │  ├──files_1
+│  │  ├──files_long_branch_expr_2
+│  │  ├──files_long_branch_1
+│  │  ├──glob_inclusion
+│  │  ├──files_with_expr
+│  │  ├──deep
+│  │  ├──files_long_branch_expr_count_1
+│  │  ├──links_4
+│  │  ├──count
+│  │  ├──links_2
+│  │  ├──links_1
+│  │  ├──files_2
+│  │  ├──no_matches
+│  │  ├──file
+│  │  ├──line_number
+│  │  └──files_long_branch_expr_1
+│  ├──utils.rs
+│  ├──tests.rs
+│  └──file_system.rs
+├──Cargo.toml
 ├──README.md
+├──.gitignore
 ├──Cargo.lock
 ├──rustfmt.toml
 ├──todos.md
-├──LICENSE
-├──Cargo.toml
-└──.gitignore
+└──LICENSE
 ```
 </details>
 
@@ -248,34 +239,33 @@ treegrep
 
 ```
 treegrep
+├──src
+│  ├──match_system.rs, style.rs, matcher.rs, config.rs, writer.rs
+│  ├──main.rs, term.rs, select_menu.rs, args_menu.rs, args.rs
+│  └──log.rs, errors.rs
+├──plugin
+│  └──treegrep.vim
 ├──tests
 │  ├──pool
 │  │  └──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
-│  │  ├──wide_2, files_long_branch_expr_1, deep, overlapping_tgrep, line_number
-│  │  ├──no_matches, files_1, links_1, files_with_expr, max_depth
-│  │  ├──files_long_branch_expr_count_2, overlapping_rg, files_2, files_long_branch_expr_2, links_3
-│  │  ├──files_long_branch_1, links_4, count, file, wide_1
-│  │  ├──links_2, files_long_branch_expr_count_1, glob_inclusion, files_long_branch_2, colon
-│  │  └──glob_exclusion
-│  └──utils.rs, file_system.rs, tests.rs
-├──benchmarks
-│  └──times, runner
-├──doc
-│  └──treegrep.vim9.txt, treegrep.nvim.txt
-├──src
-│  ├──args.rs, errors.rs, match_system.rs, options.rs, matcher.rs
-│  ├──output_processor.rs, searchers.rs, args_menu.rs, style.rs, term.rs
-│  └──config.rs, select_menu.rs, log.rs, main.rs, writer.rs
-├──.github
-│  └──workflows
-│     └──update_readme.yml, update_readme, test.yml, cr.yml
-├──plugin
-│  └──treegrep.vim
+│  │  ├──links_3, files_long_branch_2, glob_exclusion, wide_2, colon
+│  │  ├──overlapping, files_long_branch_expr_count_2, max_depth, files_1, files_long_branch_expr_2
+│  │  ├──files_long_branch_1, glob_inclusion, files_with_expr, deep, files_long_branch_expr_count_1
+│  │  ├──links_4, count, links_2, links_1, files_2
+│  │  └──no_matches, file, line_number, files_long_branch_expr_1, wide_1
+│  └──file_system.rs, utils.rs, tests.rs
 ├──lua
 │  └──treegrep.lua
-├──README.md, Cargo.lock, rustfmt.toml, todos.md, LICENSE
-└──Cargo.toml, .gitignore
+├──.github
+│  └──workflows
+│     └──update_readme.yml, update_readme, cr.yml, test.yml
+├──benchmarks
+│  └──runner, times
+├──doc
+│  └──treegrep.nvim.txt, treegrep.vim9.txt
+├──Cargo.toml, rustfmt.toml, todos.md, README.md, .gitignore
+└──Cargo.lock, LICENSE
 ```
 </details>
 
@@ -314,7 +304,6 @@ Options:
       --prefix-len <>                number of characters to show before a match [default: 3]
       --max-length <>                set the max length for a matched line
       --trim                         trim whitespace at the beginning of lines
-      --pcre2                        enable PCRE2
       --threads <>                   set the appropriate number of threads to use
       --long-branch                  multiple files from the same directory are shown on the same branch
       --long-branch-each <>          number of files to print on each branch [default: 5]
@@ -330,7 +319,6 @@ Options:
       --selected-indicator-color <>  black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
       --selected-bg-color <>         black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
       --completions <>               generate completions for given shell [possible values: bash, elvish, fish, powershell, zsh]
-      --searcher <>                  executable to do the searching [possible values: rg, tgrep]
       --selection-file <>            file to write selection to (first line: file path, second line: line number if applicable)
       --repeat-file <>               file where arguments are saved
       --repeat                       repeats the last saved search

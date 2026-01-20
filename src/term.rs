@@ -83,6 +83,15 @@ impl<'a> Term<'a> {
         let _ = panic::take_hook();
         Ok(())
     }
+
+    pub fn suspend(&mut self) -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            self.give()?;
+            signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
+        }
+        Ok(())
+    }
 }
 
 impl<'a> Write for Term<'a> {

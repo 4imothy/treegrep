@@ -34,7 +34,7 @@ fn check_results(tar_path: &Path, results: &[u8], single_poss_tar: bool) -> Opti
     if cfg!(feature = "overwrite") {
         let mut file = fs::File::create(tar_path).unwrap();
         file.write_all(results).unwrap();
-        return Some(true);
+        Some(true)
     } else {
         let content = get_target_content(tar_path);
         let content_str = String::from_utf8_lossy(&content);
@@ -44,9 +44,9 @@ fn check_results(tar_path: &Path, results: &[u8], single_poss_tar: bool) -> Opti
 
         if single_poss_tar {
             assert!(content == *results);
-            return None;
+            None
         } else {
-            return Some(*results == content);
+            Some(*results == content)
         }
     }
 }
@@ -76,16 +76,15 @@ pub fn get_output(path: &Path, args: &str) -> Vec<u8> {
     let mut tg: Command;
     match cross_runner() {
         None => {
-            tg = Command::new(&cmd_path);
+            tg = Command::new(cmd_path);
         }
         Some(runner) => {
             tg = Command::new(&runner);
-            tg.arg(&cmd_path);
+            tg.arg(cmd_path);
         }
     }
 
-    let destlye_args = ["--no-color", "--no-bold"];
-    tg.args(destlye_args);
+    tg.args(["--no-color", "--no-bold"]);
     tg.arg("--threads=1");
 
     tg.args(args.split_whitespace());

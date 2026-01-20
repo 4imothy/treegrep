@@ -94,10 +94,7 @@ pub fn search() -> Result<Option<Matches>, Message> {
     }
 }
 
-fn search_dir(
-    matchers: &Arc<Matcher>,
-    searcher: &mut Searcher,
-) -> Result<Vec<Directory>, Message> {
+fn search_dir(matchers: &Arc<Matcher>, searcher: &mut Searcher) -> Result<Vec<Directory>, Message> {
     let mut override_builder = OverrideBuilder::new(&config().path);
     for glob in &config().globs {
         override_builder

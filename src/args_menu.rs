@@ -115,7 +115,7 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
                                 quit = true;
                                 break;
                             } else if c == 'z' {
-                                menu.suspend()?;
+                                menu.term.suspend()?;
                                 menu.resume()?;
                             } else if c == 'f' {
                                 menu.cursor_forward()?;
@@ -200,7 +200,7 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
     }
 
     fn update_window(&mut self, action: Action) -> io::Result<()> {
-        let mut clear = "".to_string();
+        let mut clear = String::new();
         match action {
             Action::Append => {
                 self.cursor_index += 1;
@@ -246,15 +246,6 @@ impl<'a, 'b> ArgsMenu<'a, 'b> {
         self.center_x = self.term.width() / 2;
         self.text_box_width = self.term.width() / 2;
         self.start_x = self.center_x - self.text_box_width / 2;
-    }
-
-    fn suspend(&mut self) -> io::Result<()> {
-        #[cfg(unix)]
-        {
-            self.term.give()?;
-            signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-        }
-        Ok(())
     }
 
     fn resume(&mut self) -> io::Result<()> {

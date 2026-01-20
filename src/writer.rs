@@ -531,13 +531,9 @@ pub fn matches_to_display_lines<'a>(
         .map(Box::new);
     match &result {
         Matches::Dir(dirs) => {
-            dirs.first().unwrap().to_lines(
-                &mut lines,
-                &[],
-                &[],
-                dirs,
-                &mut overview.as_mut(),
-            )?;
+            dirs.first()
+                .unwrap()
+                .to_lines(&mut lines, &[], &[], dirs, &mut overview.as_mut())?;
         }
         Matches::File(file) => {
             file.to_lines(&mut lines, &[], false, &mut overview.as_mut())?;

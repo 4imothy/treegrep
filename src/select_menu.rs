@@ -255,7 +255,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                         }
                         KeyCode::Char('z') => {
                             if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                                menu.suspend()?;
+                                menu.term.suspend()?;
                                 menu.resume()?;
                             }
                         }
@@ -452,15 +452,6 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         } else {
             self.draw()
         }
-    }
-
-    fn suspend(&mut self) -> io::Result<()> {
-        #[cfg(unix)]
-        {
-            self.term.give()?;
-            signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-        }
-        Ok(())
     }
 
     fn resume(&mut self) -> io::Result<()> {

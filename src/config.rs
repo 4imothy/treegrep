@@ -422,10 +422,9 @@ mod tests {
     {
         let matches = generate_command().get_matches_from(args);
         let (bold, colors) = Config::get_styling(&matches);
-        let config = Config::get_config(matches, Vec::new(), bold, colors)
+        Config::get_config(matches, Vec::new(), bold, colors)
             .ok()
-            .unwrap();
-        config
+            .unwrap()
     }
 
     #[test]
