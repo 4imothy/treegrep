@@ -77,7 +77,7 @@ impl<'a> Sink for MatchSink<'a> {
 pub fn search() -> Result<Option<Matches>, Message> {
     let matchers = Matcher::new(&config().regexps)?;
     let mut searcher = SearcherBuilder::new()
-        .line_number(config().line_number)
+        .line_number(true)
         .line_terminator(LineTerminator::byte(b'\n'))
         .binary_detection(BinaryDetection::quit(b'\x00'))
         .memory_map(unsafe { MmapChoice::auto() })
