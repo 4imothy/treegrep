@@ -7,24 +7,21 @@ import datetime
 import statistics
 
 BASE_DIR = pathlib.Path(__file__).parent.resolve()
-TARGETS_DIR = BASE_DIR / 'targets'
+TARGETS_DIR = BASE_DIR / "targets"
 WARMUP_RUNS = 2
 BENCHMARK_RUNS = 5
 THREAD_COUNTS = [1, 10]
 LINUX = {
-    'dir': 'linux',
-    'url': 'https://github.com/torvalds/linux.git',
+    "dir": "linux",
+    "url": "https://github.com/torvalds/linux.git",
 }
 
 SUBS = {
-    'dir': 'eng_subs',
-    'url': 'https://object.pouta.csc.fi/OPUS-OpenSubtitles/v2016/mono/en.txt.gz',
-    'file': 'en.txt',
+    "dir": "eng_subs",
+    "url": "https://object.pouta.csc.fi/OPUS-OpenSubtitles/v2016/mono/en.txt.gz",
+    "file": "en.txt",
 }
 
-
-
-# ---------------- helpers ----------------
 
 def run_cmd(cmd):
     start = time.perf_counter()
@@ -34,10 +31,10 @@ def run_cmd(cmd):
 
 def stats(times):
     return {
-        'min': min(times),
-        'mean': statistics.mean(times),
-        'stdev': statistics.stdev(times) if len(times) > 1 else 0.0,
-        'times': times,
+        "min": min(times),
+        "mean": statistics.mean(times),
+        "stdev": statistics.stdev(times) if len(times) > 1 else 0.0,
+        "times": times,
     }
 
 
@@ -54,94 +51,104 @@ def run_benchmark(commands):
 
 
 def ensure_linux():
-    target = TARGETS_DIR / LINUX['dir']
+    target = TARGETS_DIR / LINUX["dir"]
     if not target.exists():
-        subprocess.run(['git', 'clone', '--depth', '1', LINUX['url'], str(target)])
+        subprocess.run(["git", "clone", "--depth", "1", LINUX["url"], str(target)])
+
 
 def ensure_subs():
-    target_dir = TARGETS_DIR / SUBS['dir']
-    target_file = target_dir / SUBS['file']
+    target_dir = TARGETS_DIR / SUBS["dir"]
+    target_file = target_dir / SUBS["file"]
 
     target_dir.mkdir(parents=True, exist_ok=True)
 
     if not target_file.exists():
-        gz = target_file.with_suffix('.txt.gz')
-        subprocess.run(['curl', SUBS['url'], '--output', str(gz)])
-        subprocess.run(['gunzip', str(gz)])
+        gz = target_file.with_suffix(".txt.gz")
+        subprocess.run(["curl", SUBS["url"], "--output", str(gz)])
+        subprocess.run(["gunzip", str(gz)])
 
 
 def build_commands(tool_args, search_path, threads):
-    common = ['--threads', str(threads)]
+    common = ["--threads", str(threads)]
     return {
-        'rg': ['rg', *tool_args, *common, str(search_path)],
-        'tgrep': ['tgrep', *tool_args, *common, f'--path={search_path}'],
+        "rg": ["rg", *tool_args, *common, str(search_path)],
+        "tgrep": ["tgrep", *tool_args, *common, f"--path={search_path}"],
     }
 
 
 BENCHMARKS = {
-    'subtitles': {
-        'path': lambda: TARGETS_DIR / SUBS['dir'] / SUBS['file'],
-        'args': [
-            '-e', r'[Ww]hat are you',
-            '-e', r'[Ii] don\'t know',
-            '-e', r'[Gg]et out of here',
+    "subtitles": {
+        "path": lambda: TARGETS_DIR / SUBS["dir"] / SUBS["file"],
+        "args": [
+            "-e",
+            r"[Ww]hat are you",
+            "-e",
+            r"[Ii] don\'t know",
+            "-e",
+            r"[Gg]et out of here",
         ],
     },
-    'linux': {
-        'path': lambda: TARGETS_DIR / LINUX['dir'],
-        'args': [
-            '-e', 'TODO',
-            '-e', 'EXPORT_SYMBOL',
-            '-e', r'static\s+int',
-            '-e', r'#ifdef\s+CONFIG_',
+    "linux": {
+        "path": lambda: TARGETS_DIR / LINUX["dir"],
+        "args": [
+            "-e",
+            "TODO",
+            "-e",
+            "EXPORT_SYMBOL",
+            "-e",
+            r"static\s+int",
+            "-e",
+            r"#ifdef\s+CONFIG_",
         ],
     },
-    'files': {
-        'path': lambda: TARGETS_DIR / LINUX['dir'],
-        'args': ['--files'],
+    "files": {
+        "path": lambda: TARGETS_DIR / LINUX["dir"],
+        "args": ["--files"],
     },
 }
 
 
 def format_results(results, indent):
-    return '\n'.join(
-        f'{indent}{name}: {s['mean']:.3f}s +- {s['stdev']:.3f}s '
-        f'(min {s['min']:.3f}s)'
+    return "\n".join(
+        f"{indent}{name}: {s['mean']:.3f}s +- {s['stdev']:.3f}s "
+        f"(min {s['min']:.3f}s)"
         for name, s in results.items()
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     ensure_linux()
     ensure_subs()
 
     results = {}
 
     for name, info in BENCHMARKS.items():
-        print(f'\n=== {name} ===')
+        print(f"\n=== {name} ===")
         results[name] = {}
 
         for threads in THREAD_COUNTS:
-            print(f'\n-- threads={threads} --')
+            print(f"\n-- threads={threads} --")
             cmds = build_commands(
-                info['args'],
-                info['path'](),
+                info["args"],
+                info["path"](),
                 threads,
             )
             res = run_benchmark(cmds)
             results[name][threads] = res
-            print(format_results(res, '  '))
+            print(format_results(res, "  "))
 
-    out = pathlib.Path('benchmarks')
+    out = pathlib.Path("benchmarks")
     out.mkdir(exist_ok=True)
 
-    with open(out / 'times', 'a') as f:
-        f.write(f'{datetime.datetime.now().strftime('%Y-%m-%d')}: {BENCHMARK_RUNS} runs after {WARMUP_RUNS} warmup\n\n')
+    with open(out / "times", "a") as f:
+        f.write(
+            f"{datetime.datetime.now().strftime('%Y-%m-%d')}: {BENCHMARK_RUNS} runs after {WARMUP_RUNS} warmup\n\n"
+        )
         for name, data in results.items():
-            f.write(f'{name}:\n')
+            f.write(f"{name}:\n")
             for threads, res in data.items():
-                f.write(f'  threads={threads}\n')
-                f.write(format_results(res, indent='    ') + '\n')
-            f.write('\n')
+                f.write(f"  threads={threads}\n")
+                f.write(format_results(res, indent="    ") + "\n")
+            f.write("\n")
 
-        f.write('-' * 20 + '\n')
+        f.write("-" * 20 + "\n")

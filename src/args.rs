@@ -23,7 +23,7 @@ pub struct ArgInfo {
 
 impl ArgInfo {
     const fn new(id: &'static str, h: &'static str, s: Option<char>) -> Self {
-        ArgInfo { id, h, s }
+        Self { id, h, s }
     }
 }
 
@@ -319,6 +319,21 @@ arg_info!(
 );
 arg_info!(SELECTED_BG_COLOR, "selected-bg-color", COLOR_HELP);
 arg_info!(MATCH_COLORS, "match-colors", COLOR_HELP);
+arg_info!(
+    BEFORE_CONTEXT,
+    "before-context",
+    "number of lines to show before each match"
+);
+arg_info!(
+    AFTER_CONTEXT,
+    "after-context",
+    "number of lines to show after each match"
+);
+arg_info!(
+    CONTEXT,
+    "context",
+    "number of lines to show before and after each match"
+);
 
 const HELP_TEMPLATE: &str = concat!(
     "{name} {version}
@@ -345,11 +360,9 @@ pub fn generate_command() -> Command {
         .bin_name(names::TREEGREP_BIN)
         .help_template(HELP_TEMPLATE.to_owned())
         .args_override_self(true)
-        .after_help(
-            "arguments are prefixed with the contents of the ".to_string()
-                + DEFAULT_OPTS_ENV_NAME
-                + " environment variable",
-        )
+        .after_help(format!(
+            "arguments are prefixed with the contents of the {DEFAULT_OPTS_ENV_NAME} environment variable"
+        ))
         .author(env!("CARGO_PKG_AUTHORS"))
         .disable_help_flag(true)
         .disable_version_flag(true)
@@ -400,7 +413,7 @@ fn usize_arg(info: &ArgInfo, default_value: Option<&'static str>) -> Arg {
     arg
 }
 
-fn get_args() -> [Arg; 36] {
+fn get_args() -> [Arg; 39] {
     let long_branches = Arg::new(LONG_BRANCHES.id)
         .long(LONG_BRANCHES.id)
         .help(LONG_BRANCHES.h)
@@ -499,6 +512,9 @@ fn get_args() -> [Arg; 36] {
         selection_file,
         repeat_file,
         bool_arg(REPEAT),
+        usize_arg(&BEFORE_CONTEXT, None).requires(EXPRESSION_GROUP_ID),
+        usize_arg(&AFTER_CONTEXT, None).requires(EXPRESSION_GROUP_ID),
+        usize_arg(&CONTEXT, None).requires(EXPRESSION_GROUP_ID),
         help,
         version,
     ]

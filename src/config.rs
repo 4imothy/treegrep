@@ -81,6 +81,8 @@ pub struct Config {
     pub prefix_len: usize,
     pub long_branch_each: usize,
     pub trim: bool,
+    pub before_context: usize,
+    pub after_context: usize,
     pub editor: Option<String>,
     pub open_like: Option<OpenStrategy>,
     pub completion_target: Option<clap_complete::Shell>,
@@ -91,12 +93,8 @@ pub struct Config {
 }
 
 fn canonicalize(p: &Path) -> Result<PathBuf, Message> {
-    dunce::canonicalize(p).map_err(|_| {
-        mes!(
-            "failed to canonicalize path `{}`",
-            p.to_string_lossy().into_owned()
-        )
-    })
+    dunce::canonicalize(p)
+        .map_err(|_| mes!("failed to canonicalize path `{}`", p.to_string_lossy()))
 }
 
 fn process_path(input: &Path, check_exists: bool) -> Result<PathBuf, Message> {
@@ -105,7 +103,7 @@ fn process_path(input: &Path, check_exists: bool) -> Result<PathBuf, Message> {
     match components.next() {
         Some(Component::Normal(c)) => {
             if c == "~" {
-                path.push(std::env::var("HOME").map_err(|e| mes!("{}", e.to_string()))?);
+                path.push(std::env::var("HOME").map_err(|e| mes!("{}", e))?);
             } else {
                 path.push(c);
             }
@@ -128,13 +126,9 @@ fn process_path(input: &Path, check_exists: bool) -> Result<PathBuf, Message> {
 
 fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, Message> {
     matches.get_one::<String>(name).map_or(Ok(None), |s| {
-        s.parse::<usize>().map(Some).map_err(|_| {
-            mes!(
-                "failed to parse `{}` to a usize for option `{}`",
-                s.to_string(),
-                name.to_string()
-            )
-        })
+        s.parse::<usize>()
+            .map(Some)
+            .map_err(|_| mes!("failed to parse `{}` to a usize for option `{}`", s, name))
     })
 }
 
@@ -174,28 +168,33 @@ impl Config {
         )
     }
 
+    fn read_repeat_file(f: &Path) -> Result<Vec<OsString>, Message> {
+        let data = std::fs::read(f).map_err(|e| mes!("{}", e))?;
+        let mut pos = 0;
+        let mut args = Vec::new();
+        while pos < data.len() {
+            let len = u32::from_le_bytes(
+                data[pos..pos + size_of::<u32>()]
+                    .try_into()
+                    .map_err(|e| mes!("{}", e))?,
+            ) as usize;
+            pos += size_of::<u32>();
+            let bytes = &data[pos..pos + len];
+            pos += len;
+            unsafe {
+                args.push(OsString::from_encoded_bytes_unchecked(bytes.to_vec()));
+            }
+        }
+        Ok(args)
+    }
+
     pub fn handle_repeat(&self) -> Result<Option<Self>, Message> {
         if let Some(f) = &self.repeat_file {
-            if self.repeat {
-                let data = std::fs::read(f).map_err(|e| mes!("{}", e))?;
-                unsafe {
-                    let mut pos = 0;
-                    let mut args = Vec::new();
-                    while pos < data.len() {
-                        let len = u32::from_le_bytes(
-                            data[pos..pos + size_of::<u32>()].try_into().unwrap(),
-                        ) as usize;
-                        pos += size_of::<u32>();
-                        let bytes = &data[pos..pos + len];
-                        pos += len;
-                        args.push(OsString::from_encoded_bytes_unchecked(bytes.to_vec()));
-                    }
-                    let (matches, all_args) =
-                        get_matches(args, false).map_err(|e| mes!("{}", e))?;
-                    let (bold, colors) = Self::get_styling(&matches);
-
-                    Ok(Some(Self::get_config(matches, all_args, bold, colors)?))
-                }
+            if self.repeat && !self.menu {
+                let args = Self::read_repeat_file(f)?;
+                let (matches, all_args) = get_matches(args, false).map_err(|e| mes!("{}", e))?;
+                let (bold, colors) = Self::get_styling(&matches);
+                Ok(Some(Self::get_config(matches, all_args, bold, colors)?))
             } else if self.menu {
                 Ok(None)
             } else {
@@ -216,50 +215,64 @@ impl Config {
         }
     }
 
+    pub fn read_repeat_args(&self) -> Option<String> {
+        let f = self.repeat_file.as_ref()?;
+        let args = Self::read_repeat_file(f).ok()?;
+        let strs: Vec<&str> = args
+            .iter()
+            .map(|a| a.to_str())
+            .collect::<Option<Vec<_>>>()?;
+        shlex::try_join(strs).ok()
+    }
+
     pub fn get_config(
         matches: ArgMatches,
         all_args: Vec<OsString>,
         bold: bool,
         colors: bool,
     ) -> Result<Self, Message> {
-        let mut regexps: Vec<String> = Vec::new();
+        let mut regexps = Vec::new();
         if let Some(expr) = matches.get_one::<String>(args::EXPRESSION_POSITIONAL.id) {
-            regexps.push(expr.to_owned());
+            regexps.push(expr.clone());
         }
         if let Some(exprs) = matches.get_many::<String>(args::EXPRESSION.id) {
-            for expr in exprs.into_iter() {
-                regexps.push(expr.to_owned());
-            }
+            regexps.extend(exprs.cloned());
         }
 
         let globs: Vec<String> = matches
             .get_many::<String>(args::GLOB.id)
-            .map(|exprs| exprs.map(String::to_owned).collect())
+            .map(|exprs| exprs.cloned().collect())
             .unwrap_or_default();
 
-        let long_branch: bool = matches.get_flag(args::LONG_BRANCHES.id);
-        let count: bool = matches.get_flag(args::COUNT.id);
-        let hidden: bool = matches.get_flag(args::HIDDEN.id);
-        let line_number: bool = matches.get_flag(args::LINE_NUMBER.id);
-        let files: bool = matches.get_flag(args::FILES.id);
-        let links: bool = matches.get_flag(args::LINKS.id);
-        let trim: bool = matches.get_flag(args::TRIM_LEFT.id);
-        let ignore: bool = !matches.get_flag(args::NO_IGNORE.id);
-        let overview: bool = matches.get_flag(args::OVERVIEW.id);
-        let repeat: bool = matches.get_flag(args::REPEAT.id);
-        let menu: bool = matches.get_flag(args::MENU.id);
-        let select: bool = matches.get_flag(args::SELECT.id);
+        let long_branch = matches.get_flag(args::LONG_BRANCHES.id);
+        let count = matches.get_flag(args::COUNT.id);
+        let hidden = matches.get_flag(args::HIDDEN.id);
+        let line_number = matches.get_flag(args::LINE_NUMBER.id);
+        let files = matches.get_flag(args::FILES.id);
+        let links = matches.get_flag(args::LINKS.id);
+        let trim = matches.get_flag(args::TRIM_LEFT.id);
+        let ignore = !matches.get_flag(args::NO_IGNORE.id);
+        let overview = matches.get_flag(args::OVERVIEW.id);
+        let repeat = matches.get_flag(args::REPEAT.id);
+        let menu = matches.get_flag(args::MENU.id);
+        let select = matches.get_flag(args::SELECT.id);
 
-        let max_depth: Option<usize> = get_usize_option(&matches, args::MAX_DEPTH.id)?;
-        let threads: usize = get_usize_option(&matches, args::THREADS.id).map(|v| {
+        let context_both = get_usize_option(&matches, args::CONTEXT.id)?.unwrap_or(0);
+        let before_context =
+            get_usize_option(&matches, args::BEFORE_CONTEXT.id)?.unwrap_or(context_both);
+        let after_context =
+            get_usize_option(&matches, args::AFTER_CONTEXT.id)?.unwrap_or(context_both);
+
+        let max_depth = get_usize_option(&matches, args::MAX_DEPTH.id)?;
+        let threads = get_usize_option(&matches, args::THREADS.id).map(|v| {
             v.unwrap_or_else(|| {
                 std::thread::available_parallelism()
                     .map_or(1, |n| n.get())
                     .min(12)
             })
         })?;
-        let max_length: Option<usize> = get_usize_option(&matches, args::MAX_LENGTH.id)?;
-        let long_branch_each: usize =
+        let max_length = get_usize_option(&matches, args::MAX_LENGTH.id)?;
+        let long_branch_each =
             get_usize_option_with_default(&matches, args::LONG_BRANCHES_EACH.id)?;
 
         let editor = matches.get_one::<String>(args::EDITOR.id).cloned();
@@ -314,6 +327,8 @@ impl Config {
             max_depth,
             threads,
             trim,
+            before_context,
+            after_context,
             globs,
             ignore,
             prefix_len,
@@ -413,6 +428,8 @@ mod tests {
         "--files",
         "--regexp=regexp1",
         "--regexp=regexp2",
+        "--after-context=2",
+        "--before-context=3",
     ];
 
     pub fn get_config_from<I, T>(args: I) -> Config
@@ -473,6 +490,8 @@ mod tests {
         assert!(config.with_colors);
         assert!(config.select);
         assert!(config.files);
+        assert!(config.before_context == 3);
+        assert!(config.after_context == 2);
         assert_eq!(config.regexps, vec!["posexpr", "regexp1", "regexp2"]);
     }
 

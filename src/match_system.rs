@@ -29,7 +29,7 @@ pub struct Directory {
 
 impl Directory {
     pub fn new(path: &Path) -> Result<Self, Message> {
-        Ok(Directory {
+        Ok(Self {
             path: path.to_path_buf(),
             linked: get_linked(path),
             children: Vec::new(),
@@ -46,9 +46,8 @@ pub struct File {
 
 impl File {
     pub fn from_pathbuf(path: PathBuf) -> Result<Self, Message> {
-        let linked = get_linked(&path);
-        Ok(File {
-            linked,
+        Ok(Self {
+            linked: get_linked(&path),
             path,
             lines: Vec::new(),
         })
@@ -78,7 +77,7 @@ pub struct Match {
 
 impl Match {
     pub fn new(regexp_id: usize, start: usize, end: usize) -> Self {
-        Match {
+        Self {
             regexp_id,
             start,
             end,
@@ -105,15 +104,52 @@ pub struct Line {
     pub content: String,
     pub matches: Vec<Match>,
     pub line_num: usize,
+    pub context_offset: Option<isize>,
 }
 
 impl Line {
     pub fn new(content: String, mut matches: Vec<Match>, line_num: usize) -> Self {
         Match::remove_overlapping(&mut matches);
-        Line {
+        Self {
             content,
             matches,
             line_num,
+            context_offset: None,
+        }
+    }
+
+    pub fn new_context(content: String, line_num: usize) -> Self {
+        Self {
+            content,
+            matches: Vec::new(),
+            line_num,
+            context_offset: None,
+        }
+    }
+
+    pub fn compute_context_offsets(lines: &mut [Line]) {
+        let mut anchor: Option<usize> = None;
+        for line in lines.iter_mut() {
+            if !line.matches.is_empty() {
+                anchor = Some(line.line_num);
+            } else if let Some(a) = anchor {
+                line.context_offset = Some(line.line_num as isize - a as isize);
+            }
+        }
+
+        anchor = None;
+        for line in lines.iter_mut().rev() {
+            if !line.matches.is_empty() {
+                anchor = Some(line.line_num);
+            } else if let Some(a) = anchor {
+                let offset = line.line_num as isize - a as isize;
+                if line
+                    .context_offset
+                    .is_none_or(|e| offset.unsigned_abs() < e.unsigned_abs())
+                {
+                    line.context_offset = Some(offset);
+                }
+            }
         }
     }
 }

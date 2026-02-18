@@ -10,7 +10,9 @@ use crossbeam_channel::{Receiver, Sender};
 use grep::{
     matcher::LineTerminator,
     regex::{RegexMatcher, RegexMatcherBuilder},
-    searcher::{BinaryDetection, MmapChoice, Searcher, SearcherBuilder, Sink, SinkMatch},
+    searcher::{
+        BinaryDetection, MmapChoice, Searcher, SearcherBuilder, Sink, SinkContext, SinkMatch,
+    },
 };
 use ignore::{WalkBuilder, WalkState, overrides::OverrideBuilder};
 use std::{collections::HashMap, ffi::OsString, io, path::PathBuf, sync::Arc};
@@ -32,7 +34,7 @@ impl Matcher {
                 regex::bytes::Regex::new(p).map_err(|_| mes!("regex expression `{}` is invalid", p))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Matcher {
+        Ok(Self {
             combined,
             individual,
         })
@@ -72,6 +74,18 @@ impl<'a> Sink for MatchSink<'a> {
 
         Ok(true)
     }
+
+    fn context(&mut self, _searcher: &Searcher, ctx: &SinkContext<'_>) -> Result<bool, io::Error> {
+        let line_bytes = ctx.bytes();
+        let trimmed_bytes = line_bytes
+            .strip_suffix(b"\r\n")
+            .or_else(|| line_bytes.strip_suffix(b"\n"))
+            .unwrap_or(line_bytes);
+        let content = String::from_utf8_lossy(trimmed_bytes).into_owned();
+        let line_num = ctx.line_number().unwrap_or(0) as usize;
+        self.lines.push(Line::new_context(content, line_num));
+        Ok(true)
+    }
 }
 
 pub fn search() -> Result<Option<Matches>, Message> {
@@ -81,6 +95,8 @@ pub fn search() -> Result<Option<Matches>, Message> {
         .line_terminator(LineTerminator::byte(b'\n'))
         .binary_detection(BinaryDetection::quit(b'\x00'))
         .memory_map(unsafe { MmapChoice::auto() })
+        .before_context(config().before_context)
+        .after_context(config().after_context)
         .build();
 
     if config().is_dir {
@@ -174,6 +190,10 @@ fn search_file(
 
     if sink.lines.is_empty() {
         return Ok(None);
+    }
+
+    if config().before_context > 0 || config().after_context > 0 {
+        Line::compute_context_offsets(&mut sink.lines);
     }
 
     let mut file = File::from_pathbuf(pb)?;

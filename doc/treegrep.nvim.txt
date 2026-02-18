@@ -48,6 +48,7 @@ Runs the `tgrep` binary in a floating window with the passed arguments.
 Example options:
     `'--menu'`            Open a menu to input the regex expression, path, etc.
     `'--repeat'`          Repeat the previous search (only usable if |repeat_file| specified)
+    `'--menu --repeat'`   Open the menu pre-filled with the previous search arguments
     `'--files --select'`  Show the files in a menu to select from
 
 See more options with `tgrep --help`

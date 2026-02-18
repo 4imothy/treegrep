@@ -1,0 +1,7 @@
+[ps]ctx_file[pe]
+├──-1: line two
+├──3: line three [m0s]match[m0e]
+├──+1: line four
+├──-1: line five
+├──6: line six [m0s]match[m0e]
+└──+1: line seven

@@ -153,6 +153,7 @@ struct LineDisplay<'a> {
     path: &'a Path,
     matches: &'a [Match],
     line_num: usize,
+    context_offset: Option<isize>,
     new_line: bool,
 }
 
@@ -203,11 +204,23 @@ impl<'a> Display for LineDisplay<'a> {
         }
 
         if config().line_number {
-            write!(
-                f,
-                "{}: ",
-                style::style_with(self.line_num, config().colors.line_number)
-            )?;
+            if let Some(offset) = self.context_offset {
+                write!(
+                    f,
+                    "{}: ",
+                    style::style_with(format!("{:+}", offset), config().colors.line_number)
+                )?;
+            } else {
+                write!(
+                    f,
+                    "{}: ",
+                    style::style_with(self.line_num, config().colors.line_number)
+                )?;
+            }
+        }
+
+        if self.context_offset.is_some() && config().with_colors {
+            write!(f, "{}", style::DIM)?;
         }
 
         let mut last = 0;
@@ -249,6 +262,10 @@ impl<'a> Display for LineDisplay<'a> {
             } else {
                 f.write_str(text)?;
             }
+        }
+
+        if self.context_offset.is_some() && config().with_colors {
+            write!(f, "{}", style::RESET)?;
         }
 
         if self.new_line {
@@ -462,7 +479,11 @@ impl File {
         overview: &mut Option<&mut Box<OverviewDisplay>>,
     ) -> Result<(), Message> {
         if let Some(o) = overview {
-            o.lines += self.lines.len();
+            o.lines += self
+                .lines
+                .iter()
+                .filter(|l| l.context_offset.is_none())
+                .count();
             o.count += self.lines.iter().map(|l| l.matches.len()).sum::<usize>();
         }
         let (cur_p, line_p) = if config().is_dir {
@@ -503,6 +524,7 @@ impl File {
                     path: &self.path,
                     matches: &line.matches,
                     line_num: line.line_num,
+                    context_offset: line.context_offset,
                     new_line: !config().select,
                 }));
             }

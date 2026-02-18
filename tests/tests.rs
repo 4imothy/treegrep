@@ -296,6 +296,52 @@ fn count() {
 }
 
 #[test]
+fn overview() {
+    let tar_dir: PathBuf = target_dir();
+    let dir = Dir::new("overview");
+    dir.create_file_fill(
+        &PathBuf::from("top_file"),
+        b"some text\nmore text\nother line",
+    );
+
+    let sub = PathBuf::from("sub");
+    dir.add_child(&sub);
+    dir.create_file_fill(&sub.join("sub_file"), b"some text here too");
+
+    let result = get_output(&dir.path, "text --overview");
+    assert_pass(&tar_dir.join("overview_dir"), result);
+
+    let result = get_output(&dir.path.join("top_file"), "text --overview");
+    assert_pass(&tar_dir.join("overview_file"), result);
+}
+
+#[test]
+fn context() {
+    let tar_dir: PathBuf = target_dir();
+    let dir = Dir::new("context");
+    let file = PathBuf::from("ctx_file");
+    dir.create_file_fill(
+        &file,
+        b"line one\nline two\nline three match\nline four\nline five\nline six match\nline seven\nline eight",
+    );
+
+    let result = get_output(&dir.path.join(&file), "match --line-number --context 1");
+    assert_pass(&tar_dir.join("context_c1"), result);
+
+    let result = get_output(
+        &dir.path.join(&file),
+        "match --line-number --before-context 1",
+    );
+    assert_pass(&tar_dir.join("context_b1"), result);
+
+    let result = get_output(
+        &dir.path.join(&file),
+        "match --line-number --after-context 1",
+    );
+    assert_pass(&tar_dir.join("context_a1"), result);
+}
+
+#[test]
 fn repeat() {
     let pool: &[u8] = include_bytes!("pool/alice_adventures_in_wonderland_by_lewis_carroll.txt");
     let dir = Dir::new("repeat");

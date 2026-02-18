@@ -8,6 +8,7 @@ use std::fmt::{self, Display};
 
 pub const RESET: SetAttribute = SetAttribute(Attribute::Reset);
 const BOLD: SetAttribute = SetAttribute(Attribute::Bold);
+pub const DIM: SetAttribute = SetAttribute(Attribute::Dim);
 
 const RED_FG: SetForegroundColor = SetForegroundColor(Color::Red);
 pub const SELECTED_INDICATOR_CLEAR: &str = "   ";
@@ -110,12 +111,12 @@ pub fn repeat<T>(item: T, times: usize) -> DisplayRepeater<T> {
 }
 
 pub fn error_prefix(bold: bool, colors: bool) -> String {
-    let e_str = "error:";
+    let e = "error:";
     match (bold, colors) {
-        (true, true) => format!("{}{}{}{}", BOLD, RED_FG, e_str, RESET),
-        (true, false) => format!("{}{}{}", BOLD, e_str, RESET),
-        (false, true) => format!("{}{}{}", RED_FG, e_str, RESET),
-        _ => e_str.to_string(),
+        (true, true) => format!("{BOLD}{RED_FG}{e}{RESET}"),
+        (true, false) => format!("{BOLD}{e}{RESET}"),
+        (false, true) => format!("{RED_FG}{e}{RESET}"),
+        _ => e.into(),
     }
 }
 

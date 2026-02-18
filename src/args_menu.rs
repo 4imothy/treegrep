@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    args::{self, MENU},
+    args::MENU,
     config::{self, Config},
     errors::Message,
     mes, style, term,
@@ -37,26 +37,30 @@ enum Action {
     ClearForward(usize),
 }
 
-pub fn launch(term: &mut term::Term, conf: Config) -> Result<Option<Config>, Message> {
-    let input = ArgsMenu::enter(term, &conf).map_err(|e| mes!("{}", e.to_string()))?;
+pub fn launch(
+    term: &mut term::Term,
+    conf: Config,
+    initial: Option<String>,
+) -> Result<Option<Config>, Message> {
+    let input = ArgsMenu::enter(term, &conf, initial).map_err(|e| mes!("{}", e))?;
     if let Some(i) = input {
-        let mut input_vec: Vec<OsString> = shlex::split(&i)
+        let input_vec: Vec<OsString> = shlex::split(&i)
             .ok_or_else(|| mes!("erroneous arguments"))?
             .into_iter()
             .map(OsString::from)
             .collect();
-        input_vec.push(OsString::from(format!("--{}", args::SELECT.id)));
         let res = config::get_matches(input_vec, true);
         match res {
             Ok((matches, all_args)) => {
                 let (bold, colors) = Config::get_styling(&matches);
                 let mut c = Config::get_config(matches, all_args, bold, colors)?;
-                c.repeat_file = conf.repeat_file;
+                c.repeat_file = c.repeat_file.or(conf.repeat_file);
                 if let Some(new_c) = c.handle_repeat()? {
                     c = new_c;
                 }
+                c.select = true;
                 c.menu = true;
-                c.selection_file = conf.selection_file;
+                c.selection_file = c.selection_file.or(conf.selection_file);
                 if c.completion_target.is_some() {
                     Err(mes!("can't generate completions in {}", MENU.id))
                 } else {
@@ -80,20 +84,30 @@ pub fn launch(term: &mut term::Term, conf: Config) -> Result<Option<Config>, Mes
 }
 
 impl<'a, 'b> ArgsMenu<'a, 'b> {
-    pub fn enter(term: &mut term::Term, conf: &Config) -> io::Result<Option<String>> {
+    pub fn enter(
+        term: &mut term::Term,
+        conf: &Config,
+        initial: Option<String>,
+    ) -> io::Result<Option<String>> {
         let quit;
+        let input = initial.unwrap_or_default();
+        let cursor_index = input.len();
         let mut menu = ArgsMenu {
             term,
             conf,
-            input: String::new(),
+            input,
             start: 0,
-            cursor_index: 0,
+            cursor_index,
             center_y: 0,
             center_x: 0,
             text_box_width: 0,
             start_x: 0,
         };
         menu.set_locations();
+        menu.start = menu
+            .input
+            .len()
+            .saturating_sub(menu.text_box_width as usize - 1);
         menu.draw()?;
         execute!(menu.term, cursor::Show)?;
         loop {

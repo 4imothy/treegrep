@@ -1,0 +1,8 @@
+[ps]overview[pe]
+├──[ps]sub[pe]
+│  └──[ps]sub_file[pe]
+│     └──some [m0s]text[m0e] here too
+└──[ps]top_file[pe]
+   ├──some [m0s]text[m0e]
+   └──more [m0s]text[m0e]
+found 3 matches in 3 lines across 2 files within 2 directories

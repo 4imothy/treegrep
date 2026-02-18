@@ -30,7 +30,7 @@ overwrite = ["test"]
 
 [dependencies]
 crossterm = {version = "0.29.0", features = ["use-dev-tty"]}
-clap = "4.5.58"
+clap = "4.5.60"
 clap_complete = "4.5.66"
 dunce = "1.0.5"
 bstr = "1.12.1"

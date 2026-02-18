@@ -15,7 +15,6 @@ use clap::ArgMatches;
 use clap_complete::generate;
 use config::Config;
 use errors::Message;
-use match_system::Matches;
 use select_menu::SelectMenu;
 use std::{
     ffi::OsString,
@@ -81,49 +80,46 @@ fn build_config_and_term(
         new_c.selection_file = c.selection_file;
         c = new_c;
     }
-    let term = Term::new(out, c.menu || c.select).map_err(|e| mes!("{}", e.to_string()))?;
+    let term = Term::new(out, c.menu || c.select).map_err(|e| mes!("{}", e))?;
     Ok((c, term))
 }
 
 fn run(term: &mut Term, mut c: Config) -> Result<(), Message> {
     if let Some(f) = &c.selection_file {
-        std::fs::write(f, b"").map_err(|e| mes!("{}", e.to_string()))?;
+        std::fs::write(f, b"").map_err(|e| mes!("{}", e))?;
     }
 
     if c.menu {
-        term.claim().map_err(|e| mes!("{}", e.to_string()))?;
-        match args_menu::launch(term, c)? {
+        term.claim().map_err(|e| mes!("{}", e))?;
+        let initial_input = if c.repeat { c.read_repeat_args() } else { None };
+        match args_menu::launch(term, c, initial_input)? {
             Some(new_c) => c = new_c,
             None => {
-                term.give().map_err(|e| mes!("{}", e.to_string()))?;
+                term.give().map_err(|e| mes!("{}", e))?;
                 return Ok(());
             }
         }
     }
     CONFIG.set(c).ok().unwrap();
 
-    let matches: Option<Matches> = matcher::search()?;
-
-    if matches.is_none() {
+    let Some(m) = matcher::search()? else {
         if config().menu {
-            term.give().map_err(|e| mes!("{}", e.to_string()))?;
+            term.give().map_err(|e| mes!("{}", e))?;
         }
         return Ok(());
-    }
-
-    let m = matches.unwrap();
+    };
     let lines: Vec<Box<dyn Entry>> = matches_to_display_lines(&m)?;
 
     if config().select {
         if !config().menu {
-            term.claim().map_err(|e| mes!("{}", e.to_string()))?;
+            term.claim().map_err(|e| mes!("{}", e))?;
         }
         SelectMenu::launch(term, &lines).map_err(|e| {
             let _ = term.give();
-            mes!("{}", e.to_string())
+            mes!("{}", e)
         })?;
     } else {
-        write_results(term, &lines).map_err(|e| mes!("{}", e.to_string()))?;
+        write_results(term, &lines).map_err(|e| mes!("{}", e))?;
     }
 
     Ok(())

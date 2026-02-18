@@ -84,18 +84,17 @@ enum JumpLocation {
 }
 
 impl JumpLocation {
-    fn default() -> JumpLocation {
-        JumpLocation::Middle
+    fn default() -> Self {
+        Self::Middle
     }
     fn reset(&mut self) {
-        *self = JumpLocation::default();
+        *self = Self::default();
     }
-
     fn next(&mut self) {
         *self = match *self {
-            JumpLocation::Middle => JumpLocation::Top,
-            JumpLocation::Top => JumpLocation::Bottom,
-            JumpLocation::Bottom => JumpLocation::Middle,
+            Self::Middle => Self::Top,
+            Self::Top => Self::Bottom,
+            Self::Bottom => Self::Middle,
         };
     }
 }
@@ -525,7 +524,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     fn down_path_same_depth(&mut self) -> io::Result<()> {
         let cur = &self.lines[self.selected_id];
         if !cur.is_path() {
-            return Ok(());
+            return self.down_path();
         }
         let depth = cur.depth();
         self.lines
@@ -539,7 +538,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     fn up_path_same_depth(&mut self) -> io::Result<()> {
         let cur = &self.lines[self.selected_id];
         if !cur.is_path() {
-            return Ok(());
+            return self.up_path();
         }
         let depth = cur.depth();
         self.lines
