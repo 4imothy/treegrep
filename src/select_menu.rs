@@ -25,6 +25,7 @@ const MENU_HELP_POPUP: &str = "navigate with the following
 \u{0020}- move to the start/end: g/G, </>, home/end
 \u{0020}- move up/down a page: b/f, pageup/pagedown
 \u{0020}- center cursor: z/l
+\u{0020}- fold/unfold path: tab
 \u{0020}- open selection: enter
 \u{0020}- scrolling and clicking
 \u{0020}- quit: q, ctrl + c
@@ -47,7 +48,7 @@ pub struct SelectMenu<'a, 'b> {
     selected_id: usize,
     cursor_y: u16,
     term: &'a mut Term<'b>,
-    max_line_id: usize,
+    max: usize,
     lines: &'a Vec<Box<dyn Entry + 'a>>,
     colors: bool,
     scroll_offset: u16,
@@ -55,6 +56,8 @@ pub struct SelectMenu<'a, 'b> {
     small_jump: u16,
     popup_open: bool,
     window: Window,
+    folded: Vec<usize>,
+    visible: Vec<usize>,
 }
 
 struct Window {
@@ -104,14 +107,12 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         term: &'a mut Term<'b>,
         lines: &'a Vec<Box<dyn Entry + 'a>>,
     ) -> io::Result<SelectMenu<'a, 'b>> {
-        let max_line_id = lines.len() - 1;
-
         let mut menu = SelectMenu {
             selected_id: 0,
             jump: JumpLocation::default(),
             cursor_y: START_Y,
             term,
-            max_line_id,
+            max: lines.len() - 1,
             window: Window { first: 0, last: 0 },
             lines,
             colors: config().with_colors,
@@ -119,16 +120,18 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             big_jump: 0,
             small_jump: 0,
             popup_open: false,
+            folded: Vec::new(),
+            visible: (0..lines.len()).collect(),
         };
         menu.update_offsets_and_jumps();
         Ok(menu)
     }
 
-    fn inc_selected(&mut self, amount: usize) {
+    fn down_select(&mut self, amount: usize) {
         self.selected_id += amount;
     }
 
-    fn dec_selected(&mut self, amount: usize) {
+    fn up_select(&mut self, amount: usize) {
         self.selected_id -= amount;
     }
 
@@ -137,9 +140,9 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     }
 
     fn down_page(&mut self) -> io::Result<()> {
-        let dist = (self.term.height as usize).min(self.max_line_id - self.selected_id);
+        let dist = (self.term.height as usize).min(self.max - self.selected_id);
         if dist != 0 {
-            self.inc_jump(dist)
+            self.jump_down(dist)
         } else {
             Ok(())
         }
@@ -148,7 +151,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     fn up_page(&mut self) -> io::Result<()> {
         let dist = (self.term.height as usize).min(self.selected_id);
         if dist != 0 {
-            self.dec_jump(dist)
+            self.jump_up(dist)
         } else {
             Ok(())
         }
@@ -158,6 +161,55 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         self.scroll_offset = self.term.height / 5;
         self.big_jump = self.scroll_offset;
         self.small_jump = 1;
+    }
+
+    fn print_line(&mut self, orig: usize) -> io::Result<()> {
+        queue!(self.term, Print(&self.lines[orig]))?;
+        if self.folded.contains(&orig) {
+            queue!(self.term, Print(config().chars.ellipsis))?;
+        }
+        Ok(())
+    }
+
+    fn fold_end(&self, orig: usize) -> usize {
+        let depth = self.lines[orig].depth();
+        let mut end = orig + 1;
+        while end < self.lines.len() && self.lines[end].depth() > depth {
+            end += 1;
+        }
+        end
+    }
+
+    fn toggle_fold(&mut self) -> io::Result<()> {
+        let orig = self.visible[self.selected_id];
+        if !self.lines[orig].is_path() {
+            return Ok(());
+        }
+        let fold_end = self.fold_end(orig);
+        let after = self.selected_id + 1;
+        if let Some(pos) = self.folded.iter().position(|&v| v == orig) {
+            self.folded.swap_remove(pos);
+            let mut to_insert = Vec::new();
+            let mut i = orig + 1;
+            while i < fold_end {
+                to_insert.push(i);
+                if self.folded.contains(&i) {
+                    i = self.fold_end(i);
+                } else {
+                    i += 1;
+                }
+            }
+            self.visible.splice(after..after, to_insert);
+        } else {
+            self.folded.push(orig);
+            let end = self.visible[after..]
+                .iter()
+                .position(|&o| o >= fold_end)
+                .map_or(self.visible.len(), |p| after + p);
+            self.visible.drain(after..end);
+        }
+        self.max = self.visible.len() - 1;
+        self.draw()
     }
 
     pub fn launch(term: &mut Term, lines: &'a Vec<Box<dyn Entry + 'a>>) -> io::Result<()> {
@@ -214,8 +266,9 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                                 menu.jump.next();
                                 cursor_jump = true;
                             }
+                            KeyCode::Tab => menu.toggle_fold()?,
                             KeyCode::Enter => {
-                                let selected = &menu.lines[menu.selected_id];
+                                let selected = &menu.lines[menu.visible[menu.selected_id]];
                                 match selected.open_info() {
                                     Ok(info) => {
                                         if let Some(f) = &config().selection_file {
@@ -306,18 +359,18 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     fn click_on(&mut self, row: u16) -> io::Result<()> {
         let cursor_y = self.cursor_y as isize;
         let selected_id = self.selected_id as isize;
-        let lines_len = self.lines.len() as isize;
+        let visible_len = self.visible.len() as isize;
 
         let start_results = cursor_y - selected_id;
-        let end_results = cursor_y + lines_len - selected_id;
+        let end_results = cursor_y + visible_len - selected_id;
         if (row as isize) < start_results || (row as isize) >= end_results {
             return Ok(());
         }
         self.destyle_selected()?;
         if self.cursor_y > row {
-            self.dec_selected((self.cursor_y - row) as usize);
+            self.up_select((self.cursor_y - row) as usize);
         } else {
-            self.inc_selected((row - self.cursor_y) as usize);
+            self.down_select((row - self.cursor_y) as usize);
         }
         self.cursor_y = row;
         self.style_selected()?;
@@ -331,16 +384,17 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
 
         let count_above_cursor = (self.cursor_y as usize).min(self.selected_id);
 
-        let take = (count_above_cursor + (self.term.height - self.cursor_y) as usize)
-            .min(self.max_line_id + 1);
+        let take =
+            (count_above_cursor + (self.term.height - self.cursor_y) as usize).min(self.max + 1);
         let skip = first.max(0) as usize;
         self.window.set(first, (skip + take - 1) as isize);
 
         let start_cursor = START_Y + self.cursor_y - count_above_cursor as u16;
 
-        for (i, line) in self.lines.iter().skip(skip).take(take).enumerate() {
-            let cursor = start_cursor + i as u16;
-            queue!(self.term, cursor::MoveTo(START_X, cursor), Print(line))?;
+        for i in 0..take.min(self.visible.len().saturating_sub(skip)) {
+            let orig = self.visible[skip + i];
+            queue!(self.term, cursor::MoveTo(START_X, start_cursor + i as u16))?;
+            self.print_line(orig)?;
         }
         self.style_selected()?;
         self.popup_open = false;
@@ -360,8 +414,12 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             self.window.shift_down();
             self.window.last
         };
-        if let Some(line) = (line_id >= 0).then(|| &self.lines[line_id as usize]) {
-            queue!(self.term, scroll, cursor::MoveTo(START_X, y), Print(line))?;
+        let orig = (line_id >= 0)
+            .then(|| self.visible.get(line_id as usize).copied())
+            .flatten();
+        if let Some(orig) = orig {
+            queue!(self.term, scroll, cursor::MoveTo(START_X, y))?;
+            self.print_line(orig)?;
         }
         Ok(())
     }
@@ -371,7 +429,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             self.down(self.small_jump)
         } else {
             self.destyle_selected()?;
-            self.inc_selected(1);
+            self.down_select(1);
             self.scroll_and_fill_line(false, &terminal::ScrollUp(1), self.max_cursor_y())?;
             self.style_selected()?;
             self.term.flush()
@@ -383,7 +441,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             self.up(self.small_jump)
         } else {
             self.destyle_selected()?;
-            self.dec_selected(1);
+            self.up_select(1);
             self.scroll_and_fill_line(true, &terminal::ScrollDown(1), START_Y)?;
             self.style_selected()?;
             self.term.flush()
@@ -391,11 +449,11 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     }
 
     fn down(&mut self, try_dist: u16) -> io::Result<()> {
-        let dist: usize = (try_dist as usize).min(self.max_line_id - self.selected_id);
+        let dist: usize = (try_dist as usize).min(self.max - self.selected_id);
         if dist != 0 {
             self.destyle_selected()?;
             let max_cursor_y = self.max_cursor_y();
-            self.inc_selected(dist);
+            self.down_select(dist);
             for _ in 0..dist {
                 if self.cursor_y + self.scroll_offset < max_cursor_y || self.bot_visible() {
                     self.cursor_y += 1;
@@ -414,7 +472,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         let dist: usize = (try_dist as usize).min(self.selected_id);
         if dist != 0 {
             self.destyle_selected()?;
-            self.dec_selected(dist);
+            self.up_select(dist);
             for _ in 0..dist {
                 if self.cursor_y > self.scroll_offset || self.top_visible() {
                     self.cursor_y -= 1;
@@ -471,12 +529,12 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     }
 
     fn bottom(&mut self) -> io::Result<()> {
-        if self.selected_id == self.max_line_id {
+        if self.selected_id == self.max {
             Ok(())
         } else if self.bot_visible() {
-            self.down((self.max_line_id - self.selected_id) as u16)
+            self.down((self.max - self.selected_id) as u16)
         } else {
-            self.inc_selected(self.max_line_id - self.selected_id);
+            self.down_select(self.max - self.selected_id);
             self.cursor_y = self.max_cursor_y();
             self.draw()
         }
@@ -488,7 +546,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         } else if self.top_visible() {
             self.up(self.selected_id as u16)
         } else {
-            self.dec_selected(self.selected_id);
+            self.up_select(self.selected_id);
             self.cursor_y = 0;
             self.draw()
         }
@@ -499,77 +557,77 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     }
 
     fn bot_visible(&self) -> bool {
-        self.window.last >= self.max_line_id as isize
+        self.window.last >= self.max as isize
     }
 
     pub fn down_path(&mut self) -> io::Result<()> {
-        self.lines
-            .iter()
-            .enumerate()
-            .skip(self.selected_id + 1)
-            .find(|(_, l)| l.is_path())
-            .map_or(Ok(()), |(i, _)| self.inc_jump(i - self.selected_id))
+        let after = &self.visible[self.selected_id + 1..];
+        match after.iter().position(|&o| self.lines[o].is_path()) {
+            Some(d) => self.jump_down(d + 1),
+            None => Ok(()),
+        }
     }
 
     fn up_path(&mut self) -> io::Result<()> {
-        self.lines
-            .iter()
-            .enumerate()
-            .take(self.selected_id)
-            .rev()
-            .find(|(_, l)| l.is_path())
-            .map_or(Ok(()), |(i, _)| self.dec_jump(self.selected_id - i))
+        let before = &self.visible[..self.selected_id];
+        match before.iter().rposition(|&o| self.lines[o].is_path()) {
+            Some(i) => self.jump_up(self.selected_id - i),
+            None => Ok(()),
+        }
     }
 
     fn down_path_same_depth(&mut self) -> io::Result<()> {
-        let cur = &self.lines[self.selected_id];
-        if !cur.is_path() {
+        let orig = self.visible[self.selected_id];
+        if !self.lines[orig].is_path() {
             return self.down_path();
         }
-        let depth = cur.depth();
-        self.lines
+        let depth = self.lines[orig].depth();
+        let after = &self.visible[self.selected_id + 1..];
+        match after
             .iter()
-            .enumerate()
-            .skip(self.selected_id + 1)
-            .find(|(_, l)| l.is_path() && l.depth() == depth)
-            .map_or(Ok(()), |(i, _)| self.inc_jump(i - self.selected_id))
+            .position(|&o| self.lines[o].is_path() && self.lines[o].depth() == depth)
+        {
+            Some(d) => self.jump_down(d + 1),
+            None => Ok(()),
+        }
     }
 
     fn up_path_same_depth(&mut self) -> io::Result<()> {
-        let cur = &self.lines[self.selected_id];
-        if !cur.is_path() {
+        let orig = self.visible[self.selected_id];
+        if !self.lines[orig].is_path() {
             return self.up_path();
         }
-        let depth = cur.depth();
-        self.lines
+        let depth = self.lines[orig].depth();
+        let before = &self.visible[..self.selected_id];
+        match before
             .iter()
-            .enumerate()
-            .take(self.selected_id)
-            .rev()
-            .find(|(_, l)| l.is_path() && l.depth() == depth)
-            .map_or(Ok(()), |(i, _)| self.dec_jump(self.selected_id - i))
+            .rposition(|&o| self.lines[o].is_path() && self.lines[o].depth() == depth)
+        {
+            Some(i) => self.jump_up(self.selected_id - i),
+            None => Ok(()),
+        }
     }
 
-    fn dec_jump(&mut self, dist: usize) -> io::Result<()> {
+    fn jump_up(&mut self, dist: usize) -> io::Result<()> {
         if (self.selected_id - dist) < self.window.first.max(0) as usize {
-            self.dec_selected(dist);
+            self.up_select(dist);
             self.draw()
         } else {
             self.destyle_selected()?;
-            self.dec_selected(dist);
+            self.up_select(dist);
             self.cursor_y -= dist as u16;
             self.style_selected()?;
             self.term.flush()
         }
     }
 
-    fn inc_jump(&mut self, dist: usize) -> io::Result<()> {
+    fn jump_down(&mut self, dist: usize) -> io::Result<()> {
         if self.selected_id + dist > self.window.last.max(0) as usize {
-            self.inc_selected(dist);
+            self.down_select(dist);
             self.draw()
         } else {
             self.destyle_selected()?;
-            self.inc_selected(dist);
+            self.down_select(dist);
             self.cursor_y += dist as u16;
             self.style_selected()?;
             self.term.flush()
@@ -592,11 +650,8 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         } else {
             queue!(self.term, Print(config().chars.selected_indicator),)?;
         }
-        queue!(
-            self.term,
-            cursor::MoveTo(START_X, self.cursor_y),
-            Print(&self.lines[self.selected_id])
-        )
+        queue!(self.term, cursor::MoveTo(START_X, self.cursor_y))?;
+        self.print_line(self.visible[self.selected_id])
     }
 
     fn destyle_selected(&mut self) -> io::Result<()> {
@@ -605,8 +660,8 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             cursor::MoveTo(0, self.cursor_y),
             Print(style::SELECTED_INDICATOR_CLEAR),
             cursor::MoveTo(START_X, self.cursor_y),
-            Print(&self.lines[self.selected_id])
-        )
+        )?;
+        self.print_line(self.visible[self.selected_id])
     }
 
     fn popup(&mut self, content: String) -> io::Result<()> {

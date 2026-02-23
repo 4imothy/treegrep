@@ -29,6 +29,7 @@ pub struct Chars {
     pub v: char,
     pub tee: char,
     pub selected_indicator: &'static str,
+    pub ellipsis: char,
 }
 
 pub const NONE: Chars = Chars {
@@ -40,6 +41,7 @@ pub const NONE: Chars = Chars {
     v: ' ',
     tee: ' ',
     selected_indicator: "   ",
+    ellipsis: ' ',
 };
 
 pub const ASCII: Chars = Chars {
@@ -51,6 +53,7 @@ pub const ASCII: Chars = Chars {
     v: '|',
     tee: '+',
     selected_indicator: "-> ",
+    ellipsis: '|',
 };
 
 pub const SINGLE: Chars = Chars {
@@ -62,6 +65,7 @@ pub const SINGLE: Chars = Chars {
     v: '│',
     tee: '├',
     selected_indicator: "─❱ ",
+    ellipsis: '↴',
 };
 
 pub const ROUNDED: Chars = Chars {
@@ -73,6 +77,7 @@ pub const ROUNDED: Chars = Chars {
     v: '│',
     tee: '├',
     selected_indicator: "─❱ ",
+    ellipsis: '⤵',
 };
 
 pub const HEAVY: Chars = Chars {
@@ -84,6 +89,7 @@ pub const HEAVY: Chars = Chars {
     v: '┃',
     tee: '┣',
     selected_indicator: "━❱ ",
+    ellipsis: '⤵',
 };
 
 pub const DOUBLE: Chars = Chars {
@@ -95,6 +101,7 @@ pub const DOUBLE: Chars = Chars {
     v: '║',
     tee: '╠',
     selected_indicator: "═❱ ",
+    ellipsis: '⤵',
 };
 
 pub struct DisplayRepeater<T>(T, usize);

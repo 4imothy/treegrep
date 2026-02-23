@@ -24,6 +24,7 @@ pub struct Characters {
     pub spacer_vert: String,
     pub spacer: String,
     pub selected_indicator: &'static str,
+    pub ellipsis: char,
 }
 
 pub struct Colors {
@@ -404,6 +405,7 @@ impl Config {
             match_no_next: format!("{}{}", chars.bl, style::repeat(chars.h, spacer - 1),),
             spacer_vert: format!("{}{}", chars.v, style::repeat(' ', spacer - 1)),
             spacer: " ".repeat(spacer),
+            ellipsis: chars.ellipsis,
         }
     }
 }

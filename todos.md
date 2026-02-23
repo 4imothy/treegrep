@@ -5,7 +5,6 @@
 ## Config
 - custom keybindings for the selection menu
 ## Menus
-- folding when you press tab
 - searching for text within the results
 ## Completions
 - nushell
