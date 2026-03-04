@@ -49,7 +49,7 @@ pub fn launch(
             .into_iter()
             .map(OsString::from)
             .collect();
-        let res = config::get_matches(input_vec, true);
+        let res = config::get_matches(input_vec);
         match res {
             Ok((matches, all_args)) => {
                 let (bold, colors) = Config::get_styling(&matches);

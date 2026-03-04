@@ -173,14 +173,10 @@ fn get_all_args(mut args: Vec<OsString>) -> Vec<OsString> {
     args
 }
 
-pub fn get_matches(
-    args: Vec<OsString>,
-    with_env: bool,
-) -> Result<(ArgMatches, Vec<OsString>), Error> {
-    let all_args = if with_env { get_all_args(args) } else { args };
+pub fn get_matches(args: Vec<OsString>) -> Result<(ArgMatches, Vec<OsString>), Error> {
     generate_command()
-        .try_get_matches_from(&all_args)
-        .map(|m| (m, all_args))
+        .try_get_matches_from(get_all_args(args.clone()))
+        .map(|m| (m, args))
 }
 
 impl Config {
@@ -215,7 +211,7 @@ impl Config {
         if let Some(f) = &self.repeat_file {
             if self.repeat && !self.menu {
                 let args = Self::read_repeat_file(f)?;
-                let (matches, all_args) = get_matches(args, false).map_err(|e| mes!("{}", e))?;
+                let (matches, all_args) = get_matches(args).map_err(|e| mes!("{}", e))?;
                 let (bold, colors) = Self::get_styling(&matches);
                 Ok(Some(Self::get_config(matches, all_args, bold, colors)?))
             } else if self.menu {
@@ -532,7 +528,7 @@ mod tests {
     #[test]
     fn test_env_opts() {
         unsafe { std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" ")) };
-        let (matches, all_args) = get_matches(Vec::new(), true).unwrap();
+        let (matches, all_args) = get_matches(Vec::new()).unwrap();
         let (bold, colors) = Config::get_styling(&matches);
         let config = Config::get_config(matches, all_args, bold, colors)
             .ok()

@@ -34,8 +34,8 @@ fn main() {
     if cfg!(debug_assertions) {
         log::set_panic_hook();
     }
-    let (matches, all_args) = config::get_matches(std::env::args_os().skip(1).collect(), true)
-        .unwrap_or_else(|e| e.exit());
+    let (matches, all_args) =
+        config::get_matches(std::env::args_os().skip(1).collect()).unwrap_or_else(|e| e.exit());
 
     let (bold, colors) = Config::get_styling(&matches);
     let out: StdoutLock = stdout().lock();
