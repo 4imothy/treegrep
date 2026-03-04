@@ -6,11 +6,31 @@ use crate::{
     mes, style,
 };
 use clap::{ArgMatches, Error};
-use crossterm::style::Color;
+use crossterm::{event::KeyCode, style::Color};
 use std::{
     ffi::OsString,
     path::{Component, Path, PathBuf},
 };
+
+pub struct KeyBindings {
+    pub down: Vec<KeyCode>,
+    pub up: Vec<KeyCode>,
+    pub big_down: Vec<KeyCode>,
+    pub big_up: Vec<KeyCode>,
+    pub down_path: Vec<KeyCode>,
+    pub up_path: Vec<KeyCode>,
+    pub down_same_depth: Vec<KeyCode>,
+    pub up_same_depth: Vec<KeyCode>,
+    pub top: Vec<KeyCode>,
+    pub bottom: Vec<KeyCode>,
+    pub page_down: Vec<KeyCode>,
+    pub page_up: Vec<KeyCode>,
+    pub center: Vec<KeyCode>,
+    pub help: Vec<KeyCode>,
+    pub quit: Vec<KeyCode>,
+    pub open: Vec<KeyCode>,
+    pub fold: Vec<KeyCode>,
+}
 
 pub struct Characters {
     pub bl: char,
@@ -23,7 +43,8 @@ pub struct Characters {
     pub match_no_next: String,
     pub spacer_vert: String,
     pub spacer: String,
-    pub selected_indicator: &'static str,
+    pub selected_indicator: String,
+    pub selected_indicator_clear: String,
     pub ellipsis: char,
 }
 
@@ -91,6 +112,7 @@ pub struct Config {
     pub all_args: Vec<OsString>,
     pub chars: Characters,
     pub colors: Colors,
+    pub keys: KeyBindings,
 }
 
 fn canonicalize(p: &Path) -> Result<PathBuf, Message> {
@@ -342,11 +364,9 @@ impl Config {
             menu,
             repeat,
             all_args,
-            chars: Config::get_characters(
-                matches.get_one::<args::CharacterStyle>(args::CHAR_STYLE.id),
-                prefix_len,
-            ),
+            chars: Config::get_characters(&matches, prefix_len),
             colors: Config::get_colors(&matches),
+            keys: Config::get_key_bindings(&matches),
         })
     }
 
@@ -384,28 +404,88 @@ impl Config {
         }
     }
 
-    fn get_characters(t: Option<&args::CharacterStyle>, spacer: usize) -> Characters {
-        let chars = t.map_or(style::SINGLE, |c| match c {
-            args::CharacterStyle::Single => style::SINGLE,
-            args::CharacterStyle::Ascii => style::ASCII,
-            args::CharacterStyle::Double => style::DOUBLE,
-            args::CharacterStyle::Heavy => style::HEAVY,
-            args::CharacterStyle::Rounded => style::ROUNDED,
-            args::CharacterStyle::None => style::NONE,
-        });
+    fn get_characters(matches: &ArgMatches, spacer: usize) -> Characters {
+        let v = matches
+            .get_one::<char>(args::CHAR_VERTICAL.id)
+            .copied()
+            .unwrap_or(style::DEFAULT_VERTICAL);
+        let h = matches
+            .get_one::<char>(args::CHAR_HORIZONTAL.id)
+            .copied()
+            .unwrap_or(style::DEFAULT_HORIZONTAL);
+        let tl = matches
+            .get_one::<char>(args::CHAR_TOP_LEFT.id)
+            .copied()
+            .unwrap_or(style::DEFAULT_TOP_LEFT);
+        let tr = matches
+            .get_one::<char>(args::CHAR_TOP_RIGHT.id)
+            .copied()
+            .unwrap_or(style::DEFAULT_TOP_RIGHT);
+        let bl = matches
+            .get_one::<char>(args::CHAR_BOTTOM_LEFT.id)
+            .copied()
+            .unwrap_or(style::DEFAULT_BOTTOM_LEFT);
+        let br = matches
+            .get_one::<char>(args::CHAR_BOTTOM_RIGHT.id)
+            .copied()
+            .unwrap_or(style::DEFAULT_BOTTOM_RIGHT);
+        let tee = matches
+            .get_one::<char>(args::CHAR_TEE.id)
+            .copied()
+            .unwrap_or(style::DEFAULT_TEE);
+        let ellipsis = matches
+            .get_one::<char>(args::CHAR_ELLIPSIS.id)
+            .copied()
+            .unwrap_or(style::DEFAULT_ELLIPSIS);
+        let selected_indicator = matches
+            .get_one::<String>(args::SELECTED_INDICATOR.id)
+            .cloned()
+            .unwrap_or_else(|| args::DEFAULT_SELECTED_INDICATOR.to_string());
+        let selected_indicator_clear = " ".repeat(selected_indicator.chars().count());
+
         Characters {
-            bl: chars.bl,
-            br: chars.br,
-            tl: chars.tl,
-            tr: chars.tr,
-            v: chars.v,
-            h: chars.h,
-            selected_indicator: chars.selected_indicator,
-            match_with_next: format!("{}{}", chars.tee, style::repeat(chars.h, spacer - 1),),
-            match_no_next: format!("{}{}", chars.bl, style::repeat(chars.h, spacer - 1),),
-            spacer_vert: format!("{}{}", chars.v, style::repeat(' ', spacer - 1)),
+            bl,
+            br,
+            tl,
+            tr,
+            v,
+            h,
+            selected_indicator,
+            selected_indicator_clear,
+            match_with_next: format!("{}{}", tee, style::repeat(h, spacer - 1)),
+            match_no_next: format!("{}{}", bl, style::repeat(h, spacer - 1)),
+            spacer_vert: format!("{}{}", v, style::repeat(' ', spacer - 1)),
             spacer: " ".repeat(spacer),
-            ellipsis: chars.ellipsis,
+            ellipsis,
+        }
+    }
+
+    fn get_key_bindings(matches: &ArgMatches) -> KeyBindings {
+        let get_keys = |id| {
+            matches
+                .get_many::<KeyCode>(id)
+                .map(|v| v.copied().collect())
+                .unwrap_or_default()
+        };
+
+        KeyBindings {
+            down: get_keys(args::KEY_DOWN.id),
+            up: get_keys(args::KEY_UP.id),
+            big_down: get_keys(args::KEY_BIG_DOWN.id),
+            big_up: get_keys(args::KEY_BIG_UP.id),
+            down_path: get_keys(args::KEY_DOWN_PATH.id),
+            up_path: get_keys(args::KEY_UP_PATH.id),
+            down_same_depth: get_keys(args::KEY_DOWN_SAME_DEPTH.id),
+            up_same_depth: get_keys(args::KEY_UP_SAME_DEPTH.id),
+            top: get_keys(args::KEY_TOP.id),
+            bottom: get_keys(args::KEY_BOTTOM.id),
+            page_down: get_keys(args::KEY_PAGE_DOWN.id),
+            page_up: get_keys(args::KEY_PAGE_UP.id),
+            center: get_keys(args::KEY_CENTER.id),
+            help: get_keys(args::KEY_HELP.id),
+            quit: get_keys(args::KEY_QUIT.id),
+            open: get_keys(args::KEY_OPEN.id),
+            fold: get_keys(args::KEY_FOLD.id),
         }
     }
 }
@@ -428,10 +508,13 @@ mod tests {
         "--trim",
         "--select",
         "--files",
+        "--overview",
+        "--glob=*.rs",
         "--regexp=regexp1",
         "--regexp=regexp2",
         "--after-context=2",
         "--before-context=3",
+        "--context=1",
     ];
 
     pub fn get_config_from<I, T>(args: I) -> Config
@@ -492,19 +575,38 @@ mod tests {
         assert!(config.with_colors);
         assert!(config.select);
         assert!(config.files);
-        assert!(config.before_context == 3);
-        assert!(config.after_context == 2);
+        assert!(config.overview);
+        assert_eq!(config.globs, vec!["*.rs"]);
+        assert_eq!(config.before_context, 3);
+        assert_eq!(config.after_context, 2);
         assert_eq!(config.regexps, vec!["posexpr", "regexp1", "regexp2"]);
     }
 
     #[test]
     fn test_shorts() {
-        let config = get_config_from(["posexpr", "-n.csf", "-e=regexp1", "-e=regexp2"]);
+        let config = get_config_from([
+            "posexpr",
+            "-n.csfl",
+            "-e=regexp1",
+            "-e=regexp2",
+            "-d=5",
+            "-g=*.rs",
+            "-o",
+            "-A=2",
+            "-B=3",
+            "-C=1",
+        ]);
         assert!(config.line_number);
         assert!(config.hidden);
         assert!(config.count);
         assert!(config.select);
         assert!(config.files);
+        assert!(config.links);
+        assert!(config.overview);
+        assert_eq!(config.max_depth, Some(5));
+        assert_eq!(config.globs, vec!["*.rs"]);
+        assert_eq!(config.after_context, 2);
+        assert_eq!(config.before_context, 3);
         assert_eq!(config.regexps, vec!["posexpr", "regexp1", "regexp2"]);
     }
 
@@ -527,9 +629,21 @@ mod tests {
     }
 
     #[test]
+    fn test_key_binding_hardware_named() {
+        let config = get_config_from(["expression", "--key-quit=f10", "--key-down=x"]);
+        assert!(config.keys.quit.contains(&KeyCode::F(10)));
+        assert!(config.keys.down.contains(&KeyCode::Char('x')));
+        assert!(!config.keys.down.contains(&KeyCode::Char('j')));
+        assert!(!config.keys.down.contains(&KeyCode::Down));
+    }
+
+    #[test]
     fn test_shorts_files() {
-        let config = get_config_from(["-.fs"]);
+        let config = get_config_from(["-.fslo", "-d=3"]);
         assert!(config.hidden);
+        assert!(config.links);
+        assert!(config.overview);
+        assert_eq!(config.max_depth, Some(3));
         assert!(config.select);
     }
 }

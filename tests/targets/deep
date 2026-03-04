@@ -3,15 +3,15 @@
 │  ├──[ps]second[pe]
 │  │  ├──[ps]third[pe]
 │  │  │  ├──[ps]4ourth[pe]
-│  │  │  │  └──[ps]4ourth_nice_file[pe]
-│  │  │  │     └──some not so [m0s]nice[m0e] text in the 4th file <0-0> 
-│  │  │  └──[ps]file_3[pe]
-│  │  │     └──some [m0s]nice[m0e] text in the third file
-│  │  └──[ps]2_file[pe]
-│  │     └──[m0s]nice[m0e] text in the second file
-│  └──[ps]first_file[pe]
-│     └──this is some [m0s]nice[m0e] text
-└──[ps]top_file[pe]
+│  │  │  │  ╰──[ps]4ourth_nice_file[pe]
+│  │  │  │     ╰──some not so [m0s]nice[m0e] text in the 4th file <0-0> 
+│  │  │  ╰──[ps]file_3[pe]
+│  │  │     ╰──some [m0s]nice[m0e] text in the third file
+│  │  ╰──[ps]2_file[pe]
+│  │     ╰──[m0s]nice[m0e] text in the second file
+│  ╰──[ps]first_file[pe]
+│     ╰──this is some [m0s]nice[m0e] text
+╰──[ps]top_file[pe]
    ├──idea what Latitude was, or Longitude either, but thought they were [m0s]nice[m0e]
    ├──several [m0s]nice[m0e] little histories about children who had got burnt, and
    ├──taste it, and finding it very [m0s]nice[m0e], (it had, in fact, a sort of mixed
@@ -19,4 +19,4 @@
    ├──paws and washing her face—and she is such a [m0s]nice[m0e] soft thing to
    ├──answer, so Alice went on eagerly: “There is such a [m0s]nice[m0e] little dog near
    ├──had got its neck [m0s]nice[m0e]ly straightened out, and was going to give the
-   └──“stupid,” and that he had to ask his neighbour to tell him. “A [m0s]nice[m0e]
+   ╰──“stupid,” and that he had to ask his neighbour to tell him. “A [m0s]nice[m0e]

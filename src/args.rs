@@ -6,6 +6,7 @@ use clap::{
     error::{ContextKind, ContextValue, ErrorKind},
     value_parser,
 };
+use crossterm::event::KeyCode;
 use std::{ffi::OsStr, path::PathBuf};
 
 pub const DEFAULT_PREFIX_LEN: &str = "3";
@@ -73,42 +74,6 @@ pub enum Color {
     Grey,
     Rgb(u8, u8, u8),
     Ansi(u8),
-}
-
-#[derive(Clone, Copy)]
-pub enum CharacterStyle {
-    Single,
-    Rounded,
-    Heavy,
-    Double,
-    Ascii,
-    None,
-}
-
-impl ValueEnum for CharacterStyle {
-    fn value_variants<'a>() -> &'a [Self] {
-        static VARIANTS: [CharacterStyle; 6] = [
-            CharacterStyle::Single,
-            CharacterStyle::Rounded,
-            CharacterStyle::Heavy,
-            CharacterStyle::Double,
-            CharacterStyle::Ascii,
-            CharacterStyle::None,
-        ];
-        &VARIANTS
-    }
-
-    fn to_possible_value(&self) -> Option<PossibleValue> {
-        let name = match self {
-            CharacterStyle::Single => "single",
-            CharacterStyle::Rounded => "rounded",
-            CharacterStyle::Heavy => "heavy",
-            CharacterStyle::Double => "double",
-            CharacterStyle::Ascii => "ascii",
-            CharacterStyle::None => "none",
-        };
-        Some(PossibleValue::new(name))
-    }
 }
 
 pub const EXPR_HELP: &str = "a regex expression to search for";
@@ -204,135 +169,232 @@ impl clap::builder::TypedValueParser for ColorParser {
     }
 }
 
-macro_rules! arg_info {
-    ($var_name:ident, $name:expr, $description:expr) => {
-        pub const $var_name: ArgInfo = ArgInfo::new($name, $description, None);
-    };
-    ($var_name:ident, $name:expr, $description:expr, $short:expr) => {
-        pub const $var_name: ArgInfo = ArgInfo::new($name, $description, Some($short));
-    };
+#[derive(Clone)]
+struct KeyCodeParser;
+
+impl clap::builder::TypedValueParser for KeyCodeParser {
+    type Value = KeyCode;
+
+    fn parse_ref(
+        &self,
+        cmd: &Command,
+        arg: Option<&Arg>,
+        value: &OsStr,
+    ) -> Result<Self::Value, Error> {
+        let s = value.to_string_lossy();
+        let lower = s.to_lowercase();
+
+        let named = match lower.as_str() {
+            "up" => Some(KeyCode::Up),
+            "down" => Some(KeyCode::Down),
+            "left" => Some(KeyCode::Left),
+            "right" => Some(KeyCode::Right),
+            "home" => Some(KeyCode::Home),
+            "end" => Some(KeyCode::End),
+            "pageup" => Some(KeyCode::PageUp),
+            "pagedown" => Some(KeyCode::PageDown),
+            "tab" => Some(KeyCode::Tab),
+            "enter" => Some(KeyCode::Enter),
+            "backspace" => Some(KeyCode::Backspace),
+            "delete" => Some(KeyCode::Delete),
+            "esc" => Some(KeyCode::Esc),
+            "insert" => Some(KeyCode::Insert),
+            _ => None,
+        };
+        if let Some(code) = named {
+            return Ok(code);
+        }
+
+        if lower.len() > 1
+            && lower.starts_with('f')
+            && let Ok(n) = lower[1..].parse::<u8>()
+            && n >= 1
+        {
+            return Ok(KeyCode::F(n));
+        }
+
+        let mut chars = s.chars();
+        if let (Some(c), None) = (chars.next(), chars.next()) {
+            return Ok(KeyCode::Char(c));
+        }
+
+        let mut err = Error::new(ErrorKind::InvalidValue).with_cmd(cmd);
+        err.insert(
+            ContextKind::InvalidArg,
+            ContextValue::String(arg.map(|a| a.to_string()).unwrap_or_default()),
+        );
+        err.insert(
+            ContextKind::InvalidValue,
+            ContextValue::String(s.into_owned()),
+        );
+        Err(err)
+    }
+}
+
+pub fn key_display(code: KeyCode) -> String {
+    match code {
+        KeyCode::Char(c) => c.to_string(),
+        KeyCode::Up => "up".to_string(),
+        KeyCode::Down => "down".to_string(),
+        KeyCode::Left => "left".to_string(),
+        KeyCode::Right => "right".to_string(),
+        KeyCode::Home => "home".to_string(),
+        KeyCode::End => "end".to_string(),
+        KeyCode::PageUp => "pageup".to_string(),
+        KeyCode::PageDown => "pagedown".to_string(),
+        KeyCode::Tab => "tab".to_string(),
+        KeyCode::Enter => "enter".to_string(),
+        KeyCode::Backspace => "backspace".to_string(),
+        KeyCode::Delete => "delete".to_string(),
+        KeyCode::Esc => "esc".to_string(),
+        KeyCode::Insert => "insert".to_string(),
+        KeyCode::F(n) => format!("f{n}"),
+        _ => format!("{code:?}"),
+    }
 }
 
 pub const EXPRESSION_GROUP_ID: &str = "expressions";
 pub const TARGET_GROUP_ID: &str = "targets";
 
-arg_info!(
-    LONG_BRANCHES_EACH,
+pub const LONG_BRANCHES_EACH: ArgInfo = ArgInfo::new(
     "long-branch-each",
-    "number of files to print on each branch"
+    "number of files to print on each branch",
+    None,
 );
-arg_info!(NO_BOLD, "no-bold", "don't bold anything");
-arg_info!(PATH_POSITIONAL, "positional target", PATH_HELP);
-arg_info!(PATH, "path", PATH_HELP, 'p');
-arg_info!(EXPRESSION_POSITIONAL, "positional regexp", EXPR_HELP);
-arg_info!(EXPRESSION, "regexp", EXPR_HELP, 'e');
-arg_info!(NO_COLORS, "no-color", "don't use colors");
-arg_info!(
-    COUNT,
+pub const NO_BOLD: ArgInfo = ArgInfo::new("no-bold", "don't bold anything", None);
+pub const PATH_POSITIONAL: ArgInfo = ArgInfo::new("positional target", PATH_HELP, None);
+pub const PATH: ArgInfo = ArgInfo::new("path", PATH_HELP, Some('p'));
+pub const EXPRESSION_POSITIONAL: ArgInfo = ArgInfo::new("positional regexp", EXPR_HELP, None);
+pub const EXPRESSION: ArgInfo = ArgInfo::new("regexp", EXPR_HELP, Some('e'));
+pub const NO_COLORS: ArgInfo = ArgInfo::new("no-color", "don't use colors", None);
+pub const COUNT: ArgInfo = ArgInfo::new(
     "count",
     "display number of files matched in directory and number of lines matched in a file",
-    'c'
+    Some('c'),
 );
-arg_info!(HIDDEN, "hidden", "search hidden files", '.');
-arg_info!(LINE_NUMBER, "line-number", "show line number of match", 'n');
-arg_info!(
-    SELECT,
+pub const HIDDEN: ArgInfo = ArgInfo::new("hidden", "search hidden files", Some('.'));
+pub const LINE_NUMBER: ArgInfo =
+    ArgInfo::new("line-number", "show line number of match", Some('n'));
+pub const SELECT: ArgInfo = ArgInfo::new(
     "select",
     "results are shown in a selection interface for opening",
-    's'
+    Some('s'),
 );
-arg_info!(
-    MENU,
+pub const MENU: ArgInfo = ArgInfo::new(
     "menu",
-    "provide arguments and select results through an interface"
+    "provide arguments and select results through an interface",
+    None,
 );
-arg_info!(HELP, "help", "print help", 'h');
-arg_info!(VERSION, "version", "print version", 'V');
-arg_info!(
-    FILES,
+pub const HELP: ArgInfo = ArgInfo::new("help", "print help", Some('h'));
+pub const VERSION: ArgInfo = ArgInfo::new("version", "print version", Some('V'));
+pub const FILES: ArgInfo = ArgInfo::new(
     "files",
     "if an expression is given, hide matched content, otherwise, show the files that would be searched",
-    'f'
+    Some('f'),
 );
-arg_info!(MAX_DEPTH, "max-depth", "the max depth to search");
-arg_info!(CHAR_STYLE, "char-style", "style of characters to use");
-arg_info!(EDITOR, "editor", "command used to open selections");
-arg_info!(
-    OPEN_LIKE,
+pub const MAX_DEPTH: ArgInfo = ArgInfo::new("max-depth", "the max depth to search", Some('d'));
+pub const CHAR_VERTICAL: ArgInfo = ArgInfo::new("char-vertical", "vertical branch character", None);
+pub const CHAR_HORIZONTAL: ArgInfo =
+    ArgInfo::new("char-horizontal", "horizontal branch character", None);
+pub const CHAR_TOP_LEFT: ArgInfo = ArgInfo::new("char-top-left", "top-left corner character", None);
+pub const CHAR_TOP_RIGHT: ArgInfo =
+    ArgInfo::new("char-top-right", "top-right corner character", None);
+pub const CHAR_BOTTOM_LEFT: ArgInfo =
+    ArgInfo::new("char-bottom-left", "bottom-left corner character", None);
+pub const CHAR_BOTTOM_RIGHT: ArgInfo =
+    ArgInfo::new("char-bottom-right", "bottom-right corner character", None);
+pub const CHAR_TEE: ArgInfo = ArgInfo::new("char-tee", "tee branch character", None);
+pub const CHAR_ELLIPSIS: ArgInfo =
+    ArgInfo::new("char-ellipsis", "folding indicator character", None);
+pub const KEY_DOWN: ArgInfo = ArgInfo::new("key-down", "move down", None);
+pub const KEY_UP: ArgInfo = ArgInfo::new("key-up", "move up", None);
+pub const KEY_BIG_DOWN: ArgInfo = ArgInfo::new("key-big-down", "big jump down", None);
+pub const KEY_BIG_UP: ArgInfo = ArgInfo::new("key-big-up", "big jump up", None);
+pub const KEY_DOWN_PATH: ArgInfo = ArgInfo::new("key-down-path", "next path", None);
+pub const KEY_UP_PATH: ArgInfo = ArgInfo::new("key-up-path", "previous path", None);
+pub const KEY_DOWN_SAME_DEPTH: ArgInfo =
+    ArgInfo::new("key-down-same-depth", "next path at same depth", None);
+pub const KEY_UP_SAME_DEPTH: ArgInfo =
+    ArgInfo::new("key-up-same-depth", "previous path at same depth", None);
+pub const KEY_TOP: ArgInfo = ArgInfo::new("key-top", "go to top", None);
+pub const KEY_BOTTOM: ArgInfo = ArgInfo::new("key-bottom", "go to bottom", None);
+pub const KEY_PAGE_DOWN: ArgInfo = ArgInfo::new("key-page-down", "page down", None);
+pub const KEY_PAGE_UP: ArgInfo = ArgInfo::new("key-page-up", "page up", None);
+pub const KEY_CENTER: ArgInfo = ArgInfo::new("key-center", "center cursor", None);
+pub const KEY_HELP: ArgInfo = ArgInfo::new("key-help", "show help", None);
+pub const KEY_QUIT: ArgInfo = ArgInfo::new("key-quit", "quit", None);
+pub const KEY_OPEN: ArgInfo = ArgInfo::new("key-open", "open selection", None);
+pub const KEY_FOLD: ArgInfo = ArgInfo::new("key-fold", "fold/unfold path", None);
+pub const EDITOR: ArgInfo = ArgInfo::new("editor", "command used to open selections", None);
+pub const OPEN_LIKE: ArgInfo = ArgInfo::new(
     "open-like",
-    "command line syntax for opening a file at a line"
+    "command line syntax for opening a file at a line",
+    None,
 );
-arg_info!(
-    PREFIX_LEN,
+pub const PREFIX_LEN: ArgInfo = ArgInfo::new(
     "prefix-len",
-    "number of characters to show before a match"
+    "number of characters to show before a match",
+    None,
 );
-arg_info!(LINKS, "links", "search linked paths");
-arg_info!(
-    TRIM_LEFT,
-    "trim",
-    "trim whitespace at the beginning of lines"
-);
-arg_info!(
-    THREADS,
+pub const LINKS: ArgInfo = ArgInfo::new("links", "search linked paths", Some('l'));
+pub const TRIM_LEFT: ArgInfo =
+    ArgInfo::new("trim", "trim whitespace at the beginning of lines", None);
+pub const THREADS: ArgInfo = ArgInfo::new(
     "threads",
-    "set the appropriate number of threads to use"
+    "set the appropriate number of threads to use",
+    None,
 );
-arg_info!(NO_IGNORE, "no-ignore", "don't use ignore files");
-arg_info!(
-    MAX_LENGTH,
-    "max-length",
-    "set the max length for a matched line"
-);
-arg_info!(
-    GLOB,
+pub const NO_IGNORE: ArgInfo = ArgInfo::new("no-ignore", "don't use ignore files", None);
+pub const MAX_LENGTH: ArgInfo =
+    ArgInfo::new("max-length", "set the max length for a matched line", None);
+pub const GLOB: ArgInfo = ArgInfo::new(
     "glob",
-    "rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic"
+    "rules match .gitignore globs, but ! has inverted meaning, overrides other ignore logic",
+    Some('g'),
 );
-arg_info!(
-    COMPLETIONS,
-    "completions",
-    "generate completions for given shell"
-);
-arg_info!(
-    SELECTION_FILE,
+pub const COMPLETIONS: ArgInfo =
+    ArgInfo::new("completions", "generate completions for given shell", None);
+pub const SELECTION_FILE: ArgInfo = ArgInfo::new(
     "selection-file",
-    "file to write selection to (first line: file path, second line: line number if applicable)"
+    "file to write selection to (first line: file path, second line: line number if applicable)",
+    None,
 );
-arg_info!(REPEAT, "repeat", "repeats the last saved search");
-arg_info!(REPEAT_FILE, "repeat-file", "file where arguments are saved");
-arg_info!(OVERVIEW, "overview", "conclude results with an overview");
-arg_info!(
-    LONG_BRANCHES,
+pub const REPEAT: ArgInfo = ArgInfo::new("repeat", "repeats the last saved search", None);
+pub const REPEAT_FILE: ArgInfo =
+    ArgInfo::new("repeat-file", "file where arguments are saved", None);
+pub const OVERVIEW: ArgInfo =
+    ArgInfo::new("overview", "conclude results with an overview", Some('o'));
+pub const LONG_BRANCHES: ArgInfo = ArgInfo::new(
     "long-branch",
-    "multiple files from the same directory are shown on the same branch"
+    "multiple files from the same directory are shown on the same branch",
+    None,
 );
-arg_info!(FILE_COLOR, "file-color", COLOR_HELP);
-arg_info!(DIR_COLOR, "dir-color", COLOR_HELP);
-arg_info!(TEXT_COLOR, "text-color", COLOR_HELP);
-arg_info!(BRANCH_COLOR, "branch-color", COLOR_HELP);
-arg_info!(LINE_NUMBER_COLOR, "line-number-color", COLOR_HELP);
-arg_info!(
-    SELECTED_INDICATOR_COLOR,
-    "selected-indicator-color",
-    COLOR_HELP
-);
-arg_info!(SELECTED_BG_COLOR, "selected-bg-color", COLOR_HELP);
-arg_info!(MATCH_COLORS, "match-colors", COLOR_HELP);
-arg_info!(
-    BEFORE_CONTEXT,
+pub const FILE_COLOR: ArgInfo = ArgInfo::new("file-color", COLOR_HELP, None);
+pub const DIR_COLOR: ArgInfo = ArgInfo::new("dir-color", COLOR_HELP, None);
+pub const TEXT_COLOR: ArgInfo = ArgInfo::new("text-color", COLOR_HELP, None);
+pub const BRANCH_COLOR: ArgInfo = ArgInfo::new("branch-color", COLOR_HELP, None);
+pub const LINE_NUMBER_COLOR: ArgInfo = ArgInfo::new("line-number-color", COLOR_HELP, None);
+pub const SELECTED_INDICATOR_COLOR: ArgInfo =
+    ArgInfo::new("selected-indicator-color", COLOR_HELP, None);
+pub const SELECTED_BG_COLOR: ArgInfo = ArgInfo::new("selected-bg-color", COLOR_HELP, None);
+pub const MATCH_COLORS: ArgInfo = ArgInfo::new("match-colors", COLOR_HELP, None);
+pub const SELECTED_INDICATOR: ArgInfo =
+    ArgInfo::new("selected-indicator", "selected indicator characters", None);
+pub const DEFAULT_SELECTED_INDICATOR: &str = "─❱ ";
+pub const BEFORE_CONTEXT: ArgInfo = ArgInfo::new(
     "before-context",
-    "number of lines to show before each match"
+    "number of lines to show before each match",
+    Some('B'),
 );
-arg_info!(
-    AFTER_CONTEXT,
+pub const AFTER_CONTEXT: ArgInfo = ArgInfo::new(
     "after-context",
-    "number of lines to show after each match"
+    "number of lines to show after each match",
+    Some('A'),
 );
-arg_info!(
-    CONTEXT,
+pub const CONTEXT: ArgInfo = ArgInfo::new(
     "context",
-    "number of lines to show before and after each match"
+    "number of lines to show before and after each match",
+    Some('C'),
 );
 
 const HELP_TEMPLATE: &str = concat!(
@@ -367,7 +429,8 @@ pub fn generate_command() -> Command {
         .disable_help_flag(true)
         .disable_version_flag(true)
         .about(env!("CARGO_PKG_DESCRIPTION"))
-        .version(env!("CARGO_PKG_VERSION"));
+        .version(env!("CARGO_PKG_VERSION"))
+        .next_help_heading("options");
 
     command = add_expressions(command);
     command = add_paths(command);
@@ -399,6 +462,7 @@ fn color_arg(info: ArgInfo) -> Arg {
         .value_name("")
         .value_parser(ColorParser)
         .action(ArgAction::Set)
+        .hide_short_help(true)
 }
 
 fn usize_arg(info: &ArgInfo, default_value: Option<&'static str>) -> Arg {
@@ -407,13 +471,51 @@ fn usize_arg(info: &ArgInfo, default_value: Option<&'static str>) -> Arg {
         .help(info.h)
         .value_name("")
         .action(ArgAction::Set);
+    if let Some(s) = info.s {
+        arg = arg.short(s);
+    }
     if let Some(dv) = default_value {
         arg = arg.default_value(dv);
     }
     arg
 }
 
-fn get_args() -> [Arg; 39] {
+fn hidden_usize_arg(info: &ArgInfo, default_value: Option<&'static str>) -> Arg {
+    usize_arg(info, default_value).hide_short_help(true)
+}
+
+fn char_arg(info: ArgInfo) -> Arg {
+    Arg::new(info.id)
+        .long(info.id)
+        .help(info.h)
+        .value_name("")
+        .value_parser(value_parser!(char))
+        .action(ArgAction::Set)
+        .hide_short_help(true)
+}
+
+fn string_arg(info: ArgInfo, default_value: &'static str) -> Arg {
+    Arg::new(info.id)
+        .long(info.id)
+        .help(info.h)
+        .value_name("")
+        .default_value(default_value)
+        .action(ArgAction::Set)
+        .hide_short_help(true)
+}
+
+fn key_arg(info: ArgInfo, defaults: &'static [&'static str]) -> Arg {
+    Arg::new(info.id)
+        .long(info.id)
+        .help(info.h)
+        .value_name("")
+        .value_parser(KeyCodeParser)
+        .action(ArgAction::Append)
+        .default_values(defaults)
+        .hide_short_help(true)
+}
+
+fn get_args() -> Vec<Arg> {
     let long_branches = Arg::new(LONG_BRANCHES.id)
         .long(LONG_BRANCHES.id)
         .help(LONG_BRANCHES.h)
@@ -423,15 +525,9 @@ fn get_args() -> [Arg; 39] {
     let glob = Arg::new(GLOB.id)
         .long(GLOB.id)
         .help(GLOB.h)
+        .short(GLOB.s)
         .value_name("")
         .action(ArgAction::Append);
-
-    let char_style = Arg::new(CHAR_STYLE.id)
-        .long(CHAR_STYLE.id)
-        .help(CHAR_STYLE.h)
-        .value_parser(value_parser!(CharacterStyle))
-        .value_name("")
-        .action(ArgAction::Set);
 
     let selection_file = Arg::new(SELECTION_FILE.id)
         .long(SELECTION_FILE.id)
@@ -477,29 +573,33 @@ fn get_args() -> [Arg; 39] {
         .help(VERSION.h)
         .action(ArgAction::Version);
 
-    [
-        bool_arg(MENU),
+    vec![
         bool_arg(SELECT),
-        glob,
         bool_arg(FILES),
         bool_arg(HIDDEN),
         bool_arg(LINE_NUMBER),
-        bool_arg(LINKS),
-        bool_arg(NO_IGNORE),
         bool_arg(COUNT),
-        bool_arg(NO_COLORS),
-        bool_arg(NO_BOLD),
+        glob,
+        bool_arg(LINKS),
         bool_arg(OVERVIEW),
         usize_arg(&MAX_DEPTH, None),
-        usize_arg(&PREFIX_LEN, Some(DEFAULT_PREFIX_LEN)),
+        usize_arg(&CONTEXT, None).requires(EXPRESSION_GROUP_ID),
+        usize_arg(&BEFORE_CONTEXT, None).requires(EXPRESSION_GROUP_ID),
+        usize_arg(&AFTER_CONTEXT, None).requires(EXPRESSION_GROUP_ID),
         usize_arg(&MAX_LENGTH, None).requires(EXPRESSION_GROUP_ID),
+        bool_arg(MENU),
+        bool_arg(NO_IGNORE),
         bool_arg(TRIM_LEFT).requires(EXPRESSION_GROUP_ID),
         usize_arg(&THREADS, None),
         long_branches,
-        usize_arg(&LONG_BRANCHES_EACH, Some(DEFAULT_LONG_BRANCH_EACH)).requires(LONG_BRANCHES.id),
         editor,
         open_like,
-        char_style,
+        completions,
+        selection_file,
+        repeat_file,
+        bool_arg(REPEAT),
+        bool_arg(NO_COLORS),
+        bool_arg(NO_BOLD),
         color_arg(FILE_COLOR),
         color_arg(DIR_COLOR),
         color_arg(TEXT_COLOR),
@@ -508,16 +608,87 @@ fn get_args() -> [Arg; 39] {
         color_arg(MATCH_COLORS).value_delimiter(','),
         color_arg(SELECTED_INDICATOR_COLOR),
         color_arg(SELECTED_BG_COLOR),
-        completions,
-        selection_file,
-        repeat_file,
-        bool_arg(REPEAT),
-        usize_arg(&BEFORE_CONTEXT, None).requires(EXPRESSION_GROUP_ID),
-        usize_arg(&AFTER_CONTEXT, None).requires(EXPRESSION_GROUP_ID),
-        usize_arg(&CONTEXT, None).requires(EXPRESSION_GROUP_ID),
+        hidden_usize_arg(&PREFIX_LEN, Some(DEFAULT_PREFIX_LEN)),
+        hidden_usize_arg(&LONG_BRANCHES_EACH, Some(DEFAULT_LONG_BRANCH_EACH))
+            .requires(LONG_BRANCHES.id),
+        char_arg(CHAR_VERTICAL),
+        char_arg(CHAR_HORIZONTAL),
+        char_arg(CHAR_TOP_LEFT),
+        char_arg(CHAR_TOP_RIGHT),
+        char_arg(CHAR_BOTTOM_LEFT),
+        char_arg(CHAR_BOTTOM_RIGHT),
+        char_arg(CHAR_TEE),
+        char_arg(CHAR_ELLIPSIS),
+        string_arg(SELECTED_INDICATOR, DEFAULT_SELECTED_INDICATOR),
+        key_arg(KEY_DOWN, &["down", "j", "n"]),
+        key_arg(KEY_UP, &["up", "k", "p"]),
+        key_arg(KEY_BIG_DOWN, &["J", "N"]),
+        key_arg(KEY_BIG_UP, &["K", "P"]),
+        key_arg(KEY_DOWN_PATH, &["}", "]"]),
+        key_arg(KEY_UP_PATH, &["{", "["]),
+        key_arg(KEY_DOWN_SAME_DEPTH, &[")", "d"]),
+        key_arg(KEY_UP_SAME_DEPTH, &["(", "u"]),
+        key_arg(KEY_TOP, &["home", "g", "<"]),
+        key_arg(KEY_BOTTOM, &["end", "G", ">"]),
+        key_arg(KEY_PAGE_DOWN, &["pagedown", "f"]),
+        key_arg(KEY_PAGE_UP, &["pageup", "b"]),
+        key_arg(KEY_CENTER, &["z", "l"]),
+        key_arg(KEY_HELP, &["h"]),
+        key_arg(KEY_QUIT, &["q"]),
+        key_arg(KEY_OPEN, &["enter"]),
+        key_arg(KEY_FOLD, &["tab"]),
         help,
         version,
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::builder::TypedValueParser;
+    use std::ffi::OsStr;
+
+    fn parse_key(s: &str) -> Result<KeyCode, clap::Error> {
+        KeyCodeParser.parse_ref(&generate_command(), None, OsStr::new(s))
+    }
+
+    #[test]
+    fn test_named_keys() {
+        assert_eq!(parse_key("up").unwrap(), KeyCode::Up);
+        assert_eq!(parse_key("down").unwrap(), KeyCode::Down);
+        assert_eq!(parse_key("left").unwrap(), KeyCode::Left);
+        assert_eq!(parse_key("right").unwrap(), KeyCode::Right);
+        assert_eq!(parse_key("tab").unwrap(), KeyCode::Tab);
+        assert_eq!(parse_key("enter").unwrap(), KeyCode::Enter);
+        assert_eq!(parse_key("pageup").unwrap(), KeyCode::PageUp);
+        assert_eq!(parse_key("pagedown").unwrap(), KeyCode::PageDown);
+        assert_eq!(parse_key("esc").unwrap(), KeyCode::Esc);
+        assert_eq!(parse_key("home").unwrap(), KeyCode::Home);
+        assert_eq!(parse_key("end").unwrap(), KeyCode::End);
+        assert_eq!(parse_key("backspace").unwrap(), KeyCode::Backspace);
+        assert_eq!(parse_key("delete").unwrap(), KeyCode::Delete);
+        assert_eq!(parse_key("insert").unwrap(), KeyCode::Insert);
+    }
+
+    #[test]
+    fn test_char_keys() {
+        assert_eq!(parse_key("j").unwrap(), KeyCode::Char('j'));
+        assert_eq!(parse_key("J").unwrap(), KeyCode::Char('J'));
+        assert_eq!(parse_key("1").unwrap(), KeyCode::Char('1'));
+    }
+
+    #[test]
+    fn test_function_keys() {
+        assert_eq!(parse_key("f1").unwrap(), KeyCode::F(1));
+        assert_eq!(parse_key("f12").unwrap(), KeyCode::F(12));
+        assert_eq!(parse_key("f255").unwrap(), KeyCode::F(255));
+    }
+
+    #[test]
+    fn test_invalid_keys() {
+        assert!(parse_key("toolong").is_err());
+        assert!(parse_key("").is_err());
+    }
 }
 
 fn add_expressions(command: Command) -> Command {
@@ -528,6 +699,7 @@ fn add_expressions(command: Command) -> Command {
                 .required_unless_present_any(DONT_NEED_REGEXP)
                 .required_unless_present(EXPRESSION.id)
                 .value_hint(ValueHint::Other)
+                .help_heading("arguments")
                 .index(1),
         )
         .arg(
@@ -556,6 +728,7 @@ fn add_paths(command: Command) -> Command {
                 .help(PATH_POSITIONAL.h)
                 .value_hint(ValueHint::AnyPath)
                 .value_parser(value_parser!(PathBuf))
+                .help_heading("arguments")
                 .index(2),
         )
         .arg(

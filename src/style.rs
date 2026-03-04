@@ -11,7 +11,6 @@ const BOLD: SetAttribute = SetAttribute(Attribute::Bold);
 pub const DIM: SetAttribute = SetAttribute(Attribute::Dim);
 
 const RED_FG: SetForegroundColor = SetForegroundColor(Color::Red);
-pub const SELECTED_INDICATOR_CLEAR: &str = "   ";
 pub const LONG_BRANCH_FILE_SEPARATOR: &str = ", ";
 
 pub const FILE_COLOR_DEFAULT: Color = Color::Cyan;
@@ -20,89 +19,14 @@ pub const LINE_NUMBER_COLOR_DEFAULT: Color = Color::Yellow;
 pub const MATCHED_COLORS_DEFAULT: [Color; 3] = [Color::Green, Color::Magenta, Color::Red];
 pub const SELECTED_BG_DEFAULT: Color = Color::DarkGrey;
 
-pub struct Chars {
-    pub bl: char,
-    pub br: char,
-    pub tl: char,
-    pub tr: char,
-    pub h: char,
-    pub v: char,
-    pub tee: char,
-    pub selected_indicator: &'static str,
-    pub ellipsis: char,
-}
-
-pub const NONE: Chars = Chars {
-    bl: ' ',
-    br: ' ',
-    tl: ' ',
-    tr: ' ',
-    h: ' ',
-    v: ' ',
-    tee: ' ',
-    selected_indicator: "   ",
-    ellipsis: ' ',
-};
-
-pub const ASCII: Chars = Chars {
-    bl: '+',
-    br: '+',
-    tl: '+',
-    tr: '+',
-    h: '-',
-    v: '|',
-    tee: '+',
-    selected_indicator: "-> ",
-    ellipsis: '|',
-};
-
-pub const SINGLE: Chars = Chars {
-    bl: '└',
-    br: '┘',
-    tl: '┌',
-    tr: '┐',
-    h: '─',
-    v: '│',
-    tee: '├',
-    selected_indicator: "─❱ ",
-    ellipsis: '↴',
-};
-
-pub const ROUNDED: Chars = Chars {
-    bl: '╰',
-    br: '╯',
-    tl: '╭',
-    tr: '╮',
-    h: '─',
-    v: '│',
-    tee: '├',
-    selected_indicator: "─❱ ",
-    ellipsis: '⤵',
-};
-
-pub const HEAVY: Chars = Chars {
-    bl: '┗',
-    br: '┛',
-    tl: '┏',
-    tr: '┓',
-    h: '━',
-    v: '┃',
-    tee: '┣',
-    selected_indicator: "━❱ ",
-    ellipsis: '⤵',
-};
-
-pub const DOUBLE: Chars = Chars {
-    bl: '╚',
-    br: '╝',
-    tl: '╔',
-    tr: '╗',
-    h: '═',
-    v: '║',
-    tee: '╠',
-    selected_indicator: "═❱ ",
-    ellipsis: '⤵',
-};
+pub const DEFAULT_VERTICAL: char = '│';
+pub const DEFAULT_HORIZONTAL: char = '─';
+pub const DEFAULT_TOP_LEFT: char = '╭';
+pub const DEFAULT_TOP_RIGHT: char = '╮';
+pub const DEFAULT_BOTTOM_LEFT: char = '╰';
+pub const DEFAULT_BOTTOM_RIGHT: char = '╯';
+pub const DEFAULT_TEE: char = '├';
+pub const DEFAULT_ELLIPSIS: char = '⤵';
 
 pub struct DisplayRepeater<T>(T, usize);
 impl<T: Display> Display for DisplayRepeater<T> {

@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-use crate::{args::OpenStrategy, config, errors::SUBMIT_ISSUE, style, term::Term, writer::Entry};
+use crate::{
+    args::{self, OpenStrategy},
+    config,
+    errors::SUBMIT_ISSUE,
+    style,
+    term::Term,
+    writer::Entry,
+};
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, MouseEventKind},
@@ -12,24 +19,64 @@ use std::{
     ffi::OsString,
     io::{self, Write},
     process::Command,
+    time::{Duration, Instant},
 };
 
-const START_X: u16 = style::SELECTED_INDICATOR_CLEAR.len() as u16;
+const DOUBLE_CLICK_INTERVAL: Duration = Duration::from_millis(500);
+
+fn start_x() -> u16 {
+    config().chars.selected_indicator_clear.len() as u16
+}
 const START_Y: u16 = 0;
 
-const MENU_HELP_POPUP: &str = "navigate with the following
-\u{0020}- move up/down: k/j, p/n, up arrow/down arrow
-\u{0020}- move up/down with a bigger jump: K/J, P/N
-\u{0020}- move up/down paths: {/}, [/]
-\u{0020}- move up/down paths of the same depth: (/), u/d
-\u{0020}- move to the start/end: g/G, </>, home/end
-\u{0020}- move up/down a page: b/f, pageup/pagedown
-\u{0020}- center cursor: z/l
-\u{0020}- fold/unfold path: tab
-\u{0020}- open selection: enter
-\u{0020}- scrolling and clicking
-\u{0020}- quit: q, ctrl + c
-press q to quit this popup";
+enum OpenResult {
+    Continue,
+    Exit,
+    Open(OsString, Option<usize>),
+}
+
+fn format_keys(keys: &[KeyCode]) -> String {
+    keys.iter()
+        .map(|&k| args::key_display(k))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn menu_help_popup() -> String {
+    let k = &config().keys;
+    format!(
+        "navigate with the following\n\
+         \x20- up/down: {}/{}\n\
+         \x20- big jump up/down: {}/{}\n\
+         \x20- prev/next path: {}/{}\n\
+         \x20- prev/next path same depth: {}/{}\n\
+         \x20- top/bottom: {}/{}\n\
+         \x20- page up/down: {}/{}\n\
+         \x20- center cursor: {}\n\
+         \x20- fold/unfold: {}\n\
+         \x20- open: {}\n\
+         \x20- scrolling and clicking\n\
+         \x20- quit: {} or ctrl+c\n\
+         press {} to quit this popup",
+        format_keys(&k.up),
+        format_keys(&k.down),
+        format_keys(&k.big_up),
+        format_keys(&k.big_down),
+        format_keys(&k.up_path),
+        format_keys(&k.down_path),
+        format_keys(&k.up_same_depth),
+        format_keys(&k.down_same_depth),
+        format_keys(&k.top),
+        format_keys(&k.bottom),
+        format_keys(&k.page_up),
+        format_keys(&k.page_down),
+        format_keys(&k.center),
+        format_keys(&k.fold),
+        format_keys(&k.open),
+        format_keys(&k.quit),
+        format_keys(&k.quit),
+    )
+}
 
 impl OpenStrategy {
     fn from(editor: &str) -> Self {
@@ -212,11 +259,39 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         self.draw()
     }
 
+    fn open_selected(&mut self) -> io::Result<OpenResult> {
+        let selected = &self.lines[self.visible[self.selected_id]];
+        match selected.open_info() {
+            Ok(info) => {
+                if let Some(f) = &config().selection_file {
+                    let mut buf = Vec::new();
+                    buf.extend_from_slice(info.path.as_os_str().as_encoded_bytes());
+                    buf.push(b'\n');
+                    if let Some(l) = info.line {
+                        buf.extend_from_slice(l.to_string().as_bytes());
+                    }
+                    std::fs::write(f, buf)?;
+                    Ok(OpenResult::Exit)
+                } else {
+                    Ok(OpenResult::Open(
+                        info.path.as_os_str().to_os_string(),
+                        info.line,
+                    ))
+                }
+            }
+            Err(mes) => {
+                self.popup(mes.mes)?;
+                Ok(OpenResult::Continue)
+            }
+        }
+    }
+
     pub fn launch(term: &mut Term, lines: &'a Vec<Box<dyn Entry + 'a>>) -> io::Result<()> {
         let mut menu: SelectMenu = SelectMenu::enter(term, lines)?;
 
         menu.draw()?;
         let mut down_row: u16 = 0;
+        let mut last_click: Option<(Instant, u16)> = None;
         let mut cursor_jump;
 
         loop {
@@ -230,74 +305,44 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                     ..
                 }) => {
                     if !menu.popup_open {
+                        let keys = &config().keys;
                         match code {
-                            KeyCode::Char('j') | KeyCode::Char('n') | KeyCode::Down => {
-                                menu.down(menu.small_jump)?
-                            }
-                            KeyCode::Char('k') | KeyCode::Char('p') | KeyCode::Up => {
-                                menu.up(menu.small_jump)?
-                            }
-                            KeyCode::Char('J') | KeyCode::Char('N') => menu.down(menu.big_jump)?,
-                            KeyCode::Char('K') | KeyCode::Char('P') => menu.up(menu.big_jump)?,
-                            KeyCode::Char('}') | KeyCode::Char(']') => menu.down_path()?,
-                            KeyCode::Char('{') | KeyCode::Char('[') => menu.up_path()?,
-                            KeyCode::Char(')') | KeyCode::Char('d') => {
+                            _ if keys.down.contains(&code) => menu.down(menu.small_jump)?,
+                            _ if keys.up.contains(&code) => menu.up(menu.small_jump)?,
+                            _ if keys.big_down.contains(&code) => menu.down(menu.big_jump)?,
+                            _ if keys.big_up.contains(&code) => menu.up(menu.big_jump)?,
+                            _ if keys.down_path.contains(&code) => menu.down_path()?,
+                            _ if keys.up_path.contains(&code) => menu.up_path()?,
+                            _ if keys.down_same_depth.contains(&code) => {
                                 menu.down_path_same_depth()?
                             }
-                            KeyCode::Char('(') | KeyCode::Char('u') => menu.up_path_same_depth()?,
-                            KeyCode::Char('G') | KeyCode::Char('>') | KeyCode::End => {
-                                menu.bottom()?
-                            }
-                            KeyCode::Char('g') | KeyCode::Char('<') | KeyCode::Home => {
-                                menu.top()?
-                            }
-                            KeyCode::Char('f') | KeyCode::PageDown => menu.down_page()?,
-                            KeyCode::Char('b') | KeyCode::PageUp => menu.up_page()?,
-                            KeyCode::Char('h') => menu.popup(MENU_HELP_POPUP.to_string())?,
-                            KeyCode::Char('z')
-                                if !modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
+                            _ if keys.up_same_depth.contains(&code) => menu.up_path_same_depth()?,
+                            _ if keys.bottom.contains(&code) => menu.bottom()?,
+                            _ if keys.top.contains(&code) => menu.top()?,
+                            _ if keys.page_down.contains(&code) => menu.down_page()?,
+                            _ if keys.page_up.contains(&code) => menu.up_page()?,
+                            _ if keys.help.contains(&code) => menu.popup(menu_help_popup())?,
+                            _ if keys.center.contains(&code)
+                                && !modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
                             {
                                 menu.jump_cursor(menu.jump)?;
                                 menu.jump.next();
                                 cursor_jump = true;
                             }
-                            KeyCode::Char('l') => {
-                                menu.jump_cursor(menu.jump)?;
-                                menu.jump.next();
-                                cursor_jump = true;
-                            }
-                            KeyCode::Tab => menu.toggle_fold()?,
-                            KeyCode::Enter => {
-                                let selected = &menu.lines[menu.visible[menu.selected_id]];
-                                match selected.open_info() {
-                                    Ok(info) => {
-                                        if let Some(f) = &config().selection_file {
-                                            let mut buf = Vec::new();
-                                            buf.extend_from_slice(
-                                                info.path.as_os_str().as_encoded_bytes(),
-                                            );
-                                            buf.push(b'\n');
-                                            if let Some(l) = info.line {
-                                                buf.extend_from_slice(l.to_string().as_bytes());
-                                            }
-                                            std::fs::write(f, buf)?;
-                                            break;
-                                        } else {
-                                            menu.term.give()?;
-                                            return menu.exit_and_open(
-                                                info.path.as_os_str().to_os_string(),
-                                                info.line,
-                                            );
-                                        }
-                                    }
-                                    Err(mes) => menu.popup(mes.mes)?,
+                            _ if keys.fold.contains(&code) => menu.toggle_fold()?,
+                            _ if keys.open.contains(&code) => match menu.open_selected()? {
+                                OpenResult::Continue => {}
+                                OpenResult::Exit => break,
+                                OpenResult::Open(path, line) => {
+                                    menu.term.give()?;
+                                    return menu.exit_and_open(path, line);
                                 }
-                            }
+                            },
                             _ => {}
                         }
                     }
                     match code {
-                        KeyCode::Char('q') => {
+                        _ if config().keys.quit.contains(&code) => {
                             if menu.popup_open {
                                 menu.popup_open = false;
                                 menu.draw()?;
@@ -305,16 +350,16 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                                 break;
                             }
                         }
-                        KeyCode::Char('z') => {
-                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                                menu.term.suspend()?;
-                                menu.resume()?;
-                            }
+                        KeyCode::Char('z')
+                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            menu.term.suspend()?;
+                            menu.resume()?;
                         }
-                        KeyCode::Char('c') => {
-                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                                break;
-                            }
+                        KeyCode::Char('c')
+                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            break;
                         }
                         _ => {}
                     }
@@ -335,7 +380,26 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                             }
                             MouseEventKind::Up(button) => {
                                 if button.is_left() && mouse_event.row == down_row {
-                                    menu.click_on(down_row)?;
+                                    let row = down_row;
+                                    let is_double = last_click
+                                        .map(|(t, r)| {
+                                            r == row && t.elapsed() < DOUBLE_CLICK_INTERVAL
+                                        })
+                                        .unwrap_or(false);
+                                    menu.click_on(row)?;
+                                    if is_double {
+                                        last_click = None;
+                                        match menu.open_selected()? {
+                                            OpenResult::Continue => {}
+                                            OpenResult::Exit => break,
+                                            OpenResult::Open(path, line) => {
+                                                menu.term.give()?;
+                                                return menu.exit_and_open(path, line);
+                                            }
+                                        }
+                                    } else {
+                                        last_click = Some((Instant::now(), row));
+                                    }
                                 }
                             }
                             _ => {}
@@ -393,7 +457,10 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
 
         for i in 0..take.min(self.visible.len().saturating_sub(skip)) {
             let orig = self.visible[skip + i];
-            queue!(self.term, cursor::MoveTo(START_X, start_cursor + i as u16))?;
+            queue!(
+                self.term,
+                cursor::MoveTo(start_x(), start_cursor + i as u16)
+            )?;
             self.print_line(orig)?;
         }
         self.style_selected()?;
@@ -418,7 +485,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             .then(|| self.visible.get(line_id as usize).copied())
             .flatten();
         if let Some(orig) = orig {
-            queue!(self.term, scroll, cursor::MoveTo(START_X, y))?;
+            queue!(self.term, scroll, cursor::MoveTo(start_x(), y))?;
             self.print_line(orig)?;
         }
         Ok(())
@@ -644,13 +711,16 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         {
             queue!(
                 self.term,
-                Print(style::style_with(config().chars.selected_indicator, c)),
+                Print(style::style_with(
+                    config().chars.selected_indicator.as_str(),
+                    c
+                )),
                 SetBackgroundColor(config().colors.selected_bg)
             )?;
         } else {
-            queue!(self.term, Print(config().chars.selected_indicator),)?;
+            queue!(self.term, Print(config().chars.selected_indicator.as_str()),)?;
         }
-        queue!(self.term, cursor::MoveTo(START_X, self.cursor_y))?;
+        queue!(self.term, cursor::MoveTo(start_x(), self.cursor_y))?;
         self.print_line(self.visible[self.selected_id])
     }
 
@@ -658,8 +728,8 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         queue!(
             self.term,
             cursor::MoveTo(0, self.cursor_y),
-            Print(style::SELECTED_INDICATOR_CLEAR),
-            cursor::MoveTo(START_X, self.cursor_y),
+            Print(config().chars.selected_indicator_clear.as_str()),
+            cursor::MoveTo(start_x(), self.cursor_y),
         )?;
         self.print_line(self.visible[self.selected_id])
     }
