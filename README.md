@@ -39,7 +39,7 @@ return {
             repeat_file = '/tmp/tgrep-repeat',
         })
         vim.keymap.set('n', '<leader>tt', function() require('treegrep').tgrep_with('--menu') end)
-        vim.keymap.set('n', '<leader>tr', function() require('treegrep').tgrep_with('--repeat') end)
+        vim.keymap.set('n', '<leader>tr', function() require('treegrep').tgrep_with('--repeat --select') end)
         vim.keymap.set('n', '<leader>tm', function() require('treegrep').tgrep_with('--menu --repeat') end)
         vim.keymap.set('n', '<leader>tf', function() require('treegrep').tgrep_with('--files --select') end)
     end,
@@ -72,7 +72,7 @@ let g:tgrep_selection_file = '/tmp/tgrep-select'
 let g:tgrep_repeat_file = '/tmp/tgrep-repeat'
 
 nnoremap <leader>tt :call TgrepWith('--menu')<cr>
-nnoremap <leader>tr :call TgrepWith('--repeat')<cr>
+nnoremap <leader>tr :call TgrepWith('--repeat --select')<cr>
 nnoremap <leader>tm :call TgrepWith('--menu --repeat')<cr>
 nnoremap <leader>tf :call TgrepWith('--files --select')<cr>
 ```
@@ -85,146 +85,146 @@ nnoremap <leader>tf :call TgrepWith('--files --select')<cr>
 ```
 src: 10
 ├──term.rs: 1
-│  ├──-1: 
+│  ├──-1:
 │  ├──15: pub struct Term<'a> {
 │  ╰──+1:     pub height: u16,
 ├──matcher.rs: 3
-│  ├──-1: 
+│  ├──-1:
 │  ├──20: struct Matcher {
 │  ├──+1:     combined: RegexMatcher,
-│  ├──-1: 
+│  ├──-1:
 │  ├──25: impl Matcher {
 │  ├──+1:     fn new(patterns: &[String]) -> Result<Self, Message> {
-│  ├──-1: 
+│  ├──-1:
 │  ├──44: struct MatchSink<'a> {
 │  ╰──+1:     lines: Vec<Line>,
 ├──args_menu.rs: 1
-│  ├──-1: 
+│  ├──-1:
 │  ├──21: pub struct ArgsMenu<'a, 'b> {
 │  ╰──+1:     term: &'a mut term::Term<'b>,
 ├──errors.rs: 4
-│  ├──-1: 
+│  ├──-1:
 │  ├──14: pub struct Message {
 │  ├──+1:     pub mes: String,
 │  ├──-1: }
 │  ├──17: impl Error for Message {}
-│  ├──+1: 
-│  ├──-1: 
+│  ├──+1:
+│  ├──-1:
 │  ├──34: impl fmt::Debug for Message {
 │  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-│  ├──-1: 
+│  ├──-1:
 │  ├──40: impl fmt::Display for Message {
 │  ╰──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 ├──style.rs: 1
-│  ├──-1: 
+│  ├──-1:
 │  ├──31: pub struct DisplayRepeater<T>(T, usize);
 │  ╰──+1: impl<T: Display> Display for DisplayRepeater<T> {
 ├──match_system.rs: 8
-│  ├──-1: 
+│  ├──-1:
 │  ├──23: pub struct Directory {
 │  ├──+1:     pub path: PathBuf,
-│  ├──-1: 
+│  ├──-1:
 │  ├──30: impl Directory {
 │  ├──+1:     pub fn new(path: &Path) -> Result<Self, Message> {
-│  ├──-1: 
+│  ├──-1:
 │  ├──41: pub struct File {
 │  ├──+1:     pub path: PathBuf,
-│  ├──-1: 
+│  ├──-1:
 │  ├──47: impl File {
 │  ├──+1:     pub fn from_pathbuf(path: PathBuf) -> Result<Self, Message> {
 │  ├──-1: #[cfg_attr(test, derive(PartialEq, Debug))]
 │  ├──72: pub struct Match {
 │  ├──+1:     pub regexp_id: usize,
-│  ├──-1: 
+│  ├──-1:
 │  ├──78: impl Match {
 │  ├──+1:     pub fn new(regexp_id: usize, start: usize, end: usize) -> Self {
-│  ├──-1: 
+│  ├──-1:
 │  ├──103: pub struct Line {
 │  ├──+1:     pub content: String,
-│  ├──-1: 
+│  ├──-1:
 │  ├──110: impl Line {
 │  ╰──+1:     pub fn new(content: String, mut matches: Vec<Match>, line_num: usize) -> Self {
 ├──select_menu.rs: 5
-│  ├──-1: 
+│  ├──-1:
 │  ├──81: impl OpenStrategy {
 │  ├──+1:     fn from(editor: &str) -> Self {
-│  ├──-1: 
+│  ├──-1:
 │  ├──93: pub struct SelectMenu<'a, 'b> {
 │  ├──+1:     jump: JumpLocation,
-│  ├──-1: 
+│  ├──-1:
 │  ├──110: struct Window {
 │  ├──+1:     first: isize,
-│  ├──-1: 
+│  ├──-1:
 │  ├──115: impl Window {
 │  ├──+1:     pub fn shift_up(&mut self) {
-│  ├──-1: 
+│  ├──-1:
 │  ├──136: impl JumpLocation {
 │  ╰──+1:     fn default() -> Self {
 ├──config.rs: 6
-│  ├──-1: 
+│  ├──-1:
 │  ├──15: pub struct KeyBindings {
 │  ├──+1:     pub down: Vec<KeyCode>,
-│  ├──-1: 
+│  ├──-1:
 │  ├──35: pub struct Characters {
 │  ├──+1:     pub bl: char,
-│  ├──-1: 
+│  ├──-1:
 │  ├──51: pub struct Colors {
 │  ├──+1:     pub file: Color,
-│  ├──-1: 
+│  ├──-1:
 │  ├──62: impl args::Color {
 │  ├──+1:     fn get(&self) -> Color {
-│  ├──-1: 
+│  ├──-1:
 │  ├──80: pub struct Config {
 │  ├──+1:     pub path: PathBuf,
-│  ├──-1: 
+│  ├──-1:
 │  ├──186: impl Config {
 │  ╰──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
 ├──args.rs: 7
-│  ├──-1: 
+│  ├──-1:
 │  ├──19: pub struct ArgInfo {
 │  ├──+1:     pub id: &'static str,
-│  ├──-1: 
+│  ├──-1:
 │  ├──25: impl ArgInfo {
 │  ├──+1:     const fn new(id: &'static str, h: &'static str, s: Option<char>) -> Self {
-│  ├──-1: 
+│  ├──-1:
 │  ├──40: impl ValueEnum for OpenStrategy {
 │  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
 │  ├──-1: #[derive(Clone)]
 │  ├──85: struct ColorParser;
-│  ├──+1: 
+│  ├──+1:
 │  ├──87: impl clap::builder::TypedValueParser for ColorParser {
 │  ├──+1:     type Value = Color;
 │  ├──-1: #[derive(Clone)]
 │  ├──173: struct KeyCodeParser;
-│  ├──+1: 
+│  ├──+1:
 │  ├──175: impl clap::builder::TypedValueParser for KeyCodeParser {
 │  ╰──+1:     type Value = KeyCode;
 ╰──writer.rs: 9
-   ├──-1: 
+   ├──-1:
    ├──26: pub struct OpenInfo<'a> {
    ├──+1:     pub path: &'a Path,
-   ├──-1: 
+   ├──-1:
    ├──37: struct PathDisplay<'a> {
    ├──+1:     prefix: Option<Vec<PrefixComponent>>,
-   ├──-1: 
+   ├──-1:
    ├──150: struct LineDisplay<'a> {
    ├──+1:     prefix: Vec<PrefixComponent>,
-   ├──-1: 
+   ├──-1:
    ├──279: struct LongBranchDisplay<'a> {
    ├──+1:     prefix: Vec<PrefixComponent>,
-   ├──-1: 
+   ├──-1:
    ├──320: struct OverviewDisplay {
    ├──+1:     dirs: usize,
-   ├──-1: 
+   ├──-1:
    ├──328: impl Entry for OverviewDisplay {
    ├──+1:     fn open_info(&self) -> Result<OpenInfo<'_>, Message> {
-   ├──-1: 
+   ├──-1:
    ├──340: impl Display for OverviewDisplay {
    ├──+1:     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
-   ├──-1: 
+   ├──-1:
    ├──388: impl Directory {
    ├──+1:     fn to_lines<'a>(
-   ├──-1: 
+   ├──-1:
    ├──473: impl File {
    ╰──+1:     fn to_lines<'a>(
 ```
@@ -495,6 +495,9 @@ options:
       --selected-bg-color <>
           black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
 
+      --search-highlight-color <>
+          black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
+
       --prefix-len <>
           number of characters to show before a match
           
@@ -618,6 +621,11 @@ options:
           fold/unfold path
           
           [default: tab]
+
+      --key-search <>
+          search within results
+          
+          [default: / s]
 
   -h, --help
           print help

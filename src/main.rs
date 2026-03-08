@@ -77,6 +77,7 @@ fn build_config_and_term(
 ) -> Result<(Config, Term), Message> {
     let mut c = Config::get_config(matches, all_args, bold, colors)?;
     if let Some(mut new_c) = c.handle_repeat()? {
+        new_c.select = c.select;
         new_c.selection_file = c.selection_file;
         c = new_c;
     }
