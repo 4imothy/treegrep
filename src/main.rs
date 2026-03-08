@@ -114,7 +114,7 @@ fn run(term: &mut Term, mut c: Config) -> Result<(), Message> {
         if !config().menu {
             term.claim().map_err(|e| mes!("{}", e))?;
         }
-        SelectMenu::launch(term, &lines).map_err(|e| {
+        SelectMenu::launch(term, lines).map_err(|e| {
             let _ = term.give();
             mes!("{}", e)
         })?;

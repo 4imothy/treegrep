@@ -30,6 +30,7 @@ pub struct KeyBindings {
     pub quit: Vec<KeyCode>,
     pub open: Vec<KeyCode>,
     pub fold: Vec<KeyCode>,
+    pub search: Vec<KeyCode>,
 }
 
 pub struct Characters {
@@ -57,6 +58,7 @@ pub struct Colors {
     pub selected_indicator: Option<Color>,
     pub selected_bg: Color,
     pub matches: Vec<Color>,
+    pub search_highlight: Color,
 }
 
 impl args::Color {
@@ -393,6 +395,10 @@ impl Config {
             selected_indicator: matches
                 .get_one::<args::Color>(args::SELECTED_INDICATOR_COLOR.id)
                 .map(|v| v.get()),
+            search_highlight: matches
+                .get_one::<args::Color>(args::SEARCH_HIGHLIGHT_COLOR.id)
+                .map(|v| v.get())
+                .unwrap_or(style::SEARCH_HIGHLIGHT_DEFAULT),
             matches: matches
                 .get_many::<args::Color>(args::MATCH_COLORS.id)
                 .map(|vals| vals.cloned().map(|v| v.get()).collect::<Vec<_>>())
@@ -482,6 +488,7 @@ impl Config {
             quit: get_keys(args::KEY_QUIT.id),
             open: get_keys(args::KEY_OPEN.id),
             fold: get_keys(args::KEY_FOLD.id),
+            search: get_keys(args::KEY_SEARCH.id),
         }
     }
 }

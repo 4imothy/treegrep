@@ -289,7 +289,8 @@ pub const HELP: ArgInfo = ArgInfo::new("help", "print help", Some('h'));
 pub const VERSION: ArgInfo = ArgInfo::new("version", "print version", Some('V'));
 pub const FILES: ArgInfo = ArgInfo::new(
     "files",
-    "if an expression is given, hide matched content, otherwise, show the files that would be searched",
+    "if an expression is given, hide matched content, \
+     otherwise, show the files that would be searched",
     Some('f'),
 );
 pub const MAX_DEPTH: ArgInfo = ArgInfo::new("max-depth", "the max depth to search", Some('d'));
@@ -325,6 +326,7 @@ pub const KEY_HELP: ArgInfo = ArgInfo::new("key-help", "show help", None);
 pub const KEY_QUIT: ArgInfo = ArgInfo::new("key-quit", "quit", None);
 pub const KEY_OPEN: ArgInfo = ArgInfo::new("key-open", "open selection", None);
 pub const KEY_FOLD: ArgInfo = ArgInfo::new("key-fold", "fold/unfold path", None);
+pub const KEY_SEARCH: ArgInfo = ArgInfo::new("key-search", "search within results", None);
 pub const EDITOR: ArgInfo = ArgInfo::new("editor", "command used to open selections", None);
 pub const OPEN_LIKE: ArgInfo = ArgInfo::new(
     "open-like",
@@ -378,6 +380,8 @@ pub const SELECTED_INDICATOR_COLOR: ArgInfo =
     ArgInfo::new("selected-indicator-color", COLOR_HELP, None);
 pub const SELECTED_BG_COLOR: ArgInfo = ArgInfo::new("selected-bg-color", COLOR_HELP, None);
 pub const MATCH_COLORS: ArgInfo = ArgInfo::new("match-colors", COLOR_HELP, None);
+pub const SEARCH_HIGHLIGHT_COLOR: ArgInfo =
+    ArgInfo::new("search-highlight-color", COLOR_HELP, None);
 pub const SELECTED_INDICATOR: ArgInfo =
     ArgInfo::new("selected-indicator", "selected indicator characters", None);
 pub const DEFAULT_SELECTED_INDICATOR: &str = "─❱ ";
@@ -423,7 +427,8 @@ pub fn generate_command() -> Command {
         .help_template(HELP_TEMPLATE.to_owned())
         .args_override_self(true)
         .after_help(format!(
-            "arguments are prefixed with the contents of the {DEFAULT_OPTS_ENV_NAME} environment variable"
+            "arguments are prefixed with the contents of \
+             the {DEFAULT_OPTS_ENV_NAME} environment variable"
         ))
         .author(env!("CARGO_PKG_AUTHORS"))
         .disable_help_flag(true)
@@ -608,6 +613,7 @@ fn get_args() -> Vec<Arg> {
         color_arg(MATCH_COLORS).value_delimiter(','),
         color_arg(SELECTED_INDICATOR_COLOR),
         color_arg(SELECTED_BG_COLOR),
+        color_arg(SEARCH_HIGHLIGHT_COLOR),
         hidden_usize_arg(&PREFIX_LEN, Some(DEFAULT_PREFIX_LEN)),
         hidden_usize_arg(&LONG_BRANCHES_EACH, Some(DEFAULT_LONG_BRANCH_EACH))
             .requires(LONG_BRANCHES.id),
@@ -637,6 +643,7 @@ fn get_args() -> Vec<Arg> {
         key_arg(KEY_QUIT, &["q"]),
         key_arg(KEY_OPEN, &["enter"]),
         key_arg(KEY_FOLD, &["tab"]),
+        key_arg(KEY_SEARCH, &["/", "s"]),
         help,
         version,
     ]

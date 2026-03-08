@@ -13,9 +13,10 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, MouseEventKind},
     queue,
     style::{Print, SetBackgroundColor},
-    terminal,
+    terminal::{self, ClearType},
 };
 use std::{
+    collections::HashSet,
     ffi::OsString,
     io::{self, Write},
     process::Command,
@@ -33,6 +34,12 @@ enum OpenResult {
     Continue,
     Exit,
     Open(OsString, Option<usize>),
+}
+
+enum Mode {
+    Normal,
+    Search,
+    Help,
 }
 
 fn format_keys(keys: &[KeyCode]) -> String {
@@ -54,6 +61,7 @@ fn menu_help_popup() -> String {
          \x20- page up/down: {}/{}\n\
          \x20- center cursor: {}\n\
          \x20- fold/unfold: {}\n\
+         \x20- search: {} (esc to clear, enter to keep)\n\
          \x20- open: {}\n\
          \x20- scrolling and clicking\n\
          \x20- quit: {} or ctrl+c\n\
@@ -72,6 +80,7 @@ fn menu_help_popup() -> String {
         format_keys(&k.page_down),
         format_keys(&k.center),
         format_keys(&k.fold),
+        format_keys(&k.search),
         format_keys(&k.open),
         format_keys(&k.quit),
         format_keys(&k.quit),
@@ -96,15 +105,16 @@ pub struct SelectMenu<'a, 'b> {
     cursor_y: u16,
     term: &'a mut Term<'b>,
     max: usize,
-    lines: &'a Vec<Box<dyn Entry + 'a>>,
+    lines: Vec<Box<dyn Entry + 'a>>,
     colors: bool,
     scroll_offset: u16,
     big_jump: u16,
     small_jump: u16,
-    popup_open: bool,
+    mode: Mode,
     window: Window,
-    folded: Vec<usize>,
+    folded: HashSet<usize>,
     visible: Vec<usize>,
+    search_query: String,
 }
 
 struct Window {
@@ -152,8 +162,9 @@ impl JumpLocation {
 impl<'a, 'b> SelectMenu<'a, 'b> {
     pub fn enter(
         term: &'a mut Term<'b>,
-        lines: &'a Vec<Box<dyn Entry + 'a>>,
+        lines: Vec<Box<dyn Entry + 'a>>,
     ) -> io::Result<SelectMenu<'a, 'b>> {
+        let all: Vec<usize> = (0..lines.len()).collect();
         let mut menu = SelectMenu {
             selected_id: 0,
             jump: JumpLocation::default(),
@@ -166,9 +177,10 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             scroll_offset: 0,
             big_jump: 0,
             small_jump: 0,
-            popup_open: false,
-            folded: Vec::new(),
-            visible: (0..lines.len()).collect(),
+            mode: Mode::Normal,
+            folded: HashSet::new(),
+            visible: all,
+            search_query: String::new(),
         };
         menu.update_offsets_and_jumps();
         Ok(menu)
@@ -177,17 +189,27 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     fn down_select(&mut self, amount: usize) {
         self.selected_id += amount;
     }
-
     fn up_select(&mut self, amount: usize) {
         self.selected_id -= amount;
     }
 
+    fn content_height(&self) -> u16 {
+        if matches!(self.mode, Mode::Search) || !self.search_query.is_empty() {
+            self.term.height.saturating_sub(1)
+        } else {
+            self.term.height
+        }
+    }
+
     fn max_cursor_y(&self) -> u16 {
-        self.term.height - 1
+        self.content_height().saturating_sub(1)
+    }
+    fn has_search_bar(&self) -> bool {
+        self.content_height() < self.term.height
     }
 
     fn down_page(&mut self) -> io::Result<()> {
-        let dist = (self.term.height as usize).min(self.max - self.selected_id);
+        let dist = (self.content_height() as usize).min(self.max - self.selected_id);
         if dist != 0 {
             self.jump_down(dist)
         } else {
@@ -196,7 +218,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     }
 
     fn up_page(&mut self) -> io::Result<()> {
-        let dist = (self.term.height as usize).min(self.selected_id);
+        let dist = (self.content_height() as usize).min(self.selected_id);
         if dist != 0 {
             self.jump_up(dist)
         } else {
@@ -211,7 +233,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     }
 
     fn print_line(&mut self, orig: usize) -> io::Result<()> {
-        queue!(self.term, Print(&self.lines[orig]))?;
+        queue!(self.term, Print(&*self.lines[orig]))?;
         if self.folded.contains(&orig) {
             queue!(self.term, Print(config().chars.ellipsis))?;
         }
@@ -232,31 +254,86 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         if !self.lines[orig].is_path() {
             return Ok(());
         }
-        let fold_end = self.fold_end(orig);
-        let after = self.selected_id + 1;
-        if let Some(pos) = self.folded.iter().position(|&v| v == orig) {
-            self.folded.swap_remove(pos);
-            let mut to_insert = Vec::new();
-            let mut i = orig + 1;
-            while i < fold_end {
-                to_insert.push(i);
-                if self.folded.contains(&i) {
-                    i = self.fold_end(i);
-                } else {
-                    i += 1;
+        if !self.folded.remove(&orig) {
+            self.folded.insert(orig);
+        }
+        self.update_visible();
+        self.draw()
+    }
+
+    fn update_visible(&mut self) {
+        let lower = self.search_query.to_lowercase();
+        for line in &mut self.lines {
+            line.set_search(&lower);
+        }
+        let include = if lower.is_empty() {
+            None
+        } else {
+            let mut matches = vec![false; self.lines.len()];
+            for (i, m) in matches.iter_mut().enumerate().take(self.lines.len()) {
+                if self.lines[i].search_text().to_lowercase().contains(&lower) {
+                    *m = true;
                 }
             }
-            self.visible.splice(after..after, to_insert);
-        } else {
-            self.folded.push(orig);
-            let end = self.visible[after..]
-                .iter()
-                .position(|&o| o >= fold_end)
-                .map_or(self.visible.len(), |p| after + p);
-            self.visible.drain(after..end);
+            for i in (0..self.lines.len()).rev() {
+                if self.lines[i].is_path() && !matches[i] {
+                    let end = self.fold_end(i);
+                    if (i + 1..end).any(|j| matches[j]) {
+                        matches[i] = true;
+                    }
+                }
+            }
+            Some(matches)
+        };
+
+        let mut visible = Vec::new();
+        let mut i = 0;
+        while i < self.lines.len() {
+            if include.as_ref().is_none_or(|inc| inc[i]) {
+                visible.push(i);
+            }
+            if self.folded.contains(&i) {
+                i = self.fold_end(i);
+            } else {
+                i += 1;
+            }
         }
-        self.max = self.visible.len() - 1;
-        self.draw()
+        self.visible = visible;
+        self.max = self.visible.len().saturating_sub(1);
+        if !self.visible.is_empty() {
+            self.selected_id = self.selected_id.min(self.max);
+            let max_cy = self.max_cursor_y();
+            if self.cursor_y > max_cy {
+                self.cursor_y = max_cy;
+            }
+        }
+    }
+
+    fn draw_search_bar(&mut self) -> io::Result<()> {
+        if !matches!(self.mode, Mode::Search) && self.search_query.is_empty() {
+            return Ok(());
+        }
+        let y = self.term.height - 1;
+        let prompt = format!("/{}", self.search_query);
+        let width = self.term.width() as usize;
+        queue!(
+            self.term,
+            cursor::MoveTo(0, y),
+            terminal::Clear(ClearType::CurrentLine),
+            Print(format!(
+                "{:<width$}",
+                prompt,
+                width = width.min(prompt.len() + 1)
+            )),
+        )?;
+        if matches!(self.mode, Mode::Search) {
+            queue!(
+                self.term,
+                cursor::Show,
+                cursor::MoveTo(prompt.chars().count() as u16, y),
+            )?;
+        }
+        Ok(())
     }
 
     fn open_selected(&mut self) -> io::Result<OpenResult> {
@@ -286,7 +363,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
         }
     }
 
-    pub fn launch(term: &mut Term, lines: &'a Vec<Box<dyn Entry + 'a>>) -> io::Result<()> {
+    pub fn launch(term: &mut Term, lines: Vec<Box<dyn Entry + 'a>>) -> io::Result<()> {
         let mut menu: SelectMenu = SelectMenu::enter(term, lines)?;
 
         menu.draw()?;
@@ -304,68 +381,106 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                     kind: KeyEventKind::Press,
                     ..
                 }) => {
-                    if !menu.popup_open {
-                        let keys = &config().keys;
-                        match code {
-                            _ if keys.down.contains(&code) => menu.down(menu.small_jump)?,
-                            _ if keys.up.contains(&code) => menu.up(menu.small_jump)?,
-                            _ if keys.big_down.contains(&code) => menu.down(menu.big_jump)?,
-                            _ if keys.big_up.contains(&code) => menu.up(menu.big_jump)?,
-                            _ if keys.down_path.contains(&code) => menu.down_path()?,
-                            _ if keys.up_path.contains(&code) => menu.up_path()?,
-                            _ if keys.down_same_depth.contains(&code) => {
-                                menu.down_path_same_depth()?
-                            }
-                            _ if keys.up_same_depth.contains(&code) => menu.up_path_same_depth()?,
-                            _ if keys.bottom.contains(&code) => menu.bottom()?,
-                            _ if keys.top.contains(&code) => menu.top()?,
-                            _ if keys.page_down.contains(&code) => menu.down_page()?,
-                            _ if keys.page_up.contains(&code) => menu.up_page()?,
-                            _ if keys.help.contains(&code) => menu.popup(menu_help_popup())?,
-                            _ if keys.center.contains(&code)
-                                && !modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
-                            {
-                                menu.jump_cursor(menu.jump)?;
-                                menu.jump.next();
-                                cursor_jump = true;
-                            }
-                            _ if keys.fold.contains(&code) => menu.toggle_fold()?,
-                            _ if keys.open.contains(&code) => match menu.open_selected()? {
-                                OpenResult::Continue => {}
-                                OpenResult::Exit => break,
-                                OpenResult::Open(path, line) => {
-                                    menu.term.give()?;
-                                    return menu.exit_and_open(path, line);
+                    let ctrl = modifiers.contains(crossterm::event::KeyModifiers::CONTROL);
+                    match menu.mode {
+                        Mode::Search => match code {
+                            KeyCode::Char(c) if !ctrl => {
+                                menu.search_query.push(c);
+                                menu.update_visible();
+                                if !event::poll(Duration::ZERO)? {
+                                    menu.draw()?;
                                 }
-                            },
-                            _ => {}
-                        }
-                    }
-                    match code {
-                        _ if config().keys.quit.contains(&code) => {
-                            if menu.popup_open {
-                                menu.popup_open = false;
+                            }
+                            KeyCode::Backspace | KeyCode::Delete => {
+                                if !menu.search_query.is_empty() {
+                                    menu.search_query.pop();
+                                    menu.update_visible();
+                                    if !event::poll(Duration::ZERO)? {
+                                        menu.draw()?;
+                                    }
+                                }
+                            }
+                            KeyCode::Esc => {
+                                menu.search_query.clear();
+                                menu.mode = Mode::Normal;
+                                queue!(menu.term, cursor::Hide)?;
+                                menu.update_visible();
                                 menu.draw()?;
-                            } else {
-                                break;
+                            }
+                            KeyCode::Enter => {
+                                menu.mode = Mode::Normal;
+                                queue!(menu.term, cursor::Hide)?;
+                                menu.draw()?;
+                            }
+                            KeyCode::Char('c') if ctrl => break,
+                            _ => {}
+                        },
+                        Mode::Normal => {
+                            let keys = &config().keys;
+                            match code {
+                                _ if keys.down.contains(&code) => menu.down(menu.small_jump)?,
+                                _ if keys.up.contains(&code) => menu.up(menu.small_jump)?,
+                                _ if keys.big_down.contains(&code) => menu.down(menu.big_jump)?,
+                                _ if keys.big_up.contains(&code) => menu.up(menu.big_jump)?,
+                                _ if keys.down_path.contains(&code) => menu.down_path()?,
+                                _ if keys.up_path.contains(&code) => menu.up_path()?,
+                                _ if keys.down_same_depth.contains(&code) => {
+                                    menu.down_path_same_depth()?
+                                }
+                                _ if keys.up_same_depth.contains(&code) => {
+                                    menu.up_path_same_depth()?
+                                }
+                                _ if keys.bottom.contains(&code) => menu.bottom()?,
+                                _ if keys.top.contains(&code) => menu.top()?,
+                                _ if keys.page_down.contains(&code) => menu.down_page()?,
+                                _ if keys.page_up.contains(&code) => menu.up_page()?,
+                                _ if keys.help.contains(&code) => menu.popup(menu_help_popup())?,
+                                _ if keys.center.contains(&code) && !ctrl => {
+                                    menu.jump_cursor(menu.jump)?;
+                                    menu.jump.next();
+                                    cursor_jump = true;
+                                }
+                                _ if keys.fold.contains(&code) => menu.toggle_fold()?,
+                                _ if keys.open.contains(&code) => match menu.open_selected()? {
+                                    OpenResult::Continue => {}
+                                    OpenResult::Exit => break,
+                                    OpenResult::Open(path, line) => {
+                                        menu.term.give()?;
+                                        return menu.exit_and_open(path, line);
+                                    }
+                                },
+                                _ if keys.search.contains(&code) => {
+                                    menu.mode = Mode::Search;
+                                    menu.draw()?;
+                                }
+                                _ if keys.quit.contains(&code) => break,
+                                _ => {}
+                            }
+                            match code {
+                                KeyCode::Char('z') if ctrl => {
+                                    menu.term.suspend()?;
+                                    menu.resume()?;
+                                }
+                                KeyCode::Char('c') if ctrl => break,
+                                _ => {}
                             }
                         }
-                        KeyCode::Char('z')
-                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
-                        {
-                            menu.term.suspend()?;
-                            menu.resume()?;
-                        }
-                        KeyCode::Char('c')
-                            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
-                        {
-                            break;
-                        }
-                        _ => {}
+                        Mode::Help => match code {
+                            _ if config().keys.quit.contains(&code) => {
+                                menu.mode = Mode::Normal;
+                                menu.draw()?;
+                            }
+                            KeyCode::Char('z') if ctrl => {
+                                menu.term.suspend()?;
+                                menu.resume()?;
+                            }
+                            KeyCode::Char('c') if ctrl => break,
+                            _ => {}
+                        },
                     }
                 }
                 Event::Mouse(mouse_event) => {
-                    if !menu.popup_open {
+                    if matches!(menu.mode, Mode::Normal) {
                         match mouse_event.kind {
                             MouseEventKind::ScrollUp => {
                                 menu.up_scroll()?;
@@ -443,13 +558,21 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
 
     fn draw(&mut self) -> io::Result<()> {
         self.term.clear()?;
+        if matches!(self.mode, Mode::Help) {
+            self.mode = Mode::Normal;
+        }
 
+        if self.visible.is_empty() {
+            let y = self.content_height() / 2;
+            queue!(self.term, cursor::MoveTo(0, y), Print("no results"),)?;
+            self.draw_search_bar()?;
+            return self.term.flush();
+        }
+
+        let height = self.content_height();
         let first = self.selected_id as isize - self.cursor_y as isize;
-
         let count_above_cursor = (self.cursor_y as usize).min(self.selected_id);
-
-        let take =
-            (count_above_cursor + (self.term.height - self.cursor_y) as usize).min(self.max + 1);
+        let take = (count_above_cursor + (height - self.cursor_y) as usize).min(self.max + 1);
         let skip = first.max(0) as usize;
         self.window.set(first, (skip + take - 1) as isize);
 
@@ -464,7 +587,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             self.print_line(orig)?;
         }
         self.style_selected()?;
-        self.popup_open = false;
+        self.draw_search_bar()?;
         self.term.flush()
     }
 
@@ -485,8 +608,14 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
             .then(|| self.visible.get(line_id as usize).copied())
             .flatten();
         if let Some(orig) = orig {
+            if self.has_search_bar() {
+                let bar_y = self.term.height - 1;
+                queue!(self.term, cursor::MoveTo(0, bar_y))?;
+                queue!(self.term, terminal::Clear(ClearType::CurrentLine))?;
+            }
             queue!(self.term, scroll, cursor::MoveTo(start_x(), y))?;
             self.print_line(orig)?;
+            self.draw_search_bar()?;
         }
         Ok(())
     }
@@ -556,7 +685,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
 
     fn jump_cursor(&mut self, loc: JumpLocation) -> io::Result<()> {
         let y = match loc {
-            JumpLocation::Middle => self.term.height / 2,
+            JumpLocation::Middle => self.content_height() / 2,
             JumpLocation::Top => 0,
             JumpLocation::Bottom => self.max_cursor_y(),
         };
@@ -571,7 +700,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
     fn resize(&mut self, new_height: u16, new_width: u16) -> io::Result<()> {
         self.term.set_dims(new_height, new_width);
         self.update_offsets_and_jumps();
-        if self.cursor_y as usize > (self.term.height / 2) as usize {
+        if self.cursor_y as usize > (self.content_height() / 2) as usize {
             self.jump_cursor(JumpLocation::Middle)
         } else {
             self.draw()
@@ -776,7 +905,7 @@ impl<'a, 'b> SelectMenu<'a, 'b> {
                 config().chars.br,
             ))
         )?;
-        self.popup_open = true;
+        self.mode = Mode::Help;
         self.term.flush()?;
 
         Ok(())

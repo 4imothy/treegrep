@@ -18,6 +18,7 @@ pub const DIR_COLOR_DEFAULT: Color = Color::Blue;
 pub const LINE_NUMBER_COLOR_DEFAULT: Color = Color::Yellow;
 pub const MATCHED_COLORS_DEFAULT: [Color; 3] = [Color::Green, Color::Magenta, Color::Red];
 pub const SELECTED_BG_DEFAULT: Color = Color::DarkGrey;
+pub const SEARCH_HIGHLIGHT_DEFAULT: Color = Color::Black;
 
 pub const DEFAULT_VERTICAL: char = '│';
 pub const DEFAULT_HORIZONTAL: char = '─';
@@ -70,4 +71,20 @@ pub fn match_substring(orig: &str, regexp_id: usize) -> StyledContent<&str> {
         orig,
         config().colors.matches[regexp_id % config().colors.matches.len()],
     )
+}
+
+pub fn style_with_on<D: Display>(orig: D, fg: Color, bg: Color) -> StyledContent<D> {
+    let mut s = style_with(orig, fg);
+    if config().with_colors {
+        s = s.on(bg);
+    }
+    s
+}
+
+pub fn style_on<D: Display>(orig: D, bg: Color) -> StyledContent<D> {
+    let mut s = style(orig);
+    if config().with_colors {
+        s = s.on(bg);
+    }
+    s
 }
