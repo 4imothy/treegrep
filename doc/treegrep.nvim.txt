@@ -7,7 +7,7 @@ Selections are stored in a file and opened.
 ==============================================================================
 CONFIGURATION                                              *treegrep.lua.config*
 
-All options are set via `require('tgrep').setup({...})`.
+All options are set via `require('treegrep').setup({...})`.
 
 - *selection_file* (string, required)
   Path to the file used to store selections

@@ -12,9 +12,9 @@ EXAMPLES = '### examples'
 
 EXAMPLES_TO_RUN = [
     ['--regexp', r'\bstruct\s+\w+', '--regexp', r'\bimpl\s+\w+', '--path', 'src', '--line-number', '--context=1', '--count'],
-    ['Print', os.path.join('src', 'select_menu.rs'), '--trim', '--line-number', '--char-vertical=|', '--char-horizontal=-', '--char-top-left=+', '--char-top-right=+', '--char-bottom-left=+', '--char-bottom-right=+', '--char-tee=+', '--char-ellipsis=|'],
+    ['Print', os.path.join('src', 'menu.rs'), '--trim', '--line-number', '--char-vertical=|', '--char-horizontal=-', '--char-top-left=+', '--char-top-right=+', '--char-bottom-left=+', '--char-bottom-right=+', '--char-tee=+'],
     ['--files', '--hidden', '--glob=!.git'],
-    ['--files', '--long-branch', '--hidden', '--glob=!.git']
+    ['--files', '--branch-each=5', '--hidden', '--glob=!.git']
 ]
 
 def run_and_capture_examples(examples):
@@ -39,7 +39,8 @@ def run_and_capture_examples(examples):
             )
             outputs.append(output)
         except subprocess.CalledProcessError as e:
-            print(f'error running example {cmd}: {e}')
+            print('error running example:')
+            print(f'{' '.join(full_cmd)}')
             return None
     return outputs
 
@@ -76,7 +77,6 @@ def update_readme(examples):
         if examples:
             example_outputs = run_and_capture_examples(EXAMPLES_TO_RUN)
             if not example_outputs:
-                print('failed to generate example outputs')
                 exit(1)
             f.write(EXAMPLES + '\n')
             for output in example_outputs:

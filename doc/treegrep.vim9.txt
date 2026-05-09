@@ -28,9 +28,9 @@ CONFIGURATION                                             *treegrep.vim9.config*
 ==============================================================================
 FUNCTIONS                                              *treegrep.vim9.functions*
 
-*g:TgrepFloat({args})*
+*g:TgrepWith({args})*
 >
-    call g:TgrepFloat(...)
+    call g:TgrepWith(...)
 <
 Runs the `tgrep` binary in a floating window with the passed arguments.
 

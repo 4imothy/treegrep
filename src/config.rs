@@ -1,17 +1,30 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    args::{self, OpenStrategy, REPEAT_FILE, generate_command},
+    args::{self, Args, OpenStrategy, REPEAT_FILE, generate_command},
     errors::Message,
     mes, style,
 };
-use clap::{ArgMatches, Error};
+use clap::{ArgMatches, Error, FromArgMatches};
 use crossterm::{event::KeyCode, style::Color};
 use std::{
+    collections::HashSet,
     ffi::OsString,
     path::{Component, Path, PathBuf},
+    sync::{Arc, OnceLock},
 };
 
+static CONFIG: OnceLock<Arc<Config>> = OnceLock::new();
+
+pub fn base_config() -> Arc<Config> {
+    Arc::clone(CONFIG.get().unwrap())
+}
+
+pub fn set_config(c: Config) {
+    CONFIG.set(Arc::new(c)).ok().unwrap();
+}
+
+#[derive(Clone)]
 pub struct KeyBindings {
     pub down: Vec<KeyCode>,
     pub up: Vec<KeyCode>,
@@ -25,14 +38,17 @@ pub struct KeyBindings {
     pub bottom: Vec<KeyCode>,
     pub page_down: Vec<KeyCode>,
     pub page_up: Vec<KeyCode>,
-    pub center: Vec<KeyCode>,
+    pub cycle_view: Vec<KeyCode>,
     pub help: Vec<KeyCode>,
     pub quit: Vec<KeyCode>,
     pub open: Vec<KeyCode>,
     pub fold: Vec<KeyCode>,
+    pub filter: Vec<KeyCode>,
     pub search: Vec<KeyCode>,
+    pub submit_search: Vec<KeyCode>,
 }
 
+#[derive(Clone)]
 pub struct Characters {
     pub bl: char,
     pub br: char,
@@ -40,15 +56,20 @@ pub struct Characters {
     pub tr: char,
     pub v: char,
     pub h: char,
+    pub tee: char,
     pub match_with_next: String,
     pub match_no_next: String,
     pub spacer_vert: String,
     pub spacer: String,
     pub selected_indicator: String,
     pub selected_indicator_clear: String,
-    pub ellipsis: char,
+    pub ellipsis: String,
+    pub search_prompt: String,
+    pub search_prompt_inactive: String,
+    pub filter_prompt: String,
 }
 
+#[derive(Clone)]
 pub struct Colors {
     pub file: Color,
     pub dir: Color,
@@ -58,7 +79,7 @@ pub struct Colors {
     pub selected_indicator: Option<Color>,
     pub selected_bg: Color,
     pub matches: Vec<Color>,
-    pub search_highlight: Color,
+    pub filter_highlight: Color,
 }
 
 impl args::Color {
@@ -79,42 +100,48 @@ impl args::Color {
     }
 }
 
-pub struct Config {
-    pub path: PathBuf,
+#[derive(Clone)]
+pub struct CoreConfig {
     pub selection_file: Option<PathBuf>,
     pub repeat_file: Option<PathBuf>,
-    pub long_branch: bool,
-    pub with_bold: bool,
-    pub with_colors: bool,
-    pub is_dir: bool,
-    pub regexps: Vec<String>,
-    pub globs: Vec<String>,
-    pub count: bool,
-    pub hidden: bool,
-    pub line_number: bool,
     pub select: bool,
     pub menu: bool,
-    pub files: bool,
-    pub just_files: bool,
-    pub overview: bool,
-    pub links: bool,
-    pub ignore: bool,
-    pub max_depth: Option<usize>,
+    pub live: bool,
+    pub auto_open: bool,
+    pub repeat: bool,
     pub threads: usize,
-    pub max_length: Option<usize>,
-    pub prefix_len: usize,
-    pub long_branch_each: usize,
-    pub trim: bool,
-    pub before_context: usize,
-    pub after_context: usize,
     pub editor: Option<String>,
     pub open_like: Option<OpenStrategy>,
     pub completion_target: Option<clap_complete::Shell>,
-    pub repeat: bool,
+    pub keys: KeyBindings,
     pub all_args: Vec<OsString>,
+}
+
+#[derive(Clone)]
+pub struct Config {
+    pub path: PathBuf,
+    pub is_dir: bool,
+    pub regexps: Vec<String>,
+    pub globs: Vec<String>,
+    pub hidden: bool,
+    pub line_number: bool,
+    pub files: bool,
+    pub count: bool,
+    pub links: bool,
+    pub trim: bool,
+    pub ignore: bool,
+    pub max_depth: Option<usize>,
+    pub max_length: Option<usize>,
+    pub before_context: usize,
+    pub after_context: usize,
+    pub overview: bool,
+    pub with_bold: bool,
+    pub branch_each: usize,
+    pub with_colors: bool,
+    pub prefix_len: usize,
     pub chars: Characters,
     pub colors: Colors,
-    pub keys: KeyBindings,
+    pub core: CoreConfig,
 }
 
 fn canonicalize(p: &Path) -> Result<PathBuf, Message> {
@@ -149,18 +176,6 @@ fn process_path(input: &Path, check_exists: bool) -> Result<PathBuf, Message> {
     }
 }
 
-fn get_usize_option(matches: &ArgMatches, name: &str) -> Result<Option<usize>, Message> {
-    matches.get_one::<String>(name).map_or(Ok(None), |s| {
-        s.parse::<usize>()
-            .map(Some)
-            .map_err(|_| mes!("failed to parse `{}` to a usize for option `{}`", s, name))
-    })
-}
-
-fn get_usize_option_with_default(matches: &ArgMatches, name: &str) -> Result<usize, Message> {
-    Ok(get_usize_option(matches, name)?.unwrap())
-}
-
 fn get_all_args(mut args: Vec<OsString>) -> Vec<OsString> {
     if let Some(env_args) = std::env::var_os(args::DEFAULT_OPTS_ENV_NAME) {
         args.splice(
@@ -181,12 +196,221 @@ pub fn get_matches(args: Vec<OsString>) -> Result<(ArgMatches, Vec<OsString>), E
         .map(|m| (m, args))
 }
 
+fn apply_matches(
+    core: CoreConfig,
+    matches: &ArgMatches,
+    only_explicit: bool,
+) -> Result<Config, Message> {
+    let args = Args::from_arg_matches(matches).map_err(|e| mes!("{}", e))?;
+
+    if only_explicit {
+        let applies =
+            |id: &str| matches.value_source(id) == Some(clap::parser::ValueSource::CommandLine);
+        let mut c = (*base_config()).clone();
+        c.core = core;
+        if let Some(p) = args.positional_path.as_ref().or(args.path.as_ref()) {
+            c.path = process_path(p, true)?;
+            c.is_dir = c.path.is_dir();
+        }
+        if applies(args::EXPRESSION_POSITIONAL) || applies(args::EXPRESSION) {
+            c.regexps.clear();
+            if let Some(expr) = &args.positional_regexp {
+                c.regexps.push(expr.clone());
+            }
+            c.regexps.extend(args.regexp.iter().cloned());
+        }
+        if applies(args::GLOB) {
+            c.globs = args.glob.clone();
+        }
+        if applies(args::HIDDEN) {
+            c.hidden = args.hidden;
+        }
+        if applies(args::LINE_NUMBER) {
+            c.line_number = args.line_number;
+        }
+        if applies(args::FILES) {
+            c.files = args.files;
+        }
+        if applies(args::COUNT) {
+            c.count = args.count;
+        }
+        if applies(args::LINKS) {
+            c.links = args.links;
+        }
+        if applies(args::TRIM_LEFT) {
+            c.trim = args.trim;
+        }
+        if applies(args::NO_IGNORE) {
+            c.ignore = !args.no_ignore;
+        }
+        if applies(args::MAX_DEPTH) {
+            c.max_depth = args.max_depth;
+        }
+        if applies(args::MAX_LENGTH) {
+            c.max_length = args.max_length;
+        }
+        if applies(args::LONG_BRANCHES_EACH) {
+            c.branch_each = args.branch_each;
+        }
+        let context_both = if applies(args::CONTEXT) {
+            args.context.unwrap_or(0)
+        } else {
+            0
+        };
+        if applies(args::BEFORE_CONTEXT) || applies(args::CONTEXT) {
+            c.before_context = args.before_context.unwrap_or(context_both);
+        }
+        if applies(args::AFTER_CONTEXT) || applies(args::CONTEXT) {
+            c.after_context = args.after_context.unwrap_or(context_both);
+        }
+        if applies(args::NO_COLORS) {
+            c.with_colors = !args.no_color;
+        }
+        if applies(args::NO_BOLD) {
+            c.with_bold = !args.no_bold;
+        }
+        if applies(args::OVERVIEW) {
+            c.overview = args.overview;
+        }
+        if applies(args::PREFIX_LEN) {
+            c.prefix_len = args.prefix_len;
+        }
+        if applies(args::CHAR_VERTICAL) {
+            c.chars.v = args.char_vertical;
+        }
+        if applies(args::CHAR_HORIZONTAL) {
+            c.chars.h = args.char_horizontal;
+        }
+        if applies(args::CHAR_TOP_LEFT) {
+            c.chars.tl = args.char_top_left;
+        }
+        if applies(args::CHAR_TOP_RIGHT) {
+            c.chars.tr = args.char_top_right;
+        }
+        if applies(args::CHAR_BOTTOM_LEFT) {
+            c.chars.bl = args.char_bottom_left;
+        }
+        if applies(args::CHAR_BOTTOM_RIGHT) {
+            c.chars.br = args.char_bottom_right;
+        }
+        if applies(args::CHAR_TEE) {
+            c.chars.tee = args.char_tee;
+        }
+        let s = c.prefix_len;
+        c.chars.match_with_next = format!("{}{}", c.chars.tee, style::repeat(c.chars.h, s - 1));
+        c.chars.match_no_next = format!("{}{}", c.chars.bl, style::repeat(c.chars.h, s - 1));
+        c.chars.spacer_vert = format!("{}{}", c.chars.v, style::repeat(' ', s - 1));
+        c.chars.spacer = " ".repeat(s);
+        if applies(args::SELECTED_INDICATOR) {
+            c.chars.selected_indicator_clear = " ".repeat(args.selected_indicator.chars().count());
+            c.chars.selected_indicator = args.selected_indicator.clone();
+        }
+        if applies(args::ELLIPSES) {
+            c.chars.ellipsis = args.ellipsis.clone();
+        }
+        if applies(args::SEARCH_PROMPT) {
+            c.chars.search_prompt = args.search_prompt.clone();
+        }
+        if applies(args::SEARCH_PROMPT_INACTIVE) {
+            c.chars.search_prompt_inactive = args.search_prompt_inactive.clone();
+        }
+        if applies(args::FILTER_PROMPT) {
+            c.chars.filter_prompt = args.filter_prompt.clone();
+        }
+        if applies("file_color")
+            && let Some(v) = &args.file_color
+        {
+            c.colors.file = v.get();
+        }
+        if applies("dir_color")
+            && let Some(v) = &args.dir_color
+        {
+            c.colors.dir = v.get();
+        }
+        if applies("text_color") {
+            c.colors.text = args.text_color.as_ref().map(|v| v.get());
+        }
+        if applies("branch_color") {
+            c.colors.branch = args.branch_color.as_ref().map(|v| v.get());
+        }
+        if applies("line_number_color")
+            && let Some(v) = &args.line_number_color
+        {
+            c.colors.line_number = v.get();
+        }
+        if applies("match_colors") && !args.match_colors.is_empty() {
+            c.colors.matches = args.match_colors.iter().map(|v| v.get()).collect();
+        }
+        if applies("selected_indicator_color") {
+            c.colors.selected_indicator = args.selected_indicator_color.as_ref().map(|v| v.get());
+        }
+        if applies("selected_bg_color")
+            && let Some(v) = &args.selected_bg_color
+        {
+            c.colors.selected_bg = v.get();
+        }
+        if applies("filter_highlight_color")
+            && let Some(v) = &args.filter_highlight_color
+        {
+            c.colors.filter_highlight = v.get();
+        }
+        return Ok(c);
+    }
+
+    let (path, is_dir) = match args.positional_path.as_ref().or(args.path.as_ref()) {
+        Some(p) => {
+            let p = process_path(p, true)?;
+            let d = p.is_dir();
+            (p, d)
+        }
+        None => {
+            let p = canonicalize(
+                &std::env::current_dir()
+                    .map_err(|_| mes!("failed to get current working directory"))?,
+            )?;
+            let d = p.is_dir();
+            (p, d)
+        }
+    };
+    let mut regexps = Vec::new();
+    if let Some(expr) = &args.positional_regexp {
+        regexps.push(expr.clone());
+    }
+    regexps.extend(args.regexp.iter().cloned());
+    let context = args.context.unwrap_or(0);
+    let prefix_len = args.prefix_len;
+    let chars = Config::get_characters(&args);
+    Ok(Config {
+        path,
+        is_dir,
+        regexps,
+        globs: args.glob.clone(),
+        hidden: args.hidden,
+        line_number: args.line_number,
+        files: args.files,
+        count: args.count,
+        links: args.links,
+        trim: args.trim,
+        ignore: !args.no_ignore,
+        max_depth: args.max_depth,
+        max_length: args.max_length,
+        before_context: args.before_context.unwrap_or(context),
+        after_context: args.after_context.unwrap_or(context),
+        overview: args.overview,
+        branch_each: args.branch_each,
+        with_bold: !args.no_bold,
+        with_colors: !args.no_color,
+        prefix_len,
+        chars,
+        colors: Config::get_colors(&args),
+        core,
+    })
+}
+
 impl Config {
     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
-        (
-            !matches.get_flag(args::NO_BOLD.id),
-            !matches.get_flag(args::NO_COLORS.id),
-        )
+        let args = Args::from_arg_matches(matches).expect("failed to parse args");
+        (!args.no_bold, !args.no_color)
     }
 
     fn read_repeat_file(f: &Path) -> Result<Vec<OsString>, Message> {
@@ -210,240 +434,122 @@ impl Config {
     }
 
     pub fn handle_repeat(&self) -> Result<Option<Self>, Message> {
-        if let Some(f) = &self.repeat_file {
-            if self.repeat && !self.menu {
+        if let Some(f) = &self.core.repeat_file {
+            if self.core.repeat {
                 let args = Self::read_repeat_file(f)?;
                 let (matches, all_args) = get_matches(args).map_err(|e| mes!("{}", e))?;
-                let (bold, colors) = Self::get_styling(&matches);
-                Ok(Some(Self::get_config(matches, all_args, bold, colors)?))
-            } else if self.menu {
-                Ok(None)
+                let mut c = Self::get_config(matches, all_args)?;
+                c.core.selection_file = self.core.selection_file.clone();
+                c.core.repeat_file = self.core.repeat_file.clone();
+                c.core.live = self.core.live;
+                c.core.menu = self.core.menu;
+                c.core.select = self.core.select;
+                c.core.editor = self.core.editor.clone();
+                c.core.open_like = self.core.open_like.clone();
+                Ok(Some(c))
             } else {
-                let mut buffer = Vec::new();
-                for arg in self.all_args.iter() {
-                    let bytes = arg.as_encoded_bytes();
-                    let len = bytes.len() as u32;
-                    buffer.extend_from_slice(&len.to_le_bytes());
-                    buffer.extend_from_slice(bytes);
+                if !self.regexps.is_empty() || self.files {
+                    save_to_repeat_file(f, &self.core.all_args)?;
                 }
-                std::fs::write(f, buffer).map_err(|e| mes!("{}", e))?;
                 Ok(None)
             }
-        } else if self.repeat {
-            Err(mes!("cannot repeat without a {} specified", REPEAT_FILE.id))
+        } else if self.core.repeat {
+            Err(mes!("cannot repeat without a {} specified", REPEAT_FILE))
         } else {
             Ok(None)
         }
     }
 
-    pub fn read_repeat_args(&self) -> Option<String> {
-        let f = self.repeat_file.as_ref()?;
-        let args = Self::read_repeat_file(f).ok()?;
-        let strs: Vec<&str> = args
-            .iter()
-            .map(|a| a.to_str())
-            .collect::<Option<Vec<_>>>()?;
-        shlex::try_join(strs).ok()
-    }
+    pub fn get_config(matches: ArgMatches, all_args: Vec<OsString>) -> Result<Self, Message> {
+        let args = Args::from_arg_matches(&matches).map_err(|e| mes!("{}", e))?;
 
-    pub fn get_config(
-        matches: ArgMatches,
-        all_args: Vec<OsString>,
-        bold: bool,
-        colors: bool,
-    ) -> Result<Self, Message> {
-        let mut regexps = Vec::new();
-        if let Some(expr) = matches.get_one::<String>(args::EXPRESSION_POSITIONAL.id) {
-            regexps.push(expr.clone());
-        }
-        if let Some(exprs) = matches.get_many::<String>(args::EXPRESSION.id) {
-            regexps.extend(exprs.cloned());
-        }
-
-        let globs: Vec<String> = matches
-            .get_many::<String>(args::GLOB.id)
-            .map(|exprs| exprs.cloned().collect())
-            .unwrap_or_default();
-
-        let long_branch = matches.get_flag(args::LONG_BRANCHES.id);
-        let count = matches.get_flag(args::COUNT.id);
-        let hidden = matches.get_flag(args::HIDDEN.id);
-        let line_number = matches.get_flag(args::LINE_NUMBER.id);
-        let files = matches.get_flag(args::FILES.id);
-        let links = matches.get_flag(args::LINKS.id);
-        let trim = matches.get_flag(args::TRIM_LEFT.id);
-        let ignore = !matches.get_flag(args::NO_IGNORE.id);
-        let overview = matches.get_flag(args::OVERVIEW.id);
-        let repeat = matches.get_flag(args::REPEAT.id);
-        let menu = matches.get_flag(args::MENU.id);
-        let select = matches.get_flag(args::SELECT.id);
-
-        let context_both = get_usize_option(&matches, args::CONTEXT.id)?.unwrap_or(0);
-        let before_context =
-            get_usize_option(&matches, args::BEFORE_CONTEXT.id)?.unwrap_or(context_both);
-        let after_context =
-            get_usize_option(&matches, args::AFTER_CONTEXT.id)?.unwrap_or(context_both);
-
-        let max_depth = get_usize_option(&matches, args::MAX_DEPTH.id)?;
-        let threads = get_usize_option(&matches, args::THREADS.id).map(|v| {
-            v.unwrap_or_else(|| {
-                std::thread::available_parallelism()
-                    .map_or(1, |n| n.get())
-                    .min(12)
-            })
-        })?;
-        let max_length = get_usize_option(&matches, args::MAX_LENGTH.id)?;
-        let long_branch_each =
-            get_usize_option_with_default(&matches, args::LONG_BRANCHES_EACH.id)?;
-
-        let editor = matches.get_one::<String>(args::EDITOR.id).cloned();
-        let open_like = matches.get_one::<OpenStrategy>(args::OPEN_LIKE.id).cloned();
-
-        let path = matches
-            .get_one::<PathBuf>(args::PATH_POSITIONAL.id)
-            .or_else(|| matches.get_one::<PathBuf>(args::PATH.id));
-
-        let path = if let Some(p) = path {
-            process_path(p, true)?
-        } else {
-            canonicalize(
-                &std::env::current_dir()
-                    .map_err(|_| mes!("failed to get current working directory"))?,
-            )?
-        };
-
-        let selection_file = matches
-            .get_one::<PathBuf>(args::SELECTION_FILE.id)
+        let threads = args.threads.unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map_or(1, |n| n.get())
+                .min(12)
+        });
+        let selection_file = args
+            .selection_file
+            .as_ref()
             .map(|p| process_path(p, false))
             .transpose()?;
-        let repeat_file = matches
-            .get_one::<PathBuf>(args::REPEAT_FILE.id)
+        let repeat_file = args
+            .repeat_file
+            .as_ref()
             .map(|p| process_path(p, false))
             .transpose()?;
 
-        let is_dir = path.is_dir();
-        let prefix_len = get_usize_option_with_default(&matches, args::PREFIX_LEN.id)?;
-        let just_files = files && regexps.is_empty();
-
-        let completion_target = matches
-            .get_one::<clap_complete::Shell>(args::COMPLETIONS.id)
-            .copied();
-
-        Ok(Config {
-            path,
+        let core = CoreConfig {
+            select: args.select,
+            menu: args.menu,
+            live: args.live,
+            auto_open: args.auto_open,
+            repeat: args.repeat,
+            threads,
+            editor: args.editor.clone(),
+            open_like: args.open_like.clone(),
             selection_file,
             repeat_file,
-            long_branch,
-            is_dir,
-            just_files,
-            with_bold: bold,
-            regexps,
-            line_number,
-            with_colors: colors,
-            count,
-            hidden,
-            select,
-            files,
-            links,
-            max_depth,
-            threads,
-            trim,
-            before_context,
-            after_context,
-            globs,
-            ignore,
-            prefix_len,
-            max_length,
-            long_branch_each,
-            editor,
-            open_like,
-            overview,
-            completion_target,
-            menu,
-            repeat,
+            completion_target: args.completions,
             all_args,
-            chars: Config::get_characters(&matches, prefix_len),
-            colors: Config::get_colors(&matches),
-            keys: Config::get_key_bindings(&matches),
-        })
+            keys: Config::get_key_bindings(&args, &matches),
+        };
+        apply_matches(core, &matches, false)
     }
 
-    fn get_colors(matches: &ArgMatches) -> Colors {
+    fn get_colors(args: &Args) -> Colors {
         Colors {
-            file: matches
-                .get_one::<args::Color>(args::FILE_COLOR.id)
+            file: args
+                .file_color
+                .as_ref()
                 .map(|v| v.get())
                 .unwrap_or(style::FILE_COLOR_DEFAULT),
-            dir: matches
-                .get_one::<args::Color>(args::DIR_COLOR.id)
+            dir: args
+                .dir_color
+                .as_ref()
                 .map(|v| v.get())
                 .unwrap_or(style::DIR_COLOR_DEFAULT),
-            line_number: matches
-                .get_one::<args::Color>(args::LINE_NUMBER_COLOR.id)
+            line_number: args
+                .line_number_color
+                .as_ref()
                 .map(|v| v.get())
                 .unwrap_or(style::LINE_NUMBER_COLOR_DEFAULT),
-            text: matches
-                .get_one::<args::Color>(args::TEXT_COLOR.id)
-                .map(|v| v.get()),
-            branch: matches
-                .get_one::<args::Color>(args::BRANCH_COLOR.id)
-                .map(|v| v.get()),
-            selected_bg: matches
-                .get_one::<args::Color>(args::SELECTED_BG_COLOR.id)
+            text: args.text_color.as_ref().map(|v| v.get()),
+            branch: args.branch_color.as_ref().map(|v| v.get()),
+            selected_bg: args
+                .selected_bg_color
+                .as_ref()
                 .map(|v| v.get())
                 .unwrap_or(style::SELECTED_BG_DEFAULT),
-            selected_indicator: matches
-                .get_one::<args::Color>(args::SELECTED_INDICATOR_COLOR.id)
-                .map(|v| v.get()),
-            search_highlight: matches
-                .get_one::<args::Color>(args::SEARCH_HIGHLIGHT_COLOR.id)
+            selected_indicator: args.selected_indicator_color.as_ref().map(|v| v.get()),
+            filter_highlight: args
+                .filter_highlight_color
+                .as_ref()
                 .map(|v| v.get())
-                .unwrap_or(style::SEARCH_HIGHLIGHT_DEFAULT),
-            matches: matches
-                .get_many::<args::Color>(args::MATCH_COLORS.id)
-                .map(|vals| vals.cloned().map(|v| v.get()).collect::<Vec<_>>())
-                .unwrap_or_else(|| style::MATCHED_COLORS_DEFAULT.to_vec()),
+                .unwrap_or(style::FILTER_HIGHLIGHT_DEFAULT),
+            matches: if args.match_colors.is_empty() {
+                style::MATCHED_COLORS_DEFAULT.to_vec()
+            } else {
+                args.match_colors.iter().map(|v| v.get()).collect()
+            },
         }
     }
 
-    fn get_characters(matches: &ArgMatches, spacer: usize) -> Characters {
-        let v = matches
-            .get_one::<char>(args::CHAR_VERTICAL.id)
-            .copied()
-            .unwrap_or(style::DEFAULT_VERTICAL);
-        let h = matches
-            .get_one::<char>(args::CHAR_HORIZONTAL.id)
-            .copied()
-            .unwrap_or(style::DEFAULT_HORIZONTAL);
-        let tl = matches
-            .get_one::<char>(args::CHAR_TOP_LEFT.id)
-            .copied()
-            .unwrap_or(style::DEFAULT_TOP_LEFT);
-        let tr = matches
-            .get_one::<char>(args::CHAR_TOP_RIGHT.id)
-            .copied()
-            .unwrap_or(style::DEFAULT_TOP_RIGHT);
-        let bl = matches
-            .get_one::<char>(args::CHAR_BOTTOM_LEFT.id)
-            .copied()
-            .unwrap_or(style::DEFAULT_BOTTOM_LEFT);
-        let br = matches
-            .get_one::<char>(args::CHAR_BOTTOM_RIGHT.id)
-            .copied()
-            .unwrap_or(style::DEFAULT_BOTTOM_RIGHT);
-        let tee = matches
-            .get_one::<char>(args::CHAR_TEE.id)
-            .copied()
-            .unwrap_or(style::DEFAULT_TEE);
-        let ellipsis = matches
-            .get_one::<char>(args::CHAR_ELLIPSIS.id)
-            .copied()
-            .unwrap_or(style::DEFAULT_ELLIPSIS);
-        let selected_indicator = matches
-            .get_one::<String>(args::SELECTED_INDICATOR.id)
-            .cloned()
-            .unwrap_or_else(|| args::DEFAULT_SELECTED_INDICATOR.to_string());
+    fn get_characters(args: &Args) -> Characters {
+        let v = args.char_vertical;
+        let h = args.char_horizontal;
+        let tl = args.char_top_left;
+        let tr = args.char_top_right;
+        let bl = args.char_bottom_left;
+        let br = args.char_bottom_right;
+        let tee = args.char_tee;
+        let spacer = args.prefix_len;
+        let ellipsis = args.ellipsis.clone();
+        let selected_indicator = args.selected_indicator.clone();
         let selected_indicator_clear = " ".repeat(selected_indicator.chars().count());
+        let search_prompt = args.search_prompt.clone();
+        let search_prompt_inactive = args.search_prompt_inactive.clone();
+        let filter_prompt = args.filter_prompt.clone();
 
         Characters {
             bl,
@@ -452,6 +558,7 @@ impl Config {
             tr,
             v,
             h,
+            tee,
             selected_indicator,
             selected_indicator_clear,
             match_with_next: format!("{}{}", tee, style::repeat(h, spacer - 1)),
@@ -459,38 +566,194 @@ impl Config {
             spacer_vert: format!("{}{}", v, style::repeat(' ', spacer - 1)),
             spacer: " ".repeat(spacer),
             ellipsis,
+            search_prompt,
+            search_prompt_inactive,
+            filter_prompt,
         }
     }
 
-    fn get_key_bindings(matches: &ArgMatches) -> KeyBindings {
-        let get_keys = |id| {
-            matches
-                .get_many::<KeyCode>(id)
-                .map(|v| v.copied().collect())
-                .unwrap_or_default()
+    fn get_key_bindings(args: &Args, matches: &ArgMatches) -> KeyBindings {
+        let all_ids = [
+            args::KEY_DOWN,
+            args::KEY_UP,
+            args::KEY_BIG_DOWN,
+            args::KEY_BIG_UP,
+            args::KEY_DOWN_PATH,
+            args::KEY_UP_PATH,
+            args::KEY_DOWN_SAME_DEPTH,
+            args::KEY_UP_SAME_DEPTH,
+            args::KEY_TOP,
+            args::KEY_BOTTOM,
+            args::KEY_PAGE_DOWN,
+            args::KEY_PAGE_UP,
+            args::KEY_CYCLE_VIEW,
+            args::KEY_HELP,
+            args::KEY_QUIT,
+            args::KEY_OPEN,
+            args::KEY_FOLD,
+            args::KEY_FILTER,
+            args::KEY_SEARCH,
+        ];
+        let is_user_set = |id: &str| -> bool {
+            matches.value_source(id) == Some(clap::parser::ValueSource::CommandLine)
         };
-
+        let overrides: HashSet<KeyCode> = all_ids
+            .iter()
+            .filter(|id| is_user_set(id))
+            .flat_map(|id| key_field_by_id(args, id))
+            .copied()
+            .collect();
+        let binding = |id: &str, keys: &[KeyCode]| -> Vec<KeyCode> {
+            if is_user_set(id) {
+                keys.to_vec()
+            } else {
+                keys.iter()
+                    .copied()
+                    .filter(|k| !overrides.contains(k))
+                    .collect()
+            }
+        };
         KeyBindings {
-            down: get_keys(args::KEY_DOWN.id),
-            up: get_keys(args::KEY_UP.id),
-            big_down: get_keys(args::KEY_BIG_DOWN.id),
-            big_up: get_keys(args::KEY_BIG_UP.id),
-            down_path: get_keys(args::KEY_DOWN_PATH.id),
-            up_path: get_keys(args::KEY_UP_PATH.id),
-            down_same_depth: get_keys(args::KEY_DOWN_SAME_DEPTH.id),
-            up_same_depth: get_keys(args::KEY_UP_SAME_DEPTH.id),
-            top: get_keys(args::KEY_TOP.id),
-            bottom: get_keys(args::KEY_BOTTOM.id),
-            page_down: get_keys(args::KEY_PAGE_DOWN.id),
-            page_up: get_keys(args::KEY_PAGE_UP.id),
-            center: get_keys(args::KEY_CENTER.id),
-            help: get_keys(args::KEY_HELP.id),
-            quit: get_keys(args::KEY_QUIT.id),
-            open: get_keys(args::KEY_OPEN.id),
-            fold: get_keys(args::KEY_FOLD.id),
-            search: get_keys(args::KEY_SEARCH.id),
+            down: binding(args::KEY_DOWN, &args.key_down),
+            up: binding(args::KEY_UP, &args.key_up),
+            big_down: binding(args::KEY_BIG_DOWN, &args.key_big_down),
+            big_up: binding(args::KEY_BIG_UP, &args.key_big_up),
+            down_path: binding(args::KEY_DOWN_PATH, &args.key_down_path),
+            up_path: binding(args::KEY_UP_PATH, &args.key_up_path),
+            down_same_depth: binding(args::KEY_DOWN_SAME_DEPTH, &args.key_down_same_depth),
+            up_same_depth: binding(args::KEY_UP_SAME_DEPTH, &args.key_up_same_depth),
+            top: binding(args::KEY_TOP, &args.key_top),
+            bottom: binding(args::KEY_BOTTOM, &args.key_bottom),
+            page_down: binding(args::KEY_PAGE_DOWN, &args.key_page_down),
+            page_up: binding(args::KEY_PAGE_UP, &args.key_page_up),
+            cycle_view: binding(args::KEY_CYCLE_VIEW, &args.key_cycle_view),
+            help: binding(args::KEY_HELP, &args.key_help),
+            quit: binding(args::KEY_QUIT, &args.key_quit),
+            open: binding(args::KEY_OPEN, &args.key_open),
+            fold: binding(args::KEY_FOLD, &args.key_fold),
+            filter: binding(args::KEY_FILTER, &args.key_filter),
+            search: binding(args::KEY_SEARCH, &args.key_search),
+            submit_search: binding(args::KEY_SUBMIT_SEARCH, &args.key_submit_search),
         }
     }
+}
+
+fn key_field_by_id<'a>(args: &'a Args, id: &str) -> &'a [KeyCode] {
+    match id {
+        _ if id == args::KEY_DOWN => &args.key_down,
+        _ if id == args::KEY_UP => &args.key_up,
+        _ if id == args::KEY_BIG_DOWN => &args.key_big_down,
+        _ if id == args::KEY_BIG_UP => &args.key_big_up,
+        _ if id == args::KEY_DOWN_PATH => &args.key_down_path,
+        _ if id == args::KEY_UP_PATH => &args.key_up_path,
+        _ if id == args::KEY_DOWN_SAME_DEPTH => &args.key_down_same_depth,
+        _ if id == args::KEY_UP_SAME_DEPTH => &args.key_up_same_depth,
+        _ if id == args::KEY_TOP => &args.key_top,
+        _ if id == args::KEY_BOTTOM => &args.key_bottom,
+        _ if id == args::KEY_PAGE_DOWN => &args.key_page_down,
+        _ if id == args::KEY_PAGE_UP => &args.key_page_up,
+        _ if id == args::KEY_CYCLE_VIEW => &args.key_cycle_view,
+        _ if id == args::KEY_HELP => &args.key_help,
+        _ if id == args::KEY_QUIT => &args.key_quit,
+        _ if id == args::KEY_OPEN => &args.key_open,
+        _ if id == args::KEY_FOLD => &args.key_fold,
+        _ if id == args::KEY_FILTER => &args.key_filter,
+        _ if id == args::KEY_SEARCH => &args.key_search,
+        _ => &[],
+    }
+}
+
+const MENU_UNSUPPORTED: &[&str] = &[
+    args::SELECT,
+    args::MENU,
+    args::REPEAT,
+    args::REPEAT_FILE,
+    args::SELECTION_FILE,
+    args::AUTO_OPEN,
+    args::COMPLETIONS,
+    args::KEY_DOWN,
+    args::KEY_UP,
+    args::KEY_BIG_DOWN,
+    args::KEY_BIG_UP,
+    args::KEY_DOWN_PATH,
+    args::KEY_UP_PATH,
+    args::KEY_DOWN_SAME_DEPTH,
+    args::KEY_UP_SAME_DEPTH,
+    args::KEY_TOP,
+    args::KEY_BOTTOM,
+    args::KEY_PAGE_DOWN,
+    args::KEY_PAGE_UP,
+    args::KEY_CYCLE_VIEW,
+    args::KEY_HELP,
+    args::KEY_QUIT,
+    args::KEY_OPEN,
+    args::KEY_FOLD,
+    args::KEY_FILTER,
+    args::KEY_SEARCH,
+    args::KEY_SUBMIT_SEARCH,
+];
+
+pub fn save_to_repeat_file(file: &std::path::Path, args: &[OsString]) -> Result<(), Message> {
+    let mut buffer = Vec::new();
+    for arg in args {
+        let bytes = arg.as_encoded_bytes();
+        let len = bytes.len() as u32;
+        buffer.extend_from_slice(&len.to_le_bytes());
+        buffer.extend_from_slice(bytes);
+    }
+    std::fs::write(file, buffer).map_err(|e| mes!("{}", e))
+}
+
+pub fn parse_menu_query(query: &str) -> Result<Config, Message> {
+    let base = base_config();
+    let tokens = shlex::split(query).ok_or_else(|| mes!("invalid query syntax"))?;
+
+    let full_args: Vec<OsString> = tokens.iter().map(OsString::from).collect();
+
+    let matches = generate_command()
+        .try_get_matches_from(full_args)
+        .map_err(|mut e| {
+            use clap::error::ContextKind;
+            e.remove(ContextKind::Usage);
+            e.remove(ContextKind::Suggested);
+            mes!("{}", e.render().to_string().trim_end())
+        })?;
+
+    let unsupported: Vec<&str> = matches
+        .ids()
+        .map(|id| id.as_str())
+        .filter(|id| {
+            matches.value_source(id) == Some(clap::parser::ValueSource::CommandLine)
+                && MENU_UNSUPPORTED.contains(id)
+        })
+        .collect();
+    if !unsupported.is_empty() {
+        return Err(mes!(
+            "unsupported in menu search: {}",
+            unsupported
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+
+    let args = Args::from_arg_matches(&matches).map_err(|e| mes!("{}", e))?;
+    let explicit =
+        |id: &str| matches.value_source(id) == Some(clap::parser::ValueSource::CommandLine);
+    let mut core = base.core.clone();
+    core.select = false;
+    core.menu = true;
+    let mut c = apply_matches(core, &matches, true)?;
+    let explicit_pattern = explicit(args::EXPRESSION_POSITIONAL) || explicit(args::EXPRESSION);
+    if explicit(args::FILES) && !explicit_pattern {
+        c.regexps.clear();
+    }
+    if explicit_pattern && !explicit(args::FILES) {
+        c.files = false;
+    }
+    drop(args);
+    Ok(c)
 }
 
 #[cfg(test)]
@@ -526,37 +789,15 @@ mod tests {
         T: Into<OsString> + Clone,
     {
         let matches = generate_command().get_matches_from(args);
-        let (bold, colors) = Config::get_styling(&matches);
-        Config::get_config(matches, Vec::new(), bold, colors)
-            .ok()
-            .unwrap()
+        Config::get_config(matches, Vec::new()).ok().unwrap()
     }
 
     #[test]
     fn test_env_opts() {
         unsafe { std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" ")) };
         let (matches, all_args) = get_matches(Vec::new()).unwrap();
-        let (bold, colors) = Config::get_styling(&matches);
-        let config = Config::get_config(matches, all_args, bold, colors)
-            .ok()
-            .unwrap();
+        let config = Config::get_config(matches, all_args).ok().unwrap();
         check_parsed_config_from_example_opts(config);
-    }
-
-    #[test]
-    fn test_default_opts() {
-        let config = get_config_from(["expression"]);
-        assert!(
-            config.chars.spacer
-                == " ".repeat(args::DEFAULT_PREFIX_LEN.parse::<usize>().ok().unwrap())
-        );
-        assert!(
-            config.long_branch_each
-                == args::DEFAULT_LONG_BRANCH_EACH
-                    .parse::<usize>()
-                    .ok()
-                    .unwrap()
-        );
     }
 
     #[test]
@@ -571,12 +812,12 @@ mod tests {
         assert_eq!(config.max_length, Some(20));
         assert!(!config.ignore);
         assert!(config.hidden);
-        assert!(config.threads == 8);
+        assert!(config.core.threads == 8);
         assert!(config.count);
         assert!(config.links);
         assert!(config.trim);
         assert!(config.with_colors);
-        assert!(config.select);
+        assert!(config.core.select);
         assert!(config.files);
         assert!(config.overview);
         assert_eq!(config.globs, vec!["*.rs"]);
@@ -602,7 +843,7 @@ mod tests {
         assert!(config.line_number);
         assert!(config.hidden);
         assert!(config.count);
-        assert!(config.select);
+        assert!(config.core.select);
         assert!(config.files);
         assert!(config.links);
         assert!(config.overview);
@@ -628,16 +869,16 @@ mod tests {
         assert!(config.hidden);
         assert!(config.links);
         assert!(config.with_colors);
-        assert!(config.select);
+        assert!(config.core.select);
     }
 
     #[test]
     fn test_key_binding_hardware_named() {
         let config = get_config_from(["expression", "--key-quit=f10", "--key-down=x"]);
-        assert!(config.keys.quit.contains(&KeyCode::F(10)));
-        assert!(config.keys.down.contains(&KeyCode::Char('x')));
-        assert!(!config.keys.down.contains(&KeyCode::Char('j')));
-        assert!(!config.keys.down.contains(&KeyCode::Down));
+        assert!(config.core.keys.quit.contains(&KeyCode::F(10)));
+        assert!(config.core.keys.down.contains(&KeyCode::Char('x')));
+        assert!(!config.core.keys.down.contains(&KeyCode::Char('j')));
+        assert!(!config.core.keys.down.contains(&KeyCode::Down));
     }
 
     #[test]
@@ -647,6 +888,6 @@ mod tests {
         assert!(config.links);
         assert!(config.overview);
         assert_eq!(config.max_depth, Some(3));
-        assert!(config.select);
+        assert!(config.core.select);
     }
 }

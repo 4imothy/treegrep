@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use crate::{config, errors::Message};
+use crate::errors::Message;
 use std::path::{Path, PathBuf};
 
 pub fn wrap_dirs(dirs: Vec<Directory>) -> Option<Matches> {
@@ -10,8 +10,8 @@ pub fn wrap_dirs(dirs: Vec<Directory>) -> Option<Matches> {
     Some(Matches::Dir(dirs))
 }
 
-pub fn wrap_file(file: Option<File>, just_files: bool) -> Option<Matches> {
-    file.filter(|f| !f.lines.is_empty() || just_files)
+pub fn wrap_file(file: Option<File>, files_no_regex: bool) -> Option<Matches> {
+    file.filter(|f| !f.lines.is_empty() || files_no_regex)
         .map(Matches::File)
 }
 
@@ -28,10 +28,10 @@ pub struct Directory {
 }
 
 impl Directory {
-    pub fn new(path: &Path) -> Result<Self, Message> {
+    pub fn new(path: &Path, links: bool) -> Result<Self, Message> {
         Ok(Self {
             path: path.to_path_buf(),
-            linked: get_linked(path),
+            linked: get_linked(path, links),
             children: Vec::new(),
             files: Vec::new(),
         })
@@ -45,17 +45,17 @@ pub struct File {
 }
 
 impl File {
-    pub fn from_pathbuf(path: PathBuf) -> Result<Self, Message> {
+    pub fn from_pathbuf(path: PathBuf, links: bool) -> Result<Self, Message> {
         Ok(Self {
-            linked: get_linked(&path),
+            linked: get_linked(&path, links),
             path,
             lines: Vec::new(),
         })
     }
 }
 
-fn get_linked(path: &Path) -> Option<PathBuf> {
-    if !config().links {
+fn get_linked(path: &Path, links: bool) -> Option<PathBuf> {
+    if !links {
         return None;
     }
     path.read_link().ok().map(|link| {
@@ -68,6 +68,7 @@ fn get_linked(path: &Path) -> Option<PathBuf> {
     })
 }
 
+#[derive(Clone, Copy)]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct Match {
     pub regexp_id: usize,

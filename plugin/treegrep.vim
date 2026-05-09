@@ -47,10 +47,8 @@ def g:TgrepWith(args: string)
 
     var popup_opts: dict<any>
     if g:Tgrep_win_opts_fn != v:null
-        echomsg 'calling func'
         popup_opts = g:Tgrep_win_opts_fn()
     else
-        echomsg 'not calling func'
         var width = float2nr(&columns * g:tgrep_win_width_pct)
         var height = float2nr(&lines * g:tgrep_win_height_pct)
 

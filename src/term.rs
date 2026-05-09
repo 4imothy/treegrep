@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use crossterm::{
-    cursor, event, execute, style,
+    cursor, event, execute, queue, style,
     terminal::{self, ClearType},
 };
 use std::{
@@ -16,6 +16,7 @@ pub struct Term<'a> {
     pub height: u16,
     out: StdoutLock<'a>,
     in_alternate_screen: bool,
+    panic_hook_set: bool,
 }
 
 impl<'a> Term<'a> {
@@ -26,6 +27,7 @@ impl<'a> Term<'a> {
             out,
             height,
             in_alternate_screen: false,
+            panic_hook_set: false,
         })
     }
 
@@ -35,7 +37,7 @@ impl<'a> Term<'a> {
     }
 
     pub fn clear(&mut self) -> io::Result<()> {
-        execute!(self, terminal::Clear(ClearType::All))
+        queue!(self, terminal::Clear(ClearType::All))
     }
 
     pub fn claim(&mut self) -> io::Result<()> {
@@ -47,11 +49,14 @@ impl<'a> Term<'a> {
             event::EnableMouseCapture
         )?;
         self.in_alternate_screen = true;
-        let default_hook = panic::take_hook();
-        panic::set_hook(Box::new(move |info| {
-            Term::exit(&mut io::stderr()).ok();
-            default_hook(info);
-        }));
+        if !self.panic_hook_set {
+            let default_hook = panic::take_hook();
+            panic::set_hook(Box::new(move |info| {
+                Term::exit(&mut io::stderr()).ok();
+                default_hook(info);
+            }));
+            self.panic_hook_set = true;
+        }
 
         terminal::enable_raw_mode()
     }
@@ -80,7 +85,10 @@ impl<'a> Term<'a> {
         self.flush()?;
         Term::exit(self)?;
         self.in_alternate_screen = false;
-        let _ = panic::take_hook();
+        if self.panic_hook_set {
+            let _ = panic::take_hook();
+            self.panic_hook_set = false;
+        }
         Ok(())
     }
 

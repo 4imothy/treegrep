@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 
 mod args;
-mod args_menu;
 mod config;
 mod errors;
 mod log;
 mod match_system;
 mod matcher;
-mod select_menu;
+mod menu;
 mod style;
 mod term;
 mod writer;
@@ -15,20 +14,14 @@ use clap::ArgMatches;
 use clap_complete::generate;
 use config::Config;
 use errors::Message;
-use select_menu::SelectMenu;
+use match_system::Matches;
 use std::{
     ffi::OsString,
     io::{StdoutLock, stdout},
-    sync::OnceLock,
+    sync::{Arc, atomic::AtomicBool},
 };
 use term::Term;
-use writer::{Entry, matches_to_display_lines, write_results};
-
-static CONFIG: OnceLock<Config> = OnceLock::new();
-
-fn config() -> &'static Config {
-    CONFIG.get().unwrap()
-}
+use writer::{matches_to_display_lines, write_results};
 
 fn main() {
     if cfg!(debug_assertions) {
@@ -40,12 +33,11 @@ fn main() {
     let (bold, colors) = Config::get_styling(&matches);
     let out: StdoutLock = stdout().lock();
     let err_prefix = style::error_prefix(bold, colors);
-    let (c, mut term) =
-        build_config_and_term(matches, all_args, out, bold, colors).unwrap_or_else(|e| {
-            eprintln!("{} {}", err_prefix, e);
-            std::process::exit(1);
-        });
-    if let Some(shell) = c.completion_target {
+    let (c, mut term) = build_config_and_term(matches, all_args, out).unwrap_or_else(|e| {
+        eprintln!("{} {}", err_prefix, e);
+        std::process::exit(1);
+    });
+    if let Some(shell) = c.core.completion_target {
         generate(
             shell,
             &mut args::generate_command(),
@@ -55,9 +47,9 @@ fn main() {
         return;
     }
 
-    let menu = c.menu;
+    let is_menu = c.core.menu;
     run(&mut term, c).unwrap_or_else(|e| {
-        if menu {
+        if is_menu {
             let _ = errors::view_error(&mut term, format!("{} {}", err_prefix, e)).map_err(|_| {
                 std::process::exit(1);
             });
@@ -72,56 +64,84 @@ fn build_config_and_term(
     matches: ArgMatches,
     all_args: Vec<OsString>,
     out: StdoutLock,
-    bold: bool,
-    colors: bool,
 ) -> Result<(Config, Term), Message> {
-    let mut c = Config::get_config(matches, all_args, bold, colors)?;
-    if let Some(mut new_c) = c.handle_repeat()? {
-        new_c.select = c.select;
-        new_c.selection_file = c.selection_file;
-        c = new_c;
+    let mut c = Config::get_config(matches, all_args)?;
+    if let Some(repeated) = c.handle_repeat()? {
+        c = repeated;
     }
-    let term = Term::new(out, c.menu || c.select).map_err(|e| mes!("{}", e))?;
+    let term = Term::new(out, c.core.menu || c.core.select).map_err(|e| mes!("{}", e))?;
     Ok((c, term))
 }
 
-fn run(term: &mut Term, mut c: Config) -> Result<(), Message> {
-    if let Some(f) = &c.selection_file {
-        std::fs::write(f, b"").map_err(|e| mes!("{}", e))?;
+fn auto_open_target(m: &Matches, files_only: bool) -> Option<(&std::path::Path, Option<usize>)> {
+    let files: Vec<&match_system::File> = match m {
+        Matches::Dir(dirs) => dirs.iter().flat_map(|d| d.files.iter()).collect(),
+        Matches::File(file) => vec![file],
+    };
+    if files_only {
+        return if files.len() == 1 {
+            Some((files[0].path.as_path(), None))
+        } else {
+            None
+        };
     }
-
-    if c.menu {
-        term.claim().map_err(|e| mes!("{}", e))?;
-        let initial_input = if c.repeat { c.read_repeat_args() } else { None };
-        match args_menu::launch(term, c, initial_input)? {
-            Some(new_c) => c = new_c,
-            None => {
-                term.give().map_err(|e| mes!("{}", e))?;
-                return Ok(());
+    let mut found: Option<(&std::path::Path, usize)> = None;
+    let mut multiple = false;
+    'outer: for file in &files {
+        for line in &file.lines {
+            if !line.matches.is_empty() {
+                if found.is_some() {
+                    multiple = true;
+                    break 'outer;
+                }
+                found = Some((file.path.as_path(), line.line_num));
             }
         }
     }
-    CONFIG.set(c).ok().unwrap();
-
-    let Some(m) = matcher::search()? else {
-        if config().menu {
-            term.give().map_err(|e| mes!("{}", e))?;
-        }
-        return Ok(());
-    };
-    let lines: Vec<Box<dyn Entry>> = matches_to_display_lines(&m)?;
-
-    if config().select {
-        if !config().menu {
-            term.claim().map_err(|e| mes!("{}", e))?;
-        }
-        SelectMenu::launch(term, lines).map_err(|e| {
-            let _ = term.give();
-            mes!("{}", e)
-        })?;
+    if multiple {
+        return None;
+    }
+    if let Some((path, line_num)) = found {
+        return Some((path, Some(line_num)));
+    }
+    if files.len() == 1 {
+        Some((files[0].path.as_path(), None))
     } else {
-        write_results(term, &lines).map_err(|e| mes!("{}", e))?;
+        None
+    }
+}
+
+fn run(term: &mut Term, c: Config) -> Result<(), Message> {
+    if let Some(f) = &c.core.selection_file {
+        std::fs::write(f, b"").map_err(|e| mes!("{}", e))?;
+    }
+    config::set_config(c);
+    let c = config::base_config();
+
+    let matches = matcher::search(Arc::new(AtomicBool::new(false)), Arc::clone(&c))?;
+
+    if c.core.auto_open
+        && let Some(m) = matches.as_ref()
+        && let Some((path, line)) = auto_open_target(m, c.files)
+    {
+        menu::open_path(path.as_os_str().to_os_string(), line).map_err(|e| mes!("{}", e))?;
+        return Ok(());
     }
 
-    Ok(())
+    if c.core.select || c.core.menu {
+        if matches.is_none() && !c.core.menu {
+            Ok(())
+        } else {
+            term.claim().map_err(|e| mes!("{}", e))?;
+            menu::Menu::launch(term, matches).map_err(|e| {
+                let _ = term.give();
+                mes!("{}", e)
+            })
+        }
+    } else if let Some(m) = matches {
+        let lines = matches_to_display_lines(&m, Arc::clone(&c))?;
+        write_results(term, &lines).map_err(|e| mes!("{}", e))
+    } else {
+        Ok(())
+    }
 }

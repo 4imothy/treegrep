@@ -201,7 +201,7 @@ fn files() {
     let tars = [tar_1.as_path(), tar_2.as_path()];
     assert_pass_pool(&tars, result);
 
-    let result = get_output(&dir.path, "--files --long-branch");
+    let result = get_output(&dir.path, "--files --branch-each 2");
     assert_pass_pool(
         &[
             tar_dir.join("files_long_branch_1").as_path(),
@@ -231,7 +231,7 @@ fn long_branch_with_expr() {
     dir.create_file_fill(&sub.join("one"), b"ausntha");
     dir.create_file_fill(&sub.join("two"), b"ausntha");
 
-    let result = get_output(&dir.path, &format!("{} --files --long-branch", text));
+    let result = get_output(&dir.path, &format!("{} --files --branch-each 5", text));
     assert_pass_pool(
         &[
             tar_dir.join("files_long_branch_expr_1").as_path(),
@@ -242,7 +242,7 @@ fn long_branch_with_expr() {
 
     let result = get_output(
         &dir.path,
-        &format!("{} --files --long-branch --count", text),
+        &format!("{} --files --branch-each 5 --count", text),
     );
     assert_pass_pool(
         &[

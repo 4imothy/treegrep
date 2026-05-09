@@ -39,8 +39,8 @@ local function default_win_opts()
 end
 
 function M.win_opts()
-    if config.win_opts then
-        return config.win_opts()
+    if config.win_opts_fn then
+        return config.win_opts_fn()
     end
     return default_win_opts()
 end

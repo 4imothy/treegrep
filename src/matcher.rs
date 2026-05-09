@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    config,
+    config::Config,
     errors::Message,
     match_system::{Directory, File, Line, Match, Matches, wrap_dirs, wrap_file},
     mes,
@@ -15,7 +15,16 @@ use grep::{
     },
 };
 use ignore::{WalkBuilder, WalkState, overrides::OverrideBuilder};
-use std::{collections::HashMap, ffi::OsString, io, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    ffi::OsString,
+    io,
+    path::{Path, PathBuf},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 struct Matcher {
     combined: RegexMatcher,
@@ -47,16 +56,20 @@ struct MatchSink<'a> {
     match_buf: Vec<Match>,
 }
 
+fn strip_line_ending(bytes: &[u8]) -> &[u8] {
+    bytes
+        .strip_suffix(b"\r\n")
+        .or_else(|| bytes.strip_suffix(b"\n"))
+        .unwrap_or(bytes)
+}
+
 impl<'a> Sink for MatchSink<'a> {
     type Error = io::Error;
 
     fn matched(&mut self, _searcher: &Searcher, mat: &SinkMatch<'_>) -> Result<bool, io::Error> {
         let line_bytes = mat.bytes();
         let line_num = mat.line_number().unwrap_or(0) as usize;
-        let trimmed_bytes = line_bytes
-            .strip_suffix(b"\r\n")
-            .or_else(|| line_bytes.strip_suffix(b"\n"))
-            .unwrap_or(line_bytes);
+        let trimmed_bytes = strip_line_ending(line_bytes);
 
         self.match_buf.clear();
         for (pattern_id, regex) in self.matcher.individual.iter().enumerate() {
@@ -77,10 +90,7 @@ impl<'a> Sink for MatchSink<'a> {
 
     fn context(&mut self, _searcher: &Searcher, ctx: &SinkContext<'_>) -> Result<bool, io::Error> {
         let line_bytes = ctx.bytes();
-        let trimmed_bytes = line_bytes
-            .strip_suffix(b"\r\n")
-            .or_else(|| line_bytes.strip_suffix(b"\n"))
-            .unwrap_or(line_bytes);
+        let trimmed_bytes = strip_line_ending(line_bytes);
         let content = String::from_utf8_lossy(trimmed_bytes).into_owned();
         let line_num = ctx.line_number().unwrap_or(0) as usize;
         self.lines.push(Line::new_context(content, line_num));
@@ -88,46 +98,69 @@ impl<'a> Sink for MatchSink<'a> {
     }
 }
 
-pub fn search() -> Result<Option<Matches>, Message> {
-    let matchers = Matcher::new(&config().regexps)?;
+pub fn search(abort: Arc<AtomicBool>, config: Arc<Config>) -> Result<Option<Matches>, Message> {
+    let matchers = Matcher::new(&config.regexps)?;
     let mut searcher = SearcherBuilder::new()
         .line_number(true)
         .line_terminator(LineTerminator::byte(b'\n'))
         .binary_detection(BinaryDetection::quit(b'\x00'))
         .memory_map(unsafe { MmapChoice::auto() })
-        .before_context(config().before_context)
-        .after_context(config().after_context)
+        .before_context(config.before_context)
+        .after_context(config.after_context)
         .build();
 
-    if config().is_dir {
+    if config.is_dir {
         let matchers = Arc::new(matchers);
-        Ok(wrap_dirs(search_dir(&matchers, &mut searcher)?))
+        Ok(wrap_dirs(search_dir(
+            &matchers,
+            &mut searcher,
+            abort,
+            config,
+        )?))
     } else {
         Ok(wrap_file(
-            search_file(config().path.to_path_buf(), &matchers, &mut searcher)?,
-            config().just_files,
+            search_file(config.path.to_path_buf(), &matchers, &mut searcher, &config)?,
+            config.files && config.regexps.is_empty(),
         ))
     }
 }
 
-fn search_dir(matchers: &Arc<Matcher>, searcher: &mut Searcher) -> Result<Vec<Directory>, Message> {
-    let mut override_builder = OverrideBuilder::new(&config().path);
-    for glob in &config().globs {
+fn search_dir(
+    matchers: &Arc<Matcher>,
+    searcher: &mut Searcher,
+    abort: Arc<AtomicBool>,
+    config: Arc<Config>,
+) -> Result<Vec<Directory>, Message> {
+    let path = config.path.clone();
+    let globs = config.globs.clone();
+    search_dir_impl(&path, &globs, matchers, searcher, abort, config)
+}
+
+fn search_dir_impl(
+    path: &PathBuf,
+    globs: &[String],
+    matchers: &Arc<Matcher>,
+    searcher: &mut Searcher,
+    abort: Arc<AtomicBool>,
+    config: Arc<Config>,
+) -> Result<Vec<Directory>, Message> {
+    let mut override_builder = OverrideBuilder::new(path);
+    for glob in globs {
         override_builder
             .add(glob)
             .map_err(|_| mes!("glob {} is invalid", glob))?;
     }
 
-    let walker = WalkBuilder::new(&config().path)
-        .hidden(!config().hidden)
-        .max_depth(config().max_depth)
-        .follow_links(config().links)
-        .ignore(config().ignore)
-        .git_global(config().ignore)
-        .git_ignore(config().ignore)
-        .git_exclude(config().ignore)
+    let walker = WalkBuilder::new(path)
+        .hidden(!config.hidden)
+        .max_depth(config.max_depth)
+        .follow_links(config.links)
+        .ignore(config.ignore)
+        .git_global(config.ignore)
+        .git_ignore(config.ignore)
+        .git_exclude(config.ignore)
         .require_git(false)
-        .threads(config().threads)
+        .threads(config.core.threads)
         .overrides(
             override_builder
                 .build()
@@ -141,8 +174,14 @@ fn search_dir(matchers: &Arc<Matcher>, searcher: &mut Searcher) -> Result<Vec<Di
         let tx = tx.clone();
         let matchers = Arc::clone(matchers);
         let mut searcher = searcher.clone();
+        let abort = Arc::clone(&abort);
+        let config = Arc::clone(&config);
 
         Box::new(move |entry_result| {
+            if abort.load(Ordering::Relaxed) {
+                return WalkState::Quit;
+            }
+
             let entry = match entry_result {
                 Ok(e) => e,
                 Err(_) => return WalkState::Continue,
@@ -154,7 +193,7 @@ fn search_dir(matchers: &Arc<Matcher>, searcher: &mut Searcher) -> Result<Vec<Di
             }
 
             let path = entry.into_path();
-            if let Ok(Some(file)) = search_file(path, &matchers, &mut searcher) {
+            if let Ok(Some(file)) = search_file(path, &matchers, &mut searcher, &config) {
                 let _ = tx.send(file);
             }
 
@@ -163,16 +202,17 @@ fn search_dir(matchers: &Arc<Matcher>, searcher: &mut Searcher) -> Result<Vec<Di
     });
 
     drop(tx);
-    build_directory_tree(rx)
+    build_directory_tree(rx, path, config.links)
 }
 
 fn search_file(
     pb: PathBuf,
     matcher: &Matcher,
     searcher: &mut Searcher,
+    config: &Config,
 ) -> Result<Option<File>, Message> {
-    if config().just_files {
-        return Ok(Some(File::from_pathbuf(pb)?));
+    if config.files && config.regexps.is_empty() {
+        return Ok(Some(File::from_pathbuf(pb, config.links)?));
     }
 
     let mut sink = MatchSink {
@@ -192,26 +232,35 @@ fn search_file(
         return Ok(None);
     }
 
-    if config().before_context > 0 || config().after_context > 0 {
+    if config.before_context > 0 || config.after_context > 0 {
         Line::compute_context_offsets(&mut sink.lines);
     }
 
-    let mut file = File::from_pathbuf(pb)?;
+    let mut file = File::from_pathbuf(pb, config.links)?;
     file.lines = sink.lines;
     Ok(Some(file))
 }
 
-fn build_directory_tree(rx: Receiver<File>) -> Result<Vec<Directory>, Message> {
+fn build_directory_tree(
+    rx: Receiver<File>,
+    root_path: &Path,
+    links: bool,
+) -> Result<Vec<Directory>, Message> {
     let mut path_to_index: HashMap<OsString, usize> = HashMap::new();
     let mut directories: Vec<Directory> = Vec::new();
 
-    let root_path = config().path.clone();
     path_to_index.insert(root_path.as_os_str().to_owned(), 0);
-    directories.push(Directory::new(&root_path)?);
+    directories.push(Directory::new(root_path, links)?);
 
     for file in rx {
         if let Some(dir_path) = file.path.parent() {
-            let dir_idx = get_or_create_directory(&mut path_to_index, &mut directories, dir_path)?;
+            let dir_idx = get_or_create_directory(
+                &mut path_to_index,
+                &mut directories,
+                dir_path,
+                root_path,
+                links,
+            )?;
             directories[dir_idx].files.push(file);
         }
     }
@@ -223,16 +272,24 @@ fn get_or_create_directory(
     path_to_index: &mut HashMap<OsString, usize>,
     directories: &mut Vec<Directory>,
     dir_path: &std::path::Path,
+    root_path: &Path,
+    links: bool,
 ) -> Result<usize, Message> {
     if let Some(&idx) = path_to_index.get(dir_path.as_os_str()) {
         return Ok(idx);
     }
 
     let parent_idx = if let Some(parent) = dir_path.parent() {
-        if parent == config().path || path_to_index.contains_key(parent.as_os_str()) {
+        if parent == root_path || path_to_index.contains_key(parent.as_os_str()) {
             path_to_index.get(parent.as_os_str()).copied()
         } else {
-            Some(get_or_create_directory(path_to_index, directories, parent)?)
+            Some(get_or_create_directory(
+                path_to_index,
+                directories,
+                parent,
+                root_path,
+                links,
+            )?)
         }
     } else {
         None
@@ -240,7 +297,7 @@ fn get_or_create_directory(
 
     let new_idx = directories.len();
     path_to_index.insert(dir_path.as_os_str().to_owned(), new_idx);
-    directories.push(Directory::new(dir_path)?);
+    directories.push(Directory::new(dir_path, links)?);
 
     if let Some(p_idx) = parent_idx {
         directories[p_idx].children.push(new_idx);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use crate::config;
+use crate::config::Config;
 use crossterm::style::{
     Attribute, Color, SetAttribute, SetForegroundColor, StyledContent, Stylize, style,
 };
@@ -18,16 +18,7 @@ pub const DIR_COLOR_DEFAULT: Color = Color::Blue;
 pub const LINE_NUMBER_COLOR_DEFAULT: Color = Color::Yellow;
 pub const MATCHED_COLORS_DEFAULT: [Color; 3] = [Color::Green, Color::Magenta, Color::Red];
 pub const SELECTED_BG_DEFAULT: Color = Color::DarkGrey;
-pub const SEARCH_HIGHLIGHT_DEFAULT: Color = Color::Black;
-
-pub const DEFAULT_VERTICAL: char = '│';
-pub const DEFAULT_HORIZONTAL: char = '─';
-pub const DEFAULT_TOP_LEFT: char = '╭';
-pub const DEFAULT_TOP_RIGHT: char = '╮';
-pub const DEFAULT_BOTTOM_LEFT: char = '╰';
-pub const DEFAULT_BOTTOM_RIGHT: char = '╯';
-pub const DEFAULT_TEE: char = '├';
-pub const DEFAULT_ELLIPSIS: char = '⤵';
+pub const FILTER_HIGHLIGHT_DEFAULT: Color = Color::Black;
 
 pub struct DisplayRepeater<T>(T, usize);
 impl<T: Display> Display for DisplayRepeater<T> {
@@ -52,38 +43,45 @@ pub fn error_prefix(bold: bool, colors: bool) -> String {
     }
 }
 
-pub fn style_with<D>(orig: D, color: Color) -> StyledContent<D>
-where
-    D: Display,
-{
+pub fn style_with<D: Display>(orig: D, color: Color, config: &Config) -> StyledContent<D> {
     let mut styled = style(orig);
-    if config().with_colors {
+    if config.with_colors {
         styled = styled.with(color);
     }
-    if config().with_bold {
+    if config.with_bold {
         styled = styled.bold();
     }
     styled
 }
 
-pub fn match_substring(orig: &str, regexp_id: usize) -> StyledContent<&str> {
+pub fn match_substring<'a>(
+    orig: &'a str,
+    regexp_id: usize,
+    config: &Config,
+) -> StyledContent<&'a str> {
     style_with(
         orig,
-        config().colors.matches[regexp_id % config().colors.matches.len()],
+        config.colors.matches[regexp_id % config.colors.matches.len()],
+        config,
     )
 }
 
-pub fn style_with_on<D: Display>(orig: D, fg: Color, bg: Color) -> StyledContent<D> {
-    let mut s = style_with(orig, fg);
-    if config().with_colors {
+pub fn style_with_on<D: Display>(
+    orig: D,
+    fg: Color,
+    bg: Color,
+    config: &Config,
+) -> StyledContent<D> {
+    let mut s = style_with(orig, fg, config);
+    if config.with_colors {
         s = s.on(bg);
     }
     s
 }
 
-pub fn style_on<D: Display>(orig: D, bg: Color) -> StyledContent<D> {
+pub fn style_on<D: Display>(orig: D, bg: Color, config: &Config) -> StyledContent<D> {
     let mut s = style(orig);
-    if config().with_colors {
+    if config.with_colors {
         s = s.on(bg);
     }
     s

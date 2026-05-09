@@ -38,10 +38,9 @@ return {
             selection_file = '/tmp/tgrep-select',
             repeat_file = '/tmp/tgrep-repeat',
         })
-        vim.keymap.set('n', '<leader>tt', function() require('treegrep').tgrep_with('--menu') end)
-        vim.keymap.set('n', '<leader>tr', function() require('treegrep').tgrep_with('--repeat --select') end)
-        vim.keymap.set('n', '<leader>tm', function() require('treegrep').tgrep_with('--menu --repeat') end)
-        vim.keymap.set('n', '<leader>tf', function() require('treegrep').tgrep_with('--files --select') end)
+        vim.keymap.set('n', '<leader>tt', function() require('treegrep').tgrep_with('--menu --live') end)
+        vim.keymap.set('n', '<leader>tr', function() require('treegrep').tgrep_with('--repeat --select --live') end)
+        vim.keymap.set('n', '<leader>tf', function() require('treegrep').tgrep_with('--files --select --live') end)
     end,
 }
 ```
@@ -51,13 +50,13 @@ return {
 
 - sample keybind to run treegrep and open selection
 ```toml
-C-t = [
+space.t = [
     ':sh rm -f /tmp/tgrep-select',
-    ':insert-output tgrep --menu --selection-file=/tmp/tgrep-select --repeat-file=/tmp/tgrep-repeat > /dev/tty',
+    ':insert-output tgrep --menu --live --selection-file=/tmp/tgrep-select --repeat-file=/tmp/tgrep-repeat > /dev/tty',
     ':open %sh{ f=$(sed -n 1p /tmp/tgrep-select); l=$(sed -n 2p /tmp/tgrep-select); [ -n "$l" ] && echo "$f:$l" || echo "$f"; }',
     ':redraw',
-    ':set mouse false',
-    ':set mouse true',
+    ':set-option mouse false',
+    ':set-option mouse true',
 ]
 ```
 </details>
@@ -73,7 +72,6 @@ let g:tgrep_repeat_file = '/tmp/tgrep-repeat'
 
 nnoremap <leader>tt :call TgrepWith('--menu')<cr>
 nnoremap <leader>tr :call TgrepWith('--repeat --select')<cr>
-nnoremap <leader>tm :call TgrepWith('--menu --repeat')<cr>
 nnoremap <leader>tf :call TgrepWith('--files --select')<cr>
 ```
 </details>
@@ -83,25 +81,32 @@ nnoremap <leader>tf :call TgrepWith('--files --select')<cr>
 <summary><code>tgrep --regexp \bstruct\s+\w+ --regexp \bimpl\s+\w+ --path src --line-number --context=1 --count</code></summary>
 
 ```
-src: 10
+src: 9
 ├──term.rs: 1
 │  ├──-1:
 │  ├──15: pub struct Term<'a> {
 │  ╰──+1:     pub height: u16,
-├──matcher.rs: 3
+├──style.rs: 1
 │  ├──-1:
-│  ├──20: struct Matcher {
-│  ├──+1:     combined: RegexMatcher,
+│  ├──23: pub struct DisplayRepeater<T>(T, usize);
+│  ╰──+1: impl<T: Display> Display for DisplayRepeater<T> {
+├──args.rs: 6
 │  ├──-1:
-│  ├──25: impl Matcher {
-│  ├──+1:     fn new(patterns: &[String]) -> Result<Self, Message> {
-│  ├──-1:
-│  ├──44: struct MatchSink<'a> {
-│  ╰──+1:     lines: Vec<Line>,
-├──args_menu.rs: 1
-│  ├──-1:
-│  ├──21: pub struct ArgsMenu<'a, 'b> {
-│  ╰──+1:     term: &'a mut term::Term<'b>,
+│  ├──25: impl ValueEnum for OpenStrategy {
+│  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
+│  ├──-1: #[derive(Clone)]
+│  ├──83: pub struct ColorParser;
+│  ├──+1:
+│  ├──85: impl clap::builder::TypedValueParser for ColorParser {
+│  ├──+1:     type Value = Color;
+│  ├──-1: #[derive(Clone)]
+│  ├──142: pub struct KeyCodeParser;
+│  ├──+1:
+│  ├──144: impl clap::builder::TypedValueParser for KeyCodeParser {
+│  ├──+1:     type Value = KeyCode;
+│  ├──-1: )]
+│  ├──310: pub struct Args {
+│  ╰──+1:     #[arg(
 ├──errors.rs: 4
 │  ├──-1:
 │  ├──14: pub struct Message {
@@ -115,135 +120,171 @@ src: 10
 │  ├──-1:
 │  ├──40: impl fmt::Display for Message {
 │  ╰──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-├──style.rs: 1
+├──matcher.rs: 3
 │  ├──-1:
-│  ├──31: pub struct DisplayRepeater<T>(T, usize);
-│  ╰──+1: impl<T: Display> Display for DisplayRepeater<T> {
+│  ├──29: struct Matcher {
+│  ├──+1:     combined: RegexMatcher,
+│  ├──-1:
+│  ├──34: impl Matcher {
+│  ├──+1:     fn new(patterns: &[String]) -> Result<Self, Message> {
+│  ├──-1:
+│  ├──53: struct MatchSink<'a> {
+│  ╰──+1:     lines: Vec<Line>,
 ├──match_system.rs: 8
 │  ├──-1:
 │  ├──23: pub struct Directory {
 │  ├──+1:     pub path: PathBuf,
 │  ├──-1:
 │  ├──30: impl Directory {
-│  ├──+1:     pub fn new(path: &Path) -> Result<Self, Message> {
+│  ├──+1:     pub fn new(path: &Path, links: bool) -> Result<Self, Message> {
 │  ├──-1:
 │  ├──41: pub struct File {
 │  ├──+1:     pub path: PathBuf,
 │  ├──-1:
 │  ├──47: impl File {
-│  ├──+1:     pub fn from_pathbuf(path: PathBuf) -> Result<Self, Message> {
+│  ├──+1:     pub fn from_pathbuf(path: PathBuf, links: bool) -> Result<Self, Message> {
 │  ├──-1: #[cfg_attr(test, derive(PartialEq, Debug))]
-│  ├──72: pub struct Match {
+│  ├──73: pub struct Match {
 │  ├──+1:     pub regexp_id: usize,
 │  ├──-1:
-│  ├──78: impl Match {
+│  ├──79: impl Match {
 │  ├──+1:     pub fn new(regexp_id: usize, start: usize, end: usize) -> Self {
 │  ├──-1:
-│  ├──103: pub struct Line {
+│  ├──104: pub struct Line {
 │  ├──+1:     pub content: String,
 │  ├──-1:
-│  ├──110: impl Line {
+│  ├──111: impl Line {
 │  ╰──+1:     pub fn new(content: String, mut matches: Vec<Match>, line_num: usize) -> Self {
-├──select_menu.rs: 5
+├──writer.rs: 19
 │  ├──-1:
-│  ├──81: impl OpenStrategy {
-│  ├──+1:     fn from(editor: &str) -> Self {
+│  ├──57: impl HighlightEvent<'_> {
+│  ├──+1:     fn priority(&self) -> u8 {
 │  ├──-1:
-│  ├──93: pub struct SelectMenu<'a, 'b> {
-│  ├──+1:     jump: JumpLocation,
+│  ├──158: pub struct OpenInfo<'a> {
+│  ├──+1:     pub path: &'a Path,
 │  ├──-1:
-│  ├──110: struct Window {
+│  ├──171: pub struct WithFilter<'a> {
+│  ├──+1:     pub entry: &'a dyn Entry,
+│  ├──-1:
+│  ├──176: impl Display for WithFilter<'_> {
+│  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+│  ├──-1:
+│  ├──182: struct PathDisplay {
+│  ├──+1:     prefix: Option<Vec<PrefixComponent>>,
+│  ├──-1:
+│  ├──193: impl PathDisplay {
+│  ├──+1:     fn new(
+│  ├──-1:
+│  ├──226: impl Entry for PathDisplay {
+│  ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
+│  ├──-1:
+│  ├──265: impl Display for PathDisplay {
+│  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+│  ├──-1:
+│  ├──323: struct LineDisplay {
+│  ├──+1:     prefix: Vec<PrefixComponent>,
+│  ├──-1:
+│  ├──334: impl Entry for LineDisplay {
+│  ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
+│  ├──-1:
+│  ├──453: impl Display for LineDisplay {
+│  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+│  ├──-1:
+│  ├──459: struct LongBranchDisplay {
+│  ├──+1:     prefix: Vec<PrefixComponent>,
+│  ├──-1:
+│  ├──466: impl Entry for LongBranchDisplay {
+│  ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
+│  ├──-1:
+│  ├──517: impl Display for LongBranchDisplay {
+│  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+│  ├──-1:
+│  ├──523: struct OverviewDisplay {
+│  ├──+1:     dirs: usize,
+│  ├──-1:
+│  ├──532: impl Entry for OverviewDisplay {
+│  ├──+1:     fn render(&self, f: &mut fmt::Formatter, _filter: &str) -> fmt::Result {
+│  ├──-1:
+│  ├──572: impl Display for OverviewDisplay {
+│  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+│  ├──-1:
+│  ├──594: impl Directory {
+│  ├──+1:     fn to_lines(
+│  ├──-1:
+│  ├──699: impl File {
+│  ╰──+1:     fn to_lines(
+├──menu.rs: 9
+│  ├──-1:
+│  ├──59: impl ViewAnchor {
+│  ├──+1:     fn next(&mut self) {
+│  ├──-1:
+│  ├──69: struct DoubleClick {
+│  ├──+1:     down_row: u16,
+│  ├──-1:
+│  ├──74: impl DoubleClick {
+│  ├──+1:     fn new() -> Self {
+│  ├──-1:
+│  ├──101: struct Window {
 │  ├──+1:     first: isize,
 │  ├──-1:
-│  ├──115: impl Window {
-│  ├──+1:     pub fn shift_up(&mut self) {
+│  ├──106: impl Window {
+│  ├──+1:     fn new() -> Self {
 │  ├──-1:
-│  ├──136: impl JumpLocation {
-│  ╰──+1:     fn default() -> Self {
-├──config.rs: 6
+│  ├──339: struct CurrentResults {
+│  ├──+1:     lines: Vec<Box<dyn Entry>>,
 │  ├──-1:
-│  ├──15: pub struct KeyBindings {
-│  ├──+1:     pub down: Vec<KeyCode>,
+│  ├──343: impl CurrentResults {
+│  ├──+1:     fn new(matches: Matches, config: Arc<Config>) -> io::Result<Self> {
 │  ├──-1:
-│  ├──35: pub struct Characters {
-│  ├──+1:     pub bl: char,
+│  ├──351: pub struct Menu<'a, 'b> {
+│  ├──+1:     in_menu: bool,
 │  ├──-1:
-│  ├──51: pub struct Colors {
-│  ├──+1:     pub file: Color,
-│  ├──-1:
-│  ├──62: impl args::Color {
-│  ├──+1:     fn get(&self) -> Color {
-│  ├──-1:
-│  ├──80: pub struct Config {
-│  ├──+1:     pub path: PathBuf,
-│  ├──-1:
-│  ├──186: impl Config {
-│  ╰──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
-├──args.rs: 7
-│  ├──-1:
-│  ├──19: pub struct ArgInfo {
-│  ├──+1:     pub id: &'static str,
-│  ├──-1:
-│  ├──25: impl ArgInfo {
-│  ├──+1:     const fn new(id: &'static str, h: &'static str, s: Option<char>) -> Self {
-│  ├──-1:
-│  ├──40: impl ValueEnum for OpenStrategy {
-│  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
-│  ├──-1: #[derive(Clone)]
-│  ├──85: struct ColorParser;
-│  ├──+1:
-│  ├──87: impl clap::builder::TypedValueParser for ColorParser {
-│  ├──+1:     type Value = Color;
-│  ├──-1: #[derive(Clone)]
-│  ├──173: struct KeyCodeParser;
-│  ├──+1:
-│  ├──175: impl clap::builder::TypedValueParser for KeyCodeParser {
-│  ╰──+1:     type Value = KeyCode;
-╰──writer.rs: 9
+│  ├──1478: impl OpenStrategy {
+│  ╰──+1:     fn from(editor: &str) -> Self {
+╰──config.rs: 7
+   ├──-1: #[derive(Clone)]
+   ├──28: pub struct KeyBindings {
+   ├──+1:     pub down: Vec<KeyCode>,
+   ├──-1: #[derive(Clone)]
+   ├──52: pub struct Characters {
+   ├──+1:     pub bl: char,
+   ├──-1: #[derive(Clone)]
+   ├──73: pub struct Colors {
+   ├──+1:     pub file: Color,
    ├──-1:
-   ├──26: pub struct OpenInfo<'a> {
-   ├──+1:     pub path: &'a Path,
+   ├──85: impl args::Color {
+   ├──+1:     fn get(&self) -> Color {
+   ├──-1: #[derive(Clone)]
+   ├──104: pub struct CoreConfig {
+   ├──+1:     pub selection_file: Option<PathBuf>,
+   ├──-1: #[derive(Clone)]
+   ├──121: pub struct Config {
+   ├──+1:     pub path: PathBuf,
    ├──-1:
-   ├──37: struct PathDisplay<'a> {
-   ├──+1:     prefix: Option<Vec<PrefixComponent>>,
-   ├──-1:
-   ├──150: struct LineDisplay<'a> {
-   ├──+1:     prefix: Vec<PrefixComponent>,
-   ├──-1:
-   ├──279: struct LongBranchDisplay<'a> {
-   ├──+1:     prefix: Vec<PrefixComponent>,
-   ├──-1:
-   ├──320: struct OverviewDisplay {
-   ├──+1:     dirs: usize,
-   ├──-1:
-   ├──328: impl Entry for OverviewDisplay {
-   ├──+1:     fn open_info(&self) -> Result<OpenInfo<'_>, Message> {
-   ├──-1:
-   ├──340: impl Display for OverviewDisplay {
-   ├──+1:     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
-   ├──-1:
-   ├──388: impl Directory {
-   ├──+1:     fn to_lines<'a>(
-   ├──-1:
-   ├──473: impl File {
-   ╰──+1:     fn to_lines<'a>(
+   ├──410: impl Config {
+   ╰──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
 ```
 </details>
 
 <details>
-<summary><code>tgrep Print src/select_menu.rs --trim --line-number --char-vertical=| --char-horizontal=- --char-top-left=+ --char-top-right=+ --char-bottom-left=+ --char-bottom-right=+ --char-tee=+ --char-ellipsis=|</code></summary>
+<summary><code>tgrep Print src/menu.rs --trim --line-number --char-vertical=| --char-horizontal=- --char-top-left=+ --char-top-right=+ --char-bottom-left=+ --char-bottom-right=+ --char-tee=+</code></summary>
 
 ```
-select_menu.rs
-+--15: style::{Print, SetBackgroundColor},
-+--214: queue!(self.term, Print(&self.lines[orig]))?;
-+--216: queue!(self.term, Print(config().chars.ellipsis))?;
-+--711: Print(style::style_with(config().chars.selected_indicator.as_str(), c)),
-+--715: queue!(self.term, Print(config().chars.selected_indicator.as_str()),)?;
-+--725: Print(config().chars.selected_indicator_clear.as_str()),
-+--741: Print(format!(
-+--753: Print(format!(
-+--766: Print(format!(
+menu.rs
++--19: style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
++--253: Print(format!(
++--264: Print(format!(
++--276: Print(format!(
++--526: queue!(self.term, Print(WithFilter { entry, filter }))?;
++--529: queue!(self.term, Print(&cfg.chars.ellipsis))?;
++--548: Print(style::style_with(
++--556: queue!(self.term, Print(cfg.chars.selected_indicator.as_str()))?;
++--577: Print(cfg.chars.selected_indicator_clear.as_str()),
++--920: Print(format!("{:<width$}", top, width = width.min(top.len() + 1))),
++--937: Print(format!(
++--1030: Print(line)
++--1052: queue!(self.term, cursor::MoveTo(0, y), Print(msg))?;
++--1267: Print(cfg.chars.selected_indicator_clear.as_str())
 ```
 </details>
 
@@ -254,17 +295,16 @@ select_menu.rs
 treegrep
 ├──src
 │  ├──match_system.rs
+│  ├──menu.rs
 │  ├──args.rs
 │  ├──writer.rs
 │  ├──main.rs
 │  ├──errors.rs
-│  ├──select_menu.rs
 │  ├──style.rs
 │  ├──log.rs
 │  ├──config.rs
 │  ├──matcher.rs
-│  ├──term.rs
-│  ╰──args_menu.rs
+│  ╰──term.rs
 ├──doc
 │  ├──treegrep.vim9.txt
 │  ╰──treegrep.nvim.txt
@@ -305,7 +345,6 @@ treegrep
 │  │  ├──context_c1
 │  │  ├──links_1
 │  │  ├──count
-│  │  ├──colon
 │  │  ├──overview_file
 │  │  ├──files_long_branch_expr_1
 │  │  ├──overlapping
@@ -321,21 +360,21 @@ treegrep
 ├──.gitignore
 ├──README.md
 ├──Cargo.lock
+├──LICENSE
 ├──rustfmt.toml
-├──Cargo.toml
-╰──LICENSE
+╰──Cargo.toml
 ```
 </details>
 
 <details>
-<summary><code>tgrep --files --long-branch --hidden --glob=!.git</code></summary>
+<summary><code>tgrep --files --branch-each=5 --hidden --glob=!.git</code></summary>
 
 ```
 treegrep
 ├──src
-│  ├──match_system.rs, args.rs, writer.rs, main.rs, errors.rs
-│  ├──select_menu.rs, style.rs, log.rs, config.rs, matcher.rs
-│  ╰──term.rs, args_menu.rs
+│  ├──match_system.rs, menu.rs, args.rs, writer.rs, main.rs
+│  ├──errors.rs, style.rs, log.rs, config.rs, matcher.rs
+│  ╰──term.rs
 ├──doc
 │  ╰──treegrep.vim9.txt, treegrep.nvim.txt
 ├──.github
@@ -351,12 +390,12 @@ treegrep
 │  ├──pool
 │  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
-│  │  ├──max_depth, files_long_branch_2, glob_inclusion, files_long_branch_expr_count_1, overview_file
-│  │  ├──files_with_expr, files_long_branch_expr_1, overlapping, file, links_1
-│  │  ├──colon, count, context_c1, deep, line_number
-│  │  ├──files_2, wide_1, overview_dir, files_long_branch_expr_count_2, files_long_branch_1
-│  │  ├──context_b1, context_a1, glob_exclusion, no_matches, files_long_branch_expr_2
-│  │  ╰──files_1, wide_2, links_4, links_3, links_2
+│  │  ├──files_1, wide_2, links_4, links_3, links_2
+│  │  ├──files_long_branch_expr_2, glob_exclusion, no_matches, files_long_branch_1, context_b1
+│  │  ├──context_a1, files_long_branch_expr_count_2, overview_dir, wide_1, files_2
+│  │  ├──line_number, deep, context_c1, links_1, count
+│  │  ├──overview_file, files_long_branch_expr_1, overlapping, file, max_depth
+│  │  ╰──files_long_branch_2, glob_inclusion, files_long_branch_expr_count_1, files_with_expr
 │  ╰──utils.rs, tests.rs, file_system.rs
 ├──.gitignore, README.md, Cargo.lock, LICENSE, rustfmt.toml
 ╰──Cargo.toml
@@ -365,7 +404,7 @@ treegrep
 
 ### *--help*
 ```
-treegrep 1.3.0
+tgrep 1.3.0
 
 by Timothy Cronin
 
@@ -373,13 +412,13 @@ home page: https://github.com/4imothy/treegrep
 
 regex pattern matcher that displays results in a tree structure with an interface to jump to matched text
 
-tgrep [OPTIONS] [positional regexp] [positional target]
+tgrep [OPTIONS] <POSITIONAL_REGEXP|--regexp <>|--files|--completions <>|--menu|--repeat> [POSITIONAL_PATH]
 
 arguments:
-  [positional regexp]
+  [POSITIONAL_REGEXP]
           a regex expression to search for
 
-  [positional target]
+  [POSITIONAL_PATH]
           the path to search, if not provided, search the current directory
 
 options:
@@ -392,6 +431,9 @@ options:
   -s, --select
           results are shown in a selection interface for opening
 
+  -m, --menu
+          open a search and selection interface
+
   -f, --files
           if an expression is given, hide matched content, otherwise, show the files that would be searched
 
@@ -399,7 +441,7 @@ options:
           search hidden files
 
   -n, --line-number
-          show line number of match
+          show the line numbers of matches
 
   -c, --count
           display number of files matched in directory and number of lines matched in a file
@@ -425,11 +467,11 @@ options:
   -A, --after-context <>
           number of lines to show after each match
 
+      --live
+          trigger search on every keystroke in the menu
+
       --max-length <>
           set the max length for a matched line
-
-      --menu
-          provide arguments and select results through an interface
 
       --no-ignore
           don't use ignore files
@@ -438,13 +480,13 @@ options:
           trim whitespace at the beginning of lines
 
       --threads <>
-          set the appropriate number of threads to use
-
-      --long-branch
-          multiple files from the same directory are shown on the same branch
+          set the number of threads to use
 
       --editor <>
           command used to open selections
+
+      --auto-open
+          if there is only one match, open it in the configured editor
 
       --open-like <>
           command line syntax for opening a file at a line
@@ -460,7 +502,7 @@ options:
           file to write selection to (first line: file path, second line: line number if applicable)
 
       --repeat-file <>
-          file where arguments are saved
+          file used to save the most recent successful search, with searches saved from the command line or the menu
 
       --repeat
           repeats the last saved search
@@ -480,10 +522,10 @@ options:
       --text-color <>
           black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
 
-      --line-number-color <>
+      --branch-color <>
           black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
 
-      --branch-color <>
+      --line-number-color <>
           black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
 
       --match-colors <>
@@ -495,7 +537,7 @@ options:
       --selected-bg-color <>
           black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
 
-      --search-highlight-color <>
+      --filter-highlight-color <>
           black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
 
       --prefix-len <>
@@ -503,34 +545,65 @@ options:
           
           [default: 3]
 
-      --long-branch-each <>
+      --branch-each <>
           number of files to print on each branch
           
-          [default: 5]
+          [default: 1]
 
       --char-vertical <>
           vertical branch character
+          
+          [default: │]
 
       --char-horizontal <>
           horizontal branch character
+          
+          [default: ─]
 
       --char-top-left <>
           top-left corner character
+          
+          [default: ╭]
 
       --char-top-right <>
           top-right corner character
+          
+          [default: ╮]
 
       --char-bottom-left <>
           bottom-left corner character
+          
+          [default: ╰]
 
       --char-bottom-right <>
           bottom-right corner character
+          
+          [default: ╯]
 
       --char-tee <>
           tee branch character
+          
+          [default: ├]
 
-      --char-ellipsis <>
-          folding indicator character
+      --ellipsis <>
+          folded indicator
+          
+          [default: ⤵]
+
+      --search-prompt <>
+          search mode prompt
+          
+          [default: "➜ "]
+
+      --search-prompt-inactive <>
+          search prompt when not searching
+          
+          [default: "- "]
+
+      --filter-prompt <>
+          filter mode prompt
+          
+          [default: /]
 
       --selected-indicator <>
           selected indicator characters
@@ -558,32 +631,32 @@ options:
           [default: K P]
 
       --key-down-path <>
-          next path
+          move down to the next path
           
           [default: } ]]
 
       --key-up-path <>
-          previous path
+          move up to the previous path
           
           [default: { []
 
       --key-down-same-depth <>
-          next path at same depth
+          move down to the next path at same depth
           
           [default: ) d]
 
       --key-up-same-depth <>
-          previous path at same depth
+          move up to the previous path at same depth
           
           [default: ( u]
 
       --key-top <>
-          go to top
+          move to the top
           
           [default: home g <]
 
       --key-bottom <>
-          go to bottom
+          move to the bottom
           
           [default: end G >]
 
@@ -597,8 +670,8 @@ options:
           
           [default: pageup b]
 
-      --key-center <>
-          center cursor
+      --key-cycle-view <>
+          cycle cursor position (top/center/bottom)
           
           [default: z l]
 
@@ -622,16 +695,26 @@ options:
           
           [default: tab]
 
-      --key-search <>
-          search within results
+      --key-filter <>
+          filter within results
           
           [default: / s]
 
+      --key-search <>
+          enter search mode
+          
+          [default: :]
+
+      --key-submit-search <>
+          submit search query
+          
+          [default: enter]
+
   -h, --help
-          print help
+          
 
   -V, --version
-          print version
+          
 
 arguments are prefixed with the contents of the TREEGREP_DEFAULT_OPTS environment variable
 ```
