@@ -5,7 +5,7 @@ treegrep is a regex pattern matcher that displays results in a tree structure wi
 [![test](https://github.com/4imothy/treegrep/actions/workflows/test.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
 [![release](https://github.com/4imothy/treegrep/actions/workflows/cr.yml/badge.svg)](https://github.com/4imothy/treegrep/actions)
 
-[introduction video](https://youtu.be/lRMwCE6Zwuw?si=m9SRypN6_NxgW6K4)
+[demo video](https://youtu.be/fPFmQr08B_I)
 
 [examples](#examples), [editor integrations](#editor-integrations), and [help](#--help).
 
@@ -83,186 +83,186 @@ nnoremap <leader>tf :call TgrepWith('--files --select')<cr>
 ```
 src: 9
 ├──term.rs: 1
-│  ├──-1:
+│  ├──-1: 
 │  ├──15: pub struct Term<'a> {
 │  ╰──+1:     pub height: u16,
 ├──style.rs: 1
-│  ├──-1:
+│  ├──-1: 
 │  ├──23: pub struct DisplayRepeater<T>(T, usize);
 │  ╰──+1: impl<T: Display> Display for DisplayRepeater<T> {
-├──args.rs: 6
-│  ├──-1:
-│  ├──25: impl ValueEnum for OpenStrategy {
-│  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
-│  ├──-1: #[derive(Clone)]
-│  ├──83: pub struct ColorParser;
-│  ├──+1:
-│  ├──85: impl clap::builder::TypedValueParser for ColorParser {
-│  ├──+1:     type Value = Color;
-│  ├──-1: #[derive(Clone)]
-│  ├──142: pub struct KeyCodeParser;
-│  ├──+1:
-│  ├──144: impl clap::builder::TypedValueParser for KeyCodeParser {
-│  ├──+1:     type Value = KeyCode;
-│  ├──-1: )]
-│  ├──310: pub struct Args {
-│  ╰──+1:     #[arg(
+├──matcher.rs: 3
+│  ├──-1: 
+│  ├──29: struct Matcher {
+│  ├──+1:     combined: RegexMatcher,
+│  ├──-1: 
+│  ├──34: impl Matcher {
+│  ├──+1:     fn new(patterns: &[String]) -> Result<Self, Message> {
+│  ├──-1: 
+│  ├──53: struct MatchSink<'a> {
+│  ╰──+1:     lines: Vec<Line>,
 ├──errors.rs: 4
-│  ├──-1:
+│  ├──-1: 
 │  ├──14: pub struct Message {
 │  ├──+1:     pub mes: String,
 │  ├──-1: }
 │  ├──17: impl Error for Message {}
-│  ├──+1:
-│  ├──-1:
+│  ├──+1: 
+│  ├──-1: 
 │  ├──34: impl fmt::Debug for Message {
 │  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-│  ├──-1:
+│  ├──-1: 
 │  ├──40: impl fmt::Display for Message {
 │  ╰──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-├──matcher.rs: 3
-│  ├──-1:
-│  ├──29: struct Matcher {
-│  ├──+1:     combined: RegexMatcher,
-│  ├──-1:
-│  ├──34: impl Matcher {
-│  ├──+1:     fn new(patterns: &[String]) -> Result<Self, Message> {
-│  ├──-1:
-│  ├──53: struct MatchSink<'a> {
-│  ╰──+1:     lines: Vec<Line>,
 ├──match_system.rs: 8
-│  ├──-1:
+│  ├──-1: 
 │  ├──23: pub struct Directory {
 │  ├──+1:     pub path: PathBuf,
-│  ├──-1:
+│  ├──-1: 
 │  ├──30: impl Directory {
 │  ├──+1:     pub fn new(path: &Path, links: bool) -> Result<Self, Message> {
-│  ├──-1:
+│  ├──-1: 
 │  ├──41: pub struct File {
 │  ├──+1:     pub path: PathBuf,
-│  ├──-1:
+│  ├──-1: 
 │  ├──47: impl File {
 │  ├──+1:     pub fn from_pathbuf(path: PathBuf, links: bool) -> Result<Self, Message> {
 │  ├──-1: #[cfg_attr(test, derive(PartialEq, Debug))]
 │  ├──73: pub struct Match {
 │  ├──+1:     pub regexp_id: usize,
-│  ├──-1:
+│  ├──-1: 
 │  ├──79: impl Match {
 │  ├──+1:     pub fn new(regexp_id: usize, start: usize, end: usize) -> Self {
-│  ├──-1:
+│  ├──-1: 
 │  ├──104: pub struct Line {
 │  ├──+1:     pub content: String,
-│  ├──-1:
+│  ├──-1: 
 │  ├──111: impl Line {
 │  ╰──+1:     pub fn new(content: String, mut matches: Vec<Match>, line_num: usize) -> Self {
+├──args.rs: 6
+│  ├──-1: 
+│  ├──25: impl ValueEnum for OpenStrategy {
+│  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
+│  ├──-1: #[derive(Clone)]
+│  ├──83: pub struct ColorParser;
+│  ├──+1: 
+│  ├──85: impl clap::builder::TypedValueParser for ColorParser {
+│  ├──+1:     type Value = Color;
+│  ├──-1: #[derive(Clone)]
+│  ├──142: pub struct KeyCodeParser;
+│  ├──+1: 
+│  ├──144: impl clap::builder::TypedValueParser for KeyCodeParser {
+│  ├──+1:     type Value = KeyCode;
+│  ├──-1: )]
+│  ├──310: pub struct Args {
+│  ╰──+1:     #[arg(
+├──config.rs: 7
+│  ├──-1: #[derive(Clone)]
+│  ├──28: pub struct KeyBindings {
+│  ├──+1:     pub down: Vec<KeyCode>,
+│  ├──-1: #[derive(Clone)]
+│  ├──52: pub struct Characters {
+│  ├──+1:     pub bl: char,
+│  ├──-1: #[derive(Clone)]
+│  ├──73: pub struct Colors {
+│  ├──+1:     pub file: Color,
+│  ├──-1: 
+│  ├──85: impl args::Color {
+│  ├──+1:     fn get(&self) -> Color {
+│  ├──-1: #[derive(Clone)]
+│  ├──104: pub struct CoreConfig {
+│  ├──+1:     pub selection_file: Option<PathBuf>,
+│  ├──-1: #[derive(Clone)]
+│  ├──121: pub struct Config {
+│  ├──+1:     pub path: PathBuf,
+│  ├──-1: 
+│  ├──410: impl Config {
+│  ╰──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
 ├──writer.rs: 19
-│  ├──-1:
+│  ├──-1: 
 │  ├──57: impl HighlightEvent<'_> {
 │  ├──+1:     fn priority(&self) -> u8 {
-│  ├──-1:
+│  ├──-1: 
 │  ├──158: pub struct OpenInfo<'a> {
 │  ├──+1:     pub path: &'a Path,
-│  ├──-1:
+│  ├──-1: 
 │  ├──171: pub struct WithFilter<'a> {
 │  ├──+1:     pub entry: &'a dyn Entry,
-│  ├──-1:
+│  ├──-1: 
 │  ├──176: impl Display for WithFilter<'_> {
 │  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-│  ├──-1:
+│  ├──-1: 
 │  ├──182: struct PathDisplay {
 │  ├──+1:     prefix: Option<Vec<PrefixComponent>>,
-│  ├──-1:
+│  ├──-1: 
 │  ├──193: impl PathDisplay {
 │  ├──+1:     fn new(
-│  ├──-1:
+│  ├──-1: 
 │  ├──226: impl Entry for PathDisplay {
 │  ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
-│  ├──-1:
+│  ├──-1: 
 │  ├──265: impl Display for PathDisplay {
 │  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-│  ├──-1:
+│  ├──-1: 
 │  ├──323: struct LineDisplay {
 │  ├──+1:     prefix: Vec<PrefixComponent>,
-│  ├──-1:
+│  ├──-1: 
 │  ├──334: impl Entry for LineDisplay {
 │  ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
-│  ├──-1:
+│  ├──-1: 
 │  ├──453: impl Display for LineDisplay {
 │  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-│  ├──-1:
+│  ├──-1: 
 │  ├──459: struct LongBranchDisplay {
 │  ├──+1:     prefix: Vec<PrefixComponent>,
-│  ├──-1:
+│  ├──-1: 
 │  ├──466: impl Entry for LongBranchDisplay {
 │  ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
-│  ├──-1:
+│  ├──-1: 
 │  ├──517: impl Display for LongBranchDisplay {
 │  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-│  ├──-1:
+│  ├──-1: 
 │  ├──523: struct OverviewDisplay {
 │  ├──+1:     dirs: usize,
-│  ├──-1:
+│  ├──-1: 
 │  ├──532: impl Entry for OverviewDisplay {
 │  ├──+1:     fn render(&self, f: &mut fmt::Formatter, _filter: &str) -> fmt::Result {
-│  ├──-1:
+│  ├──-1: 
 │  ├──572: impl Display for OverviewDisplay {
 │  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-│  ├──-1:
+│  ├──-1: 
 │  ├──594: impl Directory {
 │  ├──+1:     fn to_lines(
-│  ├──-1:
+│  ├──-1: 
 │  ├──699: impl File {
 │  ╰──+1:     fn to_lines(
-├──menu.rs: 9
-│  ├──-1:
-│  ├──59: impl ViewAnchor {
-│  ├──+1:     fn next(&mut self) {
-│  ├──-1:
-│  ├──69: struct DoubleClick {
-│  ├──+1:     down_row: u16,
-│  ├──-1:
-│  ├──74: impl DoubleClick {
-│  ├──+1:     fn new() -> Self {
-│  ├──-1:
-│  ├──101: struct Window {
-│  ├──+1:     first: isize,
-│  ├──-1:
-│  ├──106: impl Window {
-│  ├──+1:     fn new() -> Self {
-│  ├──-1:
-│  ├──339: struct CurrentResults {
-│  ├──+1:     lines: Vec<Box<dyn Entry>>,
-│  ├──-1:
-│  ├──343: impl CurrentResults {
-│  ├──+1:     fn new(matches: Matches, config: Arc<Config>) -> io::Result<Self> {
-│  ├──-1:
-│  ├──351: pub struct Menu<'a, 'b> {
-│  ├──+1:     in_menu: bool,
-│  ├──-1:
-│  ├──1478: impl OpenStrategy {
-│  ╰──+1:     fn from(editor: &str) -> Self {
-╰──config.rs: 7
-   ├──-1: #[derive(Clone)]
-   ├──28: pub struct KeyBindings {
-   ├──+1:     pub down: Vec<KeyCode>,
-   ├──-1: #[derive(Clone)]
-   ├──52: pub struct Characters {
-   ├──+1:     pub bl: char,
-   ├──-1: #[derive(Clone)]
-   ├──73: pub struct Colors {
-   ├──+1:     pub file: Color,
-   ├──-1:
-   ├──85: impl args::Color {
-   ├──+1:     fn get(&self) -> Color {
-   ├──-1: #[derive(Clone)]
-   ├──104: pub struct CoreConfig {
-   ├──+1:     pub selection_file: Option<PathBuf>,
-   ├──-1: #[derive(Clone)]
-   ├──121: pub struct Config {
-   ├──+1:     pub path: PathBuf,
-   ├──-1:
-   ├──410: impl Config {
-   ╰──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
+╰──menu.rs: 9
+   ├──-1: 
+   ├──59: impl ViewAnchor {
+   ├──+1:     fn next(&mut self) {
+   ├──-1: 
+   ├──69: struct DoubleClick {
+   ├──+1:     down_row: u16,
+   ├──-1: 
+   ├──74: impl DoubleClick {
+   ├──+1:     fn new() -> Self {
+   ├──-1: 
+   ├──101: struct Window {
+   ├──+1:     first: isize,
+   ├──-1: 
+   ├──106: impl Window {
+   ├──+1:     fn new() -> Self {
+   ├──-1: 
+   ├──339: struct CurrentResults {
+   ├──+1:     lines: Vec<Box<dyn Entry>>,
+   ├──-1: 
+   ├──343: impl CurrentResults {
+   ├──+1:     fn new(matches: Matches, config: Arc<Config>) -> io::Result<Self> {
+   ├──-1: 
+   ├──351: pub struct Menu<'a, 'b> {
+   ├──+1:     in_menu: bool,
+   ├──-1: 
+   ├──1496: impl OpenStrategy {
+   ╰──+1:     fn from(editor: &str) -> Self {
 ```
 </details>
 
@@ -275,16 +275,16 @@ menu.rs
 +--253: Print(format!(
 +--264: Print(format!(
 +--276: Print(format!(
-+--526: queue!(self.term, Print(WithFilter { entry, filter }))?;
-+--529: queue!(self.term, Print(&cfg.chars.ellipsis))?;
-+--548: Print(style::style_with(
-+--556: queue!(self.term, Print(cfg.chars.selected_indicator.as_str()))?;
-+--577: Print(cfg.chars.selected_indicator_clear.as_str()),
-+--920: Print(format!("{:<width$}", top, width = width.min(top.len() + 1))),
-+--937: Print(format!(
-+--1030: Print(line)
-+--1052: queue!(self.term, cursor::MoveTo(0, y), Print(msg))?;
-+--1267: Print(cfg.chars.selected_indicator_clear.as_str())
++--528: queue!(self.term, Print(WithFilter { entry, filter }))?;
++--531: queue!(self.term, Print(&cfg.chars.ellipsis))?;
++--550: Print(style::style_with(
++--558: queue!(self.term, Print(cfg.chars.selected_indicator.as_str()))?;
++--579: Print(cfg.chars.selected_indicator_clear.as_str()),
++--932: Print(format!("{:<width$}", top, width = width.min(top.len() + 1))),
++--949: Print(format!(
++--1042: Print(line)
++--1064: queue!(self.term, cursor::MoveTo(0, y), Print(msg))?;
++--1279: Print(cfg.chars.selected_indicator_clear.as_str())
 ```
 </details>
 
@@ -404,7 +404,7 @@ treegrep
 
 ### *--help*
 ```
-tgrep 1.3.0
+tgrep 2.0.0
 
 by Timothy Cronin
 
