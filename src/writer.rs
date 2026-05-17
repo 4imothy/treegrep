@@ -349,27 +349,36 @@ impl Entry for LineDisplay {
             0
         };
 
+        let line_num = if self.config.line_number {
+            Some(
+                self.context_offset
+                    .map_or_else(|| format!("{}: ", self.line_num), |o| format!("{:+}: ", o)),
+            )
+        } else {
+            None
+        };
+
         if self.config.core.select || self.config.core.menu {
             let term_width = TERM_WIDTH.load(Ordering::SeqCst) as usize;
+            let indicator_len = self.config.chars.selected_indicator.chars().count();
             let prefix_len = self.config.prefix_len * self.prefix.len();
-            let content_width = term_width.saturating_sub(prefix_len);
+            let line_num_len = line_num.as_ref().map_or(0, |n| n.len());
+            let content_width =
+                term_width.saturating_sub(indicator_len + prefix_len + line_num_len);
             let cap = self
                 .config
                 .max_length
-                .map_or(content_width, |m| (m + prefix_len).min(content_width));
+                .map_or(content_width, |m| m.min(content_width));
             content = &content[..content.floor_char_boundary(cap.min(content.len()))];
         } else if let Some(max) = self.config.max_length {
             content = &content[..content.floor_char_boundary(max.min(content.len()))];
         }
 
-        if self.config.line_number {
-            let n = self
-                .context_offset
-                .map_or_else(|| self.line_num.to_string(), |o| format!("{:+}", o));
+        if let Some(n) = &line_num {
             write!(
                 f,
-                "{}: ",
-                style::style_with(n, self.config.colors.line_number, &self.config)
+                "{}",
+                style::style_with(n.as_str(), self.config.colors.line_number, &self.config)
             )?;
         }
 

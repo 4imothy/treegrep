@@ -157,7 +157,7 @@ fn str_backspace(s: &mut String, cursor: &mut usize) {
     }
 }
 
-fn str_kill_word_back(s: &mut String, cursor: &mut usize) {
+fn str_kill_word_backward(s: &mut String, cursor: &mut usize) {
     while *cursor > 0 && s.as_bytes().get(*cursor - 1) == Some(&b' ') {
         str_backspace(s, cursor);
     }
@@ -166,8 +166,140 @@ fn str_kill_word_back(s: &mut String, cursor: &mut usize) {
     }
 }
 
-fn edit_bar(s: &mut String, cursor: &mut usize, code: KeyCode, ctrl: bool) -> Option<bool> {
-    if ctrl {
+fn str_kill_word_forward(s: &mut String, cursor: usize) {
+    while cursor < s.len() && s.as_bytes()[cursor] != b' ' {
+        s.remove(cursor);
+    }
+}
+
+fn str_move_word_forward(s: &str, cursor: usize) -> usize {
+    let mut i = cursor;
+    while i < s.len() && s.as_bytes()[i] != b' ' {
+        i = str_move_forward(s, i);
+    }
+    while i < s.len() && s.as_bytes()[i] == b' ' {
+        i = str_move_forward(s, i);
+    }
+    i
+}
+
+fn str_move_word_back(s: &str, cursor: usize) -> usize {
+    let mut i = cursor;
+    while i > 0 && s.as_bytes()[i - 1] == b' ' {
+        i = str_move_back(s, i);
+    }
+    while i > 0 && s.as_bytes()[i - 1] != b' ' {
+        i = str_move_back(s, i);
+    }
+    i
+}
+
+fn str_transpose_chars(s: &mut String, cursor: &mut usize) -> bool {
+    let at = if *cursor == s.len() {
+        str_move_back(s, *cursor)
+    } else {
+        *cursor
+    };
+    let prev = str_move_back(s, at);
+    if prev < at && at < s.len() {
+        let next = str_move_forward(s, at);
+        let a = s[prev..at].to_string();
+        let b = s[at..next].to_string();
+        s.replace_range(prev..next, &format!("{}{}", b, a));
+        *cursor = prev + b.len() + a.len();
+        true
+    } else {
+        false
+    }
+}
+
+fn str_transpose_words(s: &mut String, cursor: usize) -> Option<usize> {
+    let mut w2_end = cursor;
+    while w2_end < s.len() && s.as_bytes()[w2_end] == b' ' {
+        w2_end = str_move_forward(s, w2_end);
+    }
+    while w2_end < s.len() && s.as_bytes()[w2_end] != b' ' {
+        w2_end = str_move_forward(s, w2_end);
+    }
+    let mut w2_start = w2_end;
+    while w2_start > 0 && s.as_bytes()[w2_start - 1] != b' ' {
+        w2_start = str_move_back(s, w2_start);
+    }
+    if w2_start == w2_end {
+        return None;
+    }
+    let mut w1_end = w2_start;
+    while w1_end > 0 && s.as_bytes()[w1_end - 1] == b' ' {
+        w1_end = str_move_back(s, w1_end);
+    }
+    let mut w1_start = w1_end;
+    while w1_start > 0 && s.as_bytes()[w1_start - 1] != b' ' {
+        w1_start = str_move_back(s, w1_start);
+    }
+    if w1_start == w1_end {
+        return None;
+    }
+    let w1 = s[w1_start..w1_end].to_string();
+    let w2 = s[w2_start..w2_end].to_string();
+    s.replace_range(w2_start..w2_end, &w1);
+    s.replace_range(w1_start..w1_end, &w2);
+    let gap = w2_start - w1_end;
+    Some(w1_start + w2.len() + gap + w1.len())
+}
+
+fn bar_display(prompt: &str, text: &str, cursor_byte: usize, width: usize) -> (String, u16) {
+    let prompt_chars = prompt.chars().count();
+    let cursor_chars = text[..cursor_byte].chars().count();
+    let cursor_col = prompt_chars + cursor_chars;
+    let scroll_chars = if cursor_col >= width {
+        cursor_col + 1 - width
+    } else {
+        0
+    };
+    let visible_chars = width.saturating_sub(prompt_chars);
+    let text_visible: String = text
+        .chars()
+        .skip(scroll_chars)
+        .take(visible_chars)
+        .collect();
+    (
+        format!("{}{}", prompt, text_visible),
+        (cursor_col - scroll_chars) as u16,
+    )
+}
+
+fn edit_bar(
+    s: &mut String,
+    cursor: &mut usize,
+    code: KeyCode,
+    ctrl: bool,
+    alt: bool,
+) -> Option<bool> {
+    if alt {
+        match code {
+            KeyCode::Char('f') => {
+                *cursor = str_move_word_forward(s, *cursor);
+                Some(false)
+            }
+            KeyCode::Char('b') => {
+                *cursor = str_move_word_back(s, *cursor);
+                Some(false)
+            }
+            KeyCode::Char('d') => {
+                str_kill_word_forward(s, *cursor);
+                Some(true)
+            }
+            KeyCode::Backspace => {
+                str_kill_word_backward(s, cursor);
+                Some(true)
+            }
+            KeyCode::Char('t') => str_transpose_words(s, *cursor).map(|new| {
+                *cursor = new;
+                true
+            }),
+            _ => None,
+        }
+    } else if ctrl {
         match code {
             KeyCode::Char('a') => {
                 *cursor = 0;
@@ -195,13 +327,14 @@ fn edit_bar(s: &mut String, cursor: &mut usize, code: KeyCode, ctrl: bool) -> Op
                 Some(true)
             }
             KeyCode::Char('w') if !s.is_empty() => {
-                str_kill_word_back(s, cursor);
+                str_kill_word_backward(s, cursor);
                 Some(true)
             }
             KeyCode::Char('d') if *cursor < s.len() => {
                 s.remove(*cursor);
                 Some(true)
             }
+            KeyCode::Char('t') => str_transpose_chars(s, cursor).then_some(true),
             _ => None,
         }
     } else {
@@ -290,48 +423,87 @@ fn format_keys(keys: &[KeyCode]) -> String {
         .join(",")
 }
 
+fn help_table(rows: &[(String, &str)], indent: usize, ncols: usize) -> String {
+    let key_w = rows.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+    let desc_w = rows.iter().map(|(_, d)| d.len()).max().unwrap_or(0);
+    let pad = " ".repeat(indent);
+    rows.chunks(ncols)
+        .map(|chunk| {
+            let mut line = pad.clone();
+            for (j, (k, d)) in chunk.iter().enumerate() {
+                if j > 0 {
+                    line.push_str("   ");
+                }
+                if j + 1 < chunk.len() {
+                    line.push_str(&format!("{k:<key_w$}  {d:<desc_w$}"));
+                } else {
+                    line.push_str(&format!("{k:<key_w$}  {d}"));
+                }
+            }
+            line
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn help_popup() -> String {
     let cfg = config::base_config();
     let k = &cfg.core.keys;
-    let sp = cfg.chars.search_prompt.clone();
-    let np = cfg.chars.search_prompt_inactive.clone();
-    let fp = cfg.chars.filter_prompt.clone();
+    let sp = &cfg.chars.search_prompt;
+    let np = &cfg.chars.search_prompt_inactive;
+    let fp = &cfg.chars.filter_prompt;
+
+    let bar_rows: Vec<(String, &str)> = vec![
+        ("ctrl a/e".into(), "begin/end"),
+        ("ctrl f/b".into(), "char forward/back"),
+        ("ctrl u".into(), "clear"),
+        ("ctrl k".into(), "kill to end"),
+        ("ctrl d".into(), "delete char"),
+        ("ctrl t".into(), "transpose chars"),
+        ("alt f/b".into(), "word forward/back"),
+        ("alt d".into(), "kill word forward"),
+        ("alt bksp".into(), "kill word back"),
+        ("alt t".into(), "transpose words"),
+    ];
+
+    let nav_rows: Vec<(String, &str)> = vec![
+        (
+            format!("{}/backtab/opt+q", format_keys(&k.search)),
+            "search",
+        ),
+        (format_keys(&k.filter), "filter"),
+        (format_keys(&k.up), "up"),
+        (format_keys(&k.down), "down"),
+        (format_keys(&k.big_up), "big jump up"),
+        (format_keys(&k.big_down), "big jump down"),
+        (format_keys(&k.up_path), "prev path"),
+        (format_keys(&k.down_path), "next path"),
+        (format_keys(&k.up_same_depth), "prev same depth"),
+        (format_keys(&k.down_same_depth), "next same depth"),
+        (format_keys(&k.top), "top"),
+        (format_keys(&k.bottom), "bottom"),
+        (format_keys(&k.page_up), "page up"),
+        (format_keys(&k.page_down), "page down"),
+        (format_keys(&k.cycle_view), "cycle cursor position"),
+        (format_keys(&k.fold), "fold/unfold"),
+        ("scroll/click".into(), "scroll/click"),
+        (format_keys(&k.open), "open"),
+        (format_keys(&k.help), "help"),
+        (format!("esc/{}", format_keys(&k.quit)), "quit"),
+    ];
+
     format!(
-        "modes\n\
-         \x20- search ({sp}) -> edit regex query\n\
-         \x20  {}/backtab -> navigate (saves query for repeat), esc -> navigate\n\
-         \x20  ctrl -> a/e (begin/end), f/b (forward/back), u (clear),\n\
-         \x20           k (kill to end), w (kill word), d (delete forward)\n\
-         \x20- navigate ({np}) -> browse results\n\
-         \x20  {}/backtab/option+q -> search, {} -> filter, {} -> help, esc/{} -> quit\n\
-         \x20  up/down -> {}/{}, big jump -> {}/{}, prev/next path -> left/{}/right/{}\n\
-         \x20  prev/next path same depth -> {}/{}, top/bottom -> {}/{}\n\
-         \x20  page up/down -> {}/{}, cycle view -> {}, fold/unfold -> {}, open -> {}\n\
-         \x20  scrolling and clicking\n\
-         \x20- filter ({fp}) -> text filter over results\n\
-         \x20  backtab/enter -> navigate, esc -> clear and navigate\n\
-         \x20  same ctrl bindings as search\n\
-         press {} to quit this popup",
+        "text bars\n\
+         {}\n\
+         modes\n\
+         \x20- search ({sp})  {}/backtab → navigate, esc → navigate\n\
+         \x20- filter ({fp})  enter/backtab → navigate, esc → clear and navigate\n\
+         \x20- navigate ({np})\n\
+         {}\n\
+         press {} to close",
+        help_table(&bar_rows, 2, 2),
         format_keys(&k.submit_search),
-        format_keys(&k.search),
-        format_keys(&k.filter),
-        format_keys(&k.help),
-        format_keys(&k.quit),
-        format_keys(&k.up),
-        format_keys(&k.down),
-        format_keys(&k.big_up),
-        format_keys(&k.big_down),
-        format_keys(&k.up_path),
-        format_keys(&k.down_path),
-        format_keys(&k.up_same_depth),
-        format_keys(&k.down_same_depth),
-        format_keys(&k.top),
-        format_keys(&k.bottom),
-        format_keys(&k.page_up),
-        format_keys(&k.page_down),
-        format_keys(&k.cycle_view),
-        format_keys(&k.fold),
-        format_keys(&k.open),
+        help_table(&nav_rows, 4, 2),
         format_keys(&k.quit),
     )
 }
@@ -359,7 +531,7 @@ pub struct Menu<'a, 'b> {
     mode: Mode,
     error_msg: Option<String>,
     search_gen: u64,
-    searching: bool,
+    search_started: Option<Instant>,
     abort: Arc<AtomicBool>,
     result_rx: Receiver<(u64, Option<SearchResult>)>,
     result_tx: Sender<(u64, Option<SearchResult>)>,
@@ -396,7 +568,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             },
             error_msg: None,
             search_gen: 0,
-            searching: false,
+            search_started: None,
             abort: Arc::new(AtomicBool::new(false)),
             result_rx,
             result_tx,
@@ -867,7 +1039,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                 }
                 let new_config = Arc::new(new_config);
                 let thread_config = Arc::clone(&new_config);
-                self.searching = true;
+                self.search_started = Some(Instant::now());
                 let abort = Arc::clone(&self.abort);
                 let tx = self.result_tx.clone();
                 std::thread::spawn(move || {
@@ -886,7 +1058,7 @@ impl<'a, 'b> Menu<'a, 'b> {
     }
 
     fn apply_results(&mut self, result: Option<SearchResult>) {
-        self.searching = false;
+        self.search_started = None;
         self.current = None;
         if let Some((m, config)) = result
             && let Ok(r) = CurrentResults::new(m, config)
@@ -920,16 +1092,17 @@ impl<'a, 'b> Menu<'a, 'b> {
     fn queue_query_bar(&mut self) -> io::Result<()> {
         let cfg = config::base_config();
         let width = self.term.width() as usize;
-        let top = match self.mode {
-            Mode::Search => format!("{}{}", cfg.chars.search_prompt, self.search),
-            _ => format!("{}{}", cfg.chars.search_prompt_inactive, self.search),
+        let prompt = match self.mode {
+            Mode::Search => cfg.chars.search_prompt.as_str(),
+            _ => cfg.chars.search_prompt_inactive.as_str(),
         };
+        let (top, _) = bar_display(prompt, &self.search, self.search_cursor, width);
         queue!(
             self.term,
             ResetColor,
             cursor::MoveTo(0, TOP_ROW),
             terminal::Clear(ClearType::CurrentLine),
-            Print(format!("{:<width$}", top, width = width.min(top.len() + 1))),
+            Print(top),
         )
     }
 
@@ -939,33 +1112,41 @@ impl<'a, 'b> Menu<'a, 'b> {
         }
         let cfg = config::base_config();
         let y = self.term.height - 1;
-        let prompt = format!("{}{}", cfg.chars.filter_prompt, self.filter);
         let width = self.term.width() as usize;
+        let (display, _) = bar_display(
+            &cfg.chars.filter_prompt,
+            &self.filter,
+            self.filter_cursor,
+            width,
+        );
         queue!(
             self.term,
             ResetColor,
             cursor::MoveTo(0, y),
             terminal::Clear(ClearType::CurrentLine),
-            Print(format!(
-                "{:<width$}",
-                prompt,
-                width = width.min(prompt.len() + 1)
-            )),
+            Print(display),
         )
     }
 
     fn position_cursor(&mut self) -> io::Result<()> {
+        let width = self.term.width() as usize;
         match self.mode {
             Mode::Search => {
-                let cx = (config::base_config().chars.search_prompt.chars().count()
-                    + self.search[..self.search_cursor].chars().count())
-                    as u16;
+                let (_, cx) = bar_display(
+                    &config::base_config().chars.search_prompt,
+                    &self.search,
+                    self.search_cursor,
+                    width,
+                );
                 queue!(self.term, cursor::Show, cursor::MoveTo(cx, TOP_ROW))
             }
             Mode::Filter => {
-                let cx = (config::base_config().chars.filter_prompt.chars().count()
-                    + self.filter[..self.filter_cursor].chars().count())
-                    as u16;
+                let (_, cx) = bar_display(
+                    &config::base_config().chars.filter_prompt,
+                    &self.filter,
+                    self.filter_cursor,
+                    width,
+                );
                 let y = self.term.height - 1;
                 queue!(self.term, cursor::Show, cursor::MoveTo(cx, y))
             }
@@ -1028,8 +1209,8 @@ impl<'a, 'b> Menu<'a, 'b> {
             self.queue_filter_bar()?;
         }
 
+        let cfg = config::base_config();
         if self.visible.is_empty() {
-            let cfg = config::base_config();
             if let Some(err) = self.error_msg.clone() {
                 if cfg.with_colors {
                     queue!(self.term, SetForegroundColor(Color::Red))?;
@@ -1050,7 +1231,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                 let submit_hint;
                 let msg = if self.in_menu && self.search.is_empty() {
                     "type to search"
-                } else if self.searching {
+                } else if self.search_started.is_some() {
                     "searching..."
                 } else if self.needs_search {
                     submit_hint = format!(
@@ -1307,6 +1488,15 @@ impl<'a, 'b> Menu<'a, 'b> {
             }
 
             if !event::poll(Duration::from_millis(20))? {
+                if self.search_started.is_some_and(|t| t.elapsed() > Duration::from_millis(150))
+                    && !self.visible.is_empty()
+                {
+                    self.current = None;
+                    self.visible.clear();
+                    self.draw_results()?;
+                    self.draw_query()?;
+                    self.draw_filter()?;
+                }
                 continue;
             }
             let mut is_jump = false;
@@ -1318,6 +1508,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                     ..
                 }) => {
                     let ctrl = modifiers.contains(KeyModifiers::CONTROL);
+                    let alt = modifiers.contains(KeyModifiers::ALT);
                     match (ctrl, code) {
                         (true, KeyCode::Char('c')) => break,
                         (true, KeyCode::Char('z')) => {
@@ -1335,8 +1526,13 @@ impl<'a, 'b> Menu<'a, 'b> {
                                 }
                                 Loop::Continue
                             } else if self.mode == Mode::Filter {
-                                let changed =
-                                    edit_bar(&mut self.filter, &mut self.filter_cursor, code, ctrl);
+                                let changed = edit_bar(
+                                    &mut self.filter,
+                                    &mut self.filter_cursor,
+                                    code,
+                                    ctrl,
+                                    alt,
+                                );
                                 match changed {
                                     Some(true) => {
                                         self.update_visible();
@@ -1380,7 +1576,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                                     || cfg.core.keys.submit_search.contains(&code)
                                 {
                                     if cfg.core.live {
-                                        if self.current.is_some() {
+                                        if self.current.is_some() && !self.search.is_empty() {
                                             self.save_query_for_repeat();
                                         }
                                     } else {
@@ -1402,6 +1598,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                                         &mut self.search_cursor,
                                         code,
                                         ctrl,
+                                        alt,
                                     );
                                     match changed {
                                         Some(true) => {

@@ -118,7 +118,11 @@ fn run(term: &mut Term, c: Config) -> Result<(), Message> {
     config::set_config(c);
     let c = config::base_config();
 
-    let matches = matcher::search(Arc::new(AtomicBool::new(false)), Arc::clone(&c))?;
+    let matches = if c.core.menu && c.regexps.is_empty() && !c.files {
+        None
+    } else {
+        matcher::search(Arc::new(AtomicBool::new(false)), Arc::clone(&c))?
+    };
 
     if c.core.auto_open
         && let Some(m) = matches.as_ref()
