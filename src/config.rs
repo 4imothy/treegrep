@@ -101,29 +101,9 @@ impl args::Color {
 }
 
 #[derive(Clone)]
-pub struct CoreConfig {
-    pub selection_file: Option<PathBuf>,
-    pub repeat_file: Option<PathBuf>,
-    pub select: bool,
-    pub menu: bool,
-    pub live: bool,
-    pub auto_open: bool,
-    pub repeat: bool,
-    pub threads: usize,
-    pub editor: Option<String>,
-    pub open_like: Option<OpenStrategy>,
-    pub completion_target: Option<clap_complete::Shell>,
-    pub keys: KeyBindings,
-    pub all_args: Vec<OsString>,
-    pub mouse: bool,
-    pub alternate_screen: bool,
-}
-
-#[derive(Clone)]
-pub struct Config {
-    pub path: PathBuf,
-    pub is_dir: bool,
+pub struct SearchParams {
     pub regexps: Vec<String>,
+    pub path: PathBuf,
     pub globs: Vec<String>,
     pub hidden: bool,
     pub line_number: bool,
@@ -137,13 +117,32 @@ pub struct Config {
     pub before_context: usize,
     pub after_context: usize,
     pub overview: bool,
-    pub with_bold: bool,
     pub branch_each: usize,
+}
+
+#[derive(Clone)]
+pub struct Config {
+    pub search: SearchParams,
+    pub is_dir: bool,
+    pub with_bold: bool,
     pub with_colors: bool,
-    pub prefix_len: usize,
+    pub branch_len: usize,
     pub chars: Characters,
     pub colors: Colors,
-    pub core: CoreConfig,
+    pub threads: usize,
+    pub selection_file: Option<PathBuf>,
+    pub repeat_file: Option<PathBuf>,
+    pub select: bool,
+    pub menu: bool,
+    pub live: bool,
+    pub auto_open: bool,
+    pub repeat: bool,
+    pub editor: Option<String>,
+    pub open_like: Option<OpenStrategy>,
+    pub completion_target: Option<clap_complete::Shell>,
+    pub keys: KeyBindings,
+    pub mouse: bool,
+    pub alternate_screen: bool,
 }
 
 fn canonicalize(p: &Path) -> Result<PathBuf, Message> {
@@ -192,14 +191,12 @@ fn get_all_args(mut args: Vec<OsString>) -> Vec<OsString> {
     args
 }
 
-pub fn get_matches(args: Vec<OsString>) -> Result<(ArgMatches, Vec<OsString>), Error> {
-    generate_command()
-        .try_get_matches_from(get_all_args(args.clone()))
-        .map(|m| (m, args))
+pub fn get_matches(args: Vec<OsString>) -> Result<ArgMatches, Error> {
+    generate_command().try_get_matches_from(get_all_args(args))
 }
 
 fn apply_matches(
-    core: CoreConfig,
+    base_non_search: NonSearchFields,
     matches: &ArgMatches,
     only_explicit: bool,
 ) -> Result<Config, Message> {
@@ -209,50 +206,62 @@ fn apply_matches(
         let applies =
             |id: &str| matches.value_source(id) == Some(clap::parser::ValueSource::CommandLine);
         let mut c = (*base_config()).clone();
-        c.core = core;
+        c.selection_file = base_non_search.selection_file;
+        c.repeat_file = base_non_search.repeat_file;
+        c.select = base_non_search.select;
+        c.menu = base_non_search.menu;
+        c.live = base_non_search.live;
+        c.auto_open = base_non_search.auto_open;
+        c.repeat = base_non_search.repeat;
+        c.editor = base_non_search.editor;
+        c.open_like = base_non_search.open_like;
+        c.completion_target = base_non_search.completion_target;
+        c.keys = base_non_search.keys;
+        c.mouse = base_non_search.mouse;
+        c.alternate_screen = base_non_search.alternate_screen;
         if let Some(p) = args.positional_path.as_ref().or(args.path.as_ref()) {
-            c.path = process_path(p, true)?;
-            c.is_dir = c.path.is_dir();
+            c.search.path = process_path(p, true)?;
+            c.is_dir = c.search.path.is_dir();
         }
         if applies(args::EXPRESSION_POSITIONAL) || applies(args::EXPRESSION) {
-            c.regexps.clear();
+            c.search.regexps.clear();
             if let Some(expr) = &args.positional_regexp {
-                c.regexps.push(expr.clone());
+                c.search.regexps.push(expr.clone());
             }
-            c.regexps.extend(args.regexp.iter().cloned());
+            c.search.regexps.extend(args.regexp.iter().cloned());
         }
         if applies(args::GLOB) {
-            c.globs = args.glob.clone();
+            c.search.globs = args.glob.clone();
         }
         if applies(args::HIDDEN) {
-            c.hidden = args.hidden;
+            c.search.hidden = args.hidden;
         }
         if applies(args::LINE_NUMBER) {
-            c.line_number = args.line_number;
+            c.search.line_number = args.line_number;
         }
         if applies(args::FILES) {
-            c.files = args.files;
+            c.search.files = args.files;
         }
         if applies(args::COUNT) {
-            c.count = args.count;
+            c.search.count = args.count;
         }
         if applies(args::LINKS) {
-            c.links = args.links;
+            c.search.links = args.links;
         }
         if applies(args::TRIM_LEFT) {
-            c.trim = args.trim;
+            c.search.trim = args.trim;
         }
         if applies(args::NO_IGNORE) {
-            c.ignore = !args.no_ignore;
+            c.search.ignore = !args.no_ignore;
         }
         if applies(args::MAX_DEPTH) {
-            c.max_depth = args.max_depth;
+            c.search.max_depth = args.max_depth;
         }
         if applies(args::MAX_LENGTH) {
-            c.max_length = args.max_length;
+            c.search.max_length = args.max_length;
         }
         if applies(args::LONG_BRANCHES_EACH) {
-            c.branch_each = args.branch_each;
+            c.search.branch_each = args.branch_each;
         }
         let context_both = if applies(args::CONTEXT) {
             args.context.unwrap_or(0)
@@ -260,10 +269,10 @@ fn apply_matches(
             0
         };
         if applies(args::BEFORE_CONTEXT) || applies(args::CONTEXT) {
-            c.before_context = args.before_context.unwrap_or(context_both);
+            c.search.before_context = args.before_context.unwrap_or(context_both);
         }
         if applies(args::AFTER_CONTEXT) || applies(args::CONTEXT) {
-            c.after_context = args.after_context.unwrap_or(context_both);
+            c.search.after_context = args.after_context.unwrap_or(context_both);
         }
         if applies(args::NO_COLORS) {
             c.with_colors = !args.no_color;
@@ -272,10 +281,10 @@ fn apply_matches(
             c.with_bold = !args.no_bold;
         }
         if applies(args::OVERVIEW) {
-            c.overview = args.overview;
+            c.search.overview = args.overview;
         }
-        if applies(args::PREFIX_LEN) {
-            c.prefix_len = args.prefix_len;
+        if applies(args::BRANCH_LEN) {
+            c.branch_len = args.branch_len;
         }
         if applies(args::CHAR_VERTICAL) {
             c.chars.v = args.char_vertical;
@@ -298,7 +307,7 @@ fn apply_matches(
         if applies(args::CHAR_TEE) {
             c.chars.tee = args.char_tee;
         }
-        let s = c.prefix_len;
+        let s = c.branch_len;
         c.chars.match_with_next = format!("{}{}", c.chars.tee, style::repeat(c.chars.h, s - 1));
         c.chars.match_no_next = format!("{}{}", c.chars.bl, style::repeat(c.chars.h, s - 1));
         c.chars.spacer_vert = format!("{}{}", c.chars.v, style::repeat(' ', s - 1));
@@ -380,33 +389,65 @@ fn apply_matches(
     }
     regexps.extend(args.regexp.iter().cloned());
     let context = args.context.unwrap_or(0);
-    let prefix_len = args.prefix_len;
+    let branch_len = args.branch_len;
     let chars = Config::get_characters(&args);
     Ok(Config {
-        path,
+        search: SearchParams {
+            path,
+            regexps,
+            globs: args.glob.clone(),
+            hidden: args.hidden,
+            line_number: args.line_number,
+            files: args.files,
+            count: args.count,
+            links: args.links,
+            trim: args.trim,
+            ignore: !args.no_ignore,
+            max_depth: args.max_depth,
+            max_length: args.max_length,
+            before_context: args.before_context.unwrap_or(context),
+            after_context: args.after_context.unwrap_or(context),
+            overview: args.overview,
+            branch_each: args.branch_each,
+        },
         is_dir,
-        regexps,
-        globs: args.glob.clone(),
-        hidden: args.hidden,
-        line_number: args.line_number,
-        files: args.files,
-        count: args.count,
-        links: args.links,
-        trim: args.trim,
-        ignore: !args.no_ignore,
-        max_depth: args.max_depth,
-        max_length: args.max_length,
-        before_context: args.before_context.unwrap_or(context),
-        after_context: args.after_context.unwrap_or(context),
-        overview: args.overview,
-        branch_each: args.branch_each,
         with_bold: !args.no_bold,
         with_colors: !args.no_color,
-        prefix_len,
+        branch_len,
+        threads: base_non_search.threads,
         chars,
         colors: Config::get_colors(&args),
-        core,
+        selection_file: base_non_search.selection_file,
+        repeat_file: base_non_search.repeat_file,
+        select: base_non_search.select,
+        menu: base_non_search.menu,
+        live: base_non_search.live,
+        auto_open: base_non_search.auto_open,
+        repeat: base_non_search.repeat,
+        editor: base_non_search.editor,
+        open_like: base_non_search.open_like,
+        completion_target: base_non_search.completion_target,
+        keys: base_non_search.keys,
+        mouse: base_non_search.mouse,
+        alternate_screen: base_non_search.alternate_screen,
     })
+}
+
+struct NonSearchFields {
+    selection_file: Option<PathBuf>,
+    repeat_file: Option<PathBuf>,
+    select: bool,
+    menu: bool,
+    live: bool,
+    auto_open: bool,
+    repeat: bool,
+    threads: usize,
+    editor: Option<String>,
+    open_like: Option<OpenStrategy>,
+    completion_target: Option<clap_complete::Shell>,
+    keys: KeyBindings,
+    mouse: bool,
+    alternate_screen: bool,
 }
 
 impl Config {
@@ -436,33 +477,43 @@ impl Config {
     }
 
     pub fn handle_repeat(&self) -> Result<Option<Self>, Message> {
-        if let Some(f) = &self.core.repeat_file {
-            if self.core.repeat {
+        if let Some(f) = &self.repeat_file {
+            if self.repeat {
                 let args = Self::read_repeat_file(f)?;
-                let (matches, all_args) = get_matches(args).map_err(|e| mes!("{}", e))?;
-                let mut c = Self::get_config(matches, all_args)?;
-                c.core.selection_file = self.core.selection_file.clone();
-                c.core.repeat_file = self.core.repeat_file.clone();
-                c.core.live = self.core.live;
-                c.core.menu = self.core.menu;
-                c.core.select = self.core.select;
-                c.core.editor = self.core.editor.clone();
-                c.core.open_like = self.core.open_like.clone();
+                let matches = get_matches(args).map_err(|e| mes!("{}", e))?;
+                let mut c = Self::get_config(matches)?;
+                c.is_dir = c.search.path.is_dir();
+                c.with_bold = self.with_bold;
+                c.with_colors = self.with_colors;
+                c.branch_len = self.branch_len;
+                c.chars = self.chars.clone();
+                c.colors = self.colors.clone();
+                c.selection_file = self.selection_file.clone();
+                c.repeat_file = self.repeat_file.clone();
+                c.select = self.select;
+                c.menu = self.menu;
+                c.live = self.live;
+                c.auto_open = self.auto_open;
+                c.editor = self.editor.clone();
+                c.open_like = self.open_like.clone();
+                c.keys = self.keys.clone();
+                c.mouse = self.mouse;
+                c.alternate_screen = self.alternate_screen;
                 Ok(Some(c))
             } else {
-                if !self.regexps.is_empty() || self.files {
-                    save_to_repeat_file(f, &self.core.all_args)?;
+                if !self.search.regexps.is_empty() {
+                    save_search_params(f, self)?;
                 }
                 Ok(None)
             }
-        } else if self.core.repeat {
+        } else if self.repeat {
             Err(mes!("cannot repeat without a {} specified", REPEAT_FILE))
         } else {
             Ok(None)
         }
     }
 
-    pub fn get_config(matches: ArgMatches, all_args: Vec<OsString>) -> Result<Self, Message> {
+    pub fn get_config(matches: ArgMatches) -> Result<Self, Message> {
         let args = Args::from_arg_matches(&matches).map_err(|e| mes!("{}", e))?;
 
         let threads = args.threads.unwrap_or_else(|| {
@@ -481,7 +532,7 @@ impl Config {
             .map(|p| process_path(p, false))
             .transpose()?;
 
-        let core = CoreConfig {
+        let non_search = NonSearchFields {
             select: args.select,
             menu: args.menu,
             live: args.live,
@@ -493,12 +544,11 @@ impl Config {
             selection_file,
             repeat_file,
             completion_target: args.completions,
-            all_args,
             keys: Config::get_key_bindings(&args, &matches),
             mouse: !args.no_mouse,
             alternate_screen: !args.no_alternate_screen,
         };
-        apply_matches(core, &matches, false)
+        apply_matches(non_search, &matches, false)
     }
 
     fn get_colors(args: &Args) -> Colors {
@@ -547,7 +597,7 @@ impl Config {
         let bl = args.char_bottom_left;
         let br = args.char_bottom_right;
         let tee = args.char_tee;
-        let spacer = args.prefix_len;
+        let spacer = args.branch_len;
         let ellipsis = args.ellipsis.clone();
         let selected_indicator = args.selected_indicator.clone();
         let selected_indicator_clear = " ".repeat(selected_indicator.chars().count());
@@ -697,6 +747,81 @@ const MENU_UNSUPPORTED: &[&str] = &[
     args::KEY_SUBMIT_SEARCH,
 ];
 
+fn id_to_flag(id: &str) -> String {
+    format!("--{}", id.replace('_', "-"))
+}
+
+impl SearchParams {
+    fn to_args(&self) -> Vec<OsString> {
+        let mut args: Vec<OsString> = Vec::new();
+        for r in &self.regexps {
+            args.push(format!("{}={r}", id_to_flag(args::EXPRESSION)).into());
+        }
+        args.push(format!("{}={}", id_to_flag(args::PATH), self.path.display()).into());
+        for g in &self.globs {
+            args.push(format!("{}={g}", id_to_flag(args::GLOB)).into());
+        }
+        if self.hidden {
+            args.push(id_to_flag(args::HIDDEN).into());
+        }
+        if self.line_number {
+            args.push(id_to_flag(args::LINE_NUMBER).into());
+        }
+        if self.files {
+            args.push(id_to_flag(args::FILES).into());
+        }
+        if self.count {
+            args.push(id_to_flag(args::COUNT).into());
+        }
+        if self.links {
+            args.push(id_to_flag(args::LINKS).into());
+        }
+        if self.trim {
+            args.push(id_to_flag(args::TRIM_LEFT).into());
+        }
+        if !self.ignore {
+            args.push(id_to_flag(args::NO_IGNORE).into());
+        }
+        if let Some(d) = self.max_depth {
+            args.push(format!("{}={d}", id_to_flag(args::MAX_DEPTH)).into());
+        }
+        if let Some(l) = self.max_length {
+            args.push(format!("{}={l}", id_to_flag(args::MAX_LENGTH)).into());
+        }
+        if self.before_context > 0 {
+            args.push(
+                format!(
+                    "{}={}",
+                    id_to_flag(args::BEFORE_CONTEXT),
+                    self.before_context
+                )
+                .into(),
+            );
+        }
+        if self.after_context > 0 {
+            args.push(format!("{}={}", id_to_flag(args::AFTER_CONTEXT), self.after_context).into());
+        }
+        if self.overview {
+            args.push(id_to_flag(args::OVERVIEW).into());
+        }
+        if self.branch_each > 1 {
+            args.push(
+                format!(
+                    "{}={}",
+                    id_to_flag(args::LONG_BRANCHES_EACH),
+                    self.branch_each
+                )
+                .into(),
+            );
+        }
+        args
+    }
+}
+
+pub fn save_search_params(file: &Path, config: &Config) -> Result<(), Message> {
+    save_to_repeat_file(file, &config.search.to_args())
+}
+
 pub fn save_to_repeat_file(file: &std::path::Path, args: &[OsString]) -> Result<(), Message> {
     let mut buffer = Vec::new();
     for arg in args {
@@ -745,16 +870,29 @@ pub fn parse_menu_query(query: &str) -> Result<Config, Message> {
     let args = Args::from_arg_matches(&matches).map_err(|e| mes!("{}", e))?;
     let explicit =
         |id: &str| matches.value_source(id) == Some(clap::parser::ValueSource::CommandLine);
-    let mut core = base.core.clone();
-    core.select = false;
-    core.menu = true;
-    let mut c = apply_matches(core, &matches, true)?;
+    let non_search = NonSearchFields {
+        selection_file: base.selection_file.clone(),
+        repeat_file: base.repeat_file.clone(),
+        select: false,
+        menu: true,
+        live: base.live,
+        auto_open: base.auto_open,
+        repeat: base.repeat,
+        threads: base.threads,
+        editor: base.editor.clone(),
+        open_like: base.open_like.clone(),
+        completion_target: base.completion_target,
+        keys: base.keys.clone(),
+        mouse: base.mouse,
+        alternate_screen: base.alternate_screen,
+    };
+    let mut c = apply_matches(non_search, &matches, true)?;
     let explicit_pattern = explicit(args::EXPRESSION_POSITIONAL) || explicit(args::EXPRESSION);
     if explicit(args::FILES) && !explicit_pattern {
-        c.regexps.clear();
+        c.search.regexps.clear();
     }
     if explicit_pattern && !explicit(args::FILES) {
-        c.files = false;
+        c.search.files = false;
     }
     drop(args);
     Ok(c)
@@ -793,14 +931,14 @@ mod tests {
         T: Into<OsString> + Clone,
     {
         let matches = generate_command().get_matches_from(args);
-        Config::get_config(matches, Vec::new()).ok().unwrap()
+        Config::get_config(matches).ok().unwrap()
     }
 
     #[test]
     fn test_env_opts() {
         unsafe { std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" ")) };
-        let (matches, all_args) = get_matches(Vec::new()).unwrap();
-        let config = Config::get_config(matches, all_args).ok().unwrap();
+        let matches = get_matches(Vec::new()).unwrap();
+        let config = Config::get_config(matches).ok().unwrap();
         check_parsed_config_from_example_opts(config);
     }
 
@@ -811,23 +949,23 @@ mod tests {
     }
 
     fn check_parsed_config_from_example_opts(config: Config) {
-        assert!(config.line_number);
-        assert_eq!(config.max_depth, Some(5));
-        assert_eq!(config.max_length, Some(20));
-        assert!(!config.ignore);
-        assert!(config.hidden);
-        assert!(config.core.threads == 8);
-        assert!(config.count);
-        assert!(config.links);
-        assert!(config.trim);
+        assert!(config.search.line_number);
+        assert_eq!(config.search.max_depth, Some(5));
+        assert_eq!(config.search.max_length, Some(20));
+        assert!(!config.search.ignore);
+        assert!(config.search.hidden);
+        assert!(config.threads == 8);
+        assert!(config.search.count);
+        assert!(config.search.links);
+        assert!(config.search.trim);
         assert!(config.with_colors);
-        assert!(config.core.select);
-        assert!(config.files);
-        assert!(config.overview);
-        assert_eq!(config.globs, vec!["*.rs"]);
-        assert_eq!(config.before_context, 3);
-        assert_eq!(config.after_context, 2);
-        assert_eq!(config.regexps, vec!["posexpr", "regexp1", "regexp2"]);
+        assert!(config.select);
+        assert!(config.search.files);
+        assert!(config.search.overview);
+        assert_eq!(config.search.globs, vec!["*.rs"]);
+        assert_eq!(config.search.before_context, 3);
+        assert_eq!(config.search.after_context, 2);
+        assert_eq!(config.search.regexps, vec!["posexpr", "regexp1", "regexp2"]);
     }
 
     #[test]
@@ -844,18 +982,18 @@ mod tests {
             "-B=3",
             "-C=1",
         ]);
-        assert!(config.line_number);
-        assert!(config.hidden);
-        assert!(config.count);
-        assert!(config.core.select);
-        assert!(config.files);
-        assert!(config.links);
-        assert!(config.overview);
-        assert_eq!(config.max_depth, Some(5));
-        assert_eq!(config.globs, vec!["*.rs"]);
-        assert_eq!(config.after_context, 2);
-        assert_eq!(config.before_context, 3);
-        assert_eq!(config.regexps, vec!["posexpr", "regexp1", "regexp2"]);
+        assert!(config.search.line_number);
+        assert!(config.search.hidden);
+        assert!(config.search.count);
+        assert!(config.select);
+        assert!(config.search.files);
+        assert!(config.search.links);
+        assert!(config.search.overview);
+        assert_eq!(config.search.max_depth, Some(5));
+        assert_eq!(config.search.globs, vec!["*.rs"]);
+        assert_eq!(config.search.after_context, 2);
+        assert_eq!(config.search.before_context, 3);
+        assert_eq!(config.search.regexps, vec!["posexpr", "regexp1", "regexp2"]);
     }
 
     #[test]
@@ -868,30 +1006,30 @@ mod tests {
             "--links",
             "--select",
         ]);
-        assert_eq!(config.max_depth, Some(5));
-        assert!(!config.ignore);
-        assert!(config.hidden);
-        assert!(config.links);
+        assert_eq!(config.search.max_depth, Some(5));
+        assert!(!config.search.ignore);
+        assert!(config.search.hidden);
+        assert!(config.search.links);
         assert!(config.with_colors);
-        assert!(config.core.select);
+        assert!(config.select);
     }
 
     #[test]
     fn test_key_binding_hardware_named() {
         let config = get_config_from(["expression", "--key-quit=f10", "--key-down=x"]);
-        assert!(config.core.keys.quit.contains(&KeyCode::F(10)));
-        assert!(config.core.keys.down.contains(&KeyCode::Char('x')));
-        assert!(!config.core.keys.down.contains(&KeyCode::Char('j')));
-        assert!(!config.core.keys.down.contains(&KeyCode::Down));
+        assert!(config.keys.quit.contains(&KeyCode::F(10)));
+        assert!(config.keys.down.contains(&KeyCode::Char('x')));
+        assert!(!config.keys.down.contains(&KeyCode::Char('j')));
+        assert!(!config.keys.down.contains(&KeyCode::Down));
     }
 
     #[test]
     fn test_shorts_files() {
         let config = get_config_from(["-.fslo", "-d=3"]);
-        assert!(config.hidden);
-        assert!(config.links);
-        assert!(config.overview);
-        assert_eq!(config.max_depth, Some(3));
-        assert!(config.core.select);
+        assert!(config.search.hidden);
+        assert!(config.search.links);
+        assert!(config.search.overview);
+        assert_eq!(config.search.max_depth, Some(3));
+        assert!(config.select);
     }
 }

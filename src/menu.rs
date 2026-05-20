@@ -448,7 +448,7 @@ fn help_table(rows: &[(String, &str)], indent: usize, ncols: usize) -> String {
 
 fn help_popup() -> String {
     let cfg = config::base_config();
-    let k = &cfg.core.keys;
+    let k = &cfg.keys;
     let sp = &cfg.chars.search_prompt;
     let np = &cfg.chars.search_prompt_inactive;
     let fp = &cfg.chars.filter_prompt;
@@ -553,7 +553,7 @@ impl<'a, 'b> Menu<'a, 'b> {
     fn new(term: &'a mut Term<'b>) -> Self {
         let (result_tx, result_rx) = crossbeam_channel::unbounded();
         let term_height = term.height;
-        let in_menu = base_config().core.menu;
+        let in_menu = base_config().menu;
         Menu {
             in_menu,
             needs_search: false,
@@ -1033,7 +1033,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         }
         match config::parse_menu_query(&self.search) {
             Ok(new_config) => {
-                if new_config.regexps.is_empty() && !new_config.files {
+                if new_config.search.regexps.is_empty() && !new_config.search.files {
                     self.apply_results(None);
                     return;
                 }
@@ -1079,14 +1079,14 @@ impl<'a, 'b> Menu<'a, 'b> {
 
     fn save_query_for_repeat(&self) {
         let cfg = config::base_config();
-        let Some(file) = &cfg.core.repeat_file else {
+        let Some(file) = &cfg.repeat_file else {
             return;
         };
-        let Some(tokens) = shlex::split(&self.search) else {
-            return;
-        };
-        let args: Vec<OsString> = tokens.iter().map(OsString::from).collect();
-        let _ = config::save_to_repeat_file(file, &args);
+        if self.search.is_empty() {
+            let _ = config::save_search_params(file, &cfg);
+        } else if let Ok(merged) = config::parse_menu_query(&self.search) {
+            let _ = config::save_search_params(file, &merged);
+        }
     }
 
     fn queue_query_bar(&mut self) -> io::Result<()> {
@@ -1234,10 +1234,8 @@ impl<'a, 'b> Menu<'a, 'b> {
                 } else if self.search_started.is_some() {
                     "searching..."
                 } else if self.needs_search {
-                    submit_hint = format!(
-                        "press {} to search",
-                        format_keys(&cfg.core.keys.submit_search)
-                    );
+                    submit_hint =
+                        format!("press {} to search", format_keys(&cfg.keys.submit_search));
                     &submit_hint
                 } else {
                     "no results"
@@ -1335,7 +1333,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             None => return Ok(Loop::Continue),
         };
         let cfg = config::base_config();
-        if let Some(f) = &cfg.core.selection_file {
+        if let Some(f) = &cfg.selection_file {
             let mut buf = info.path.as_os_str().as_encoded_bytes().to_vec();
             buf.push(b'\n');
             if let Some(l) = info.line {
@@ -1353,7 +1351,7 @@ impl<'a, 'b> Menu<'a, 'b> {
 
     fn handle_navigate(&mut self, code: KeyCode, modifiers: KeyModifiers) -> io::Result<Loop> {
         let cfg = config::base_config();
-        let keys = &cfg.core.keys;
+        let keys = &cfg.keys;
 
         if modifiers.contains(KeyModifiers::ALT) {
             if code == KeyCode::Char('q') {
@@ -1520,7 +1518,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                         _ => {
                             let lc = if self.mode == Mode::Help {
                                 let cfg = config::base_config();
-                                if cfg.core.keys.quit.contains(&code) || code == KeyCode::Esc {
+                                if cfg.keys.quit.contains(&code) || code == KeyCode::Esc {
                                     self.mode = Mode::Navigate;
                                     self.draw_results()?;
                                     self.draw_query()?;
@@ -1575,9 +1573,9 @@ impl<'a, 'b> Menu<'a, 'b> {
                             } else {
                                 let cfg = config::base_config();
                                 if code == KeyCode::BackTab
-                                    || cfg.core.keys.submit_search.contains(&code)
+                                    || cfg.keys.submit_search.contains(&code)
                                 {
-                                    if cfg.core.live {
+                                    if cfg.live {
                                         if self.current.is_some() && !self.search.is_empty() {
                                             self.save_query_for_repeat();
                                         }
@@ -1604,7 +1602,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                                     );
                                     match changed {
                                         Some(true) => {
-                                            if cfg.core.live {
+                                            if cfg.live {
                                                 self.trigger_search();
                                                 if !event::poll(Duration::ZERO)? {
                                                     self.draw_results()?;
@@ -1707,11 +1705,10 @@ impl OpenStrategy {
 pub fn open_path(mut path: OsString, line_num: Option<usize>) -> io::Result<()> {
     let cfg = config::base_config();
     let env_editor = std::env::var("EDITOR").ok().filter(|s| !s.is_empty());
-    let mut cmd = match cfg.core.editor.as_ref().or(env_editor.as_ref()) {
+    let mut cmd = match cfg.editor.as_ref().or(env_editor.as_ref()) {
         Some(editor) => {
             let mut cmd = Command::new(editor);
             match cfg
-                .core
                 .open_like
                 .as_ref()
                 .unwrap_or(&OpenStrategy::from(editor))

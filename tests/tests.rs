@@ -372,7 +372,7 @@ fn repeat() {
     let mut orig_result = get_output(
         &dir.path,
         &format!(
-            "some --line-number --count --glob=!4ourth --repeat-file={} --overview --prefix-len=5 --trim",
+            "some --line-number --count --glob=!4ourth --repeat-file={} --overview --trim",
             repeat_file
         ),
     );
@@ -385,7 +385,7 @@ fn repeat() {
     (orig_result) = get_output(
         &dir.path,
         &format!(
-            "--files --glob=!4ourth_nice_file --repeat-file={} --overview --prefix-len=5",
+            "in --files --glob=!4ourth_nice_file --repeat-file={} --overview",
             repeat_file
         ),
     );

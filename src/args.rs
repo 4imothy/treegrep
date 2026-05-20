@@ -270,7 +270,7 @@ pub const KEY_SEARCH: &str = "key_search";
 pub const KEY_SUBMIT_SEARCH: &str = "key_submit_search";
 pub const OVERVIEW: &str = "overview";
 pub const AUTO_OPEN: &str = "auto_open";
-pub const PREFIX_LEN: &str = "prefix_len";
+pub const BRANCH_LEN: &str = "branch_len";
 pub const LINKS: &str = "links";
 pub const TRIM_LEFT: &str = "trim";
 pub const NO_IGNORE: &str = "no_ignore";
@@ -286,7 +286,26 @@ pub const CONTEXT: &str = "context";
 
 pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
 
-const HELP_TEMPLATE: &str = concat!(
+pub const REPEAT_STORED: &[&str] = &[
+    EXPRESSION,
+    PATH,
+    GLOB,
+    HIDDEN,
+    LINE_NUMBER,
+    FILES,
+    COUNT,
+    LINKS,
+    TRIM_LEFT,
+    NO_IGNORE,
+    MAX_DEPTH,
+    MAX_LENGTH,
+    BEFORE_CONTEXT,
+    AFTER_CONTEXT,
+    OVERVIEW,
+    LONG_BRANCHES_EACH,
+];
+
+pub const HELP_TEMPLATE: &str = concat!(
     "{name} {version}\n\nby {author}\n\nhome page: ",
     env!("CARGO_PKG_HOMEPAGE"),
     "\n\n{about}\n\n{usage}\n\n{all-args}{after-help}"
@@ -452,14 +471,26 @@ pub struct Args {
     #[arg(long, value_name = "", help = "generate completions for given shell")]
     pub completions: Option<clap_complete::Shell>,
 
-    #[arg(long, value_parser = value_parser!(PathBuf), value_name = "", value_hint = ValueHint::AnyPath, help = "file to write selection to (first line: file path, second line: line number if applicable)")]
-    pub selection_file: Option<PathBuf>,
-
-    #[arg(long, value_parser = value_parser!(PathBuf), value_name = "", value_hint = ValueHint::AnyPath, help = "file used to save the most recent successful search, with searches saved from the command line or the menu")]
-    pub repeat_file: Option<PathBuf>,
-
     #[arg(long, help = "repeats the last saved search")]
     pub repeat: bool,
+
+    #[arg(
+        long,
+        default_value_t = 3,
+        hide_short_help = true,
+        value_name = "",
+        help = "number of characters to show before a match"
+    )]
+    pub branch_len: usize,
+
+    #[arg(
+        long,
+        default_value_t = 1,
+        requires = FILES,
+        value_name = "",
+        help = "number of files to print on each branch"
+    )]
+    pub branch_each: usize,
 
     #[arg(long, help = "disable colors")]
     pub no_color: bool,
@@ -499,25 +530,6 @@ pub struct Args {
 
     #[arg(long, value_parser = ColorParser, value_name = "", hide_short_help = true, help = COLOR_HELP)]
     pub filter_highlight_color: Option<Color>,
-
-    #[arg(
-        long,
-        default_value_t = 3,
-        hide_short_help = true,
-        value_name = "",
-        help = "number of characters to show before a match"
-    )]
-    pub prefix_len: usize,
-
-    #[arg(
-        long,
-        default_value_t = 1,
-        requires = FILES,
-        hide_short_help = true,
-        value_name = "",
-        help = "number of files to print on each branch"
-    )]
-    pub branch_each: usize,
 
     #[arg(
         long,
@@ -687,6 +699,12 @@ pub struct Args {
     #[arg(long, value_parser = KeyCodeParser, default_values = ["enter"], hide_short_help = true, value_name = "", help = "submit search query")]
     pub key_submit_search: Vec<KeyCode>,
 
+    #[arg(long, value_parser = value_parser!(PathBuf), value_name = "", hide_short_help = true, value_hint = ValueHint::AnyPath, help = "file to write selection to")]
+    pub selection_file: Option<PathBuf>,
+
+    #[arg(long, value_parser = value_parser!(PathBuf), value_name = "", hide_short_help = true, value_hint = ValueHint::AnyPath, help = "file to save and replay regexp searches")]
+    pub repeat_file: Option<PathBuf>,
+
     #[arg(long, short = 'h', action = ArgAction::Help)]
     pub help: Option<bool>,
 
@@ -695,12 +713,22 @@ pub struct Args {
 }
 
 pub fn generate_command() -> Command {
-    Args::command()
+    let mut cmd = Args::command()
         .args_override_self(true)
         .help_template(HELP_TEMPLATE)
         .after_help(format!(
             "arguments are prefixed with the contents of the {DEFAULT_OPTS_ENV_NAME} environment variable"
-        ))
+        ));
+    for id in REPEAT_STORED {
+        cmd = cmd.mut_arg(id, |a| {
+            let help = a
+                .get_help()
+                .map(|h| format!("{h} (saved for repeat)"))
+                .unwrap_or_else(|| "(saved for repeat)".to_string());
+            a.help(help)
+        });
+    }
+    cmd
 }
 
 #[cfg(test)]

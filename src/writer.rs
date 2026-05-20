@@ -289,7 +289,7 @@ fn write_path(
             write_content_with_highlights(f, l, &[], 0, Some(color), filter, config)?;
         }
     }
-    if config.count && count > 0 {
+    if config.search.count && count > 0 {
         write!(f, ": {}", count)?;
     }
     if config.with_colors || config.with_bold {
@@ -340,7 +340,7 @@ impl Entry for LineDisplay {
 
         let mut content: &str = &self.content;
 
-        let cut = if self.config.trim {
+        let cut = if self.config.search.trim {
             let trimmed = content.trim_start();
             let cut = content.len() - trimmed.len();
             content = trimmed;
@@ -349,7 +349,7 @@ impl Entry for LineDisplay {
             0
         };
 
-        let line_num = if self.config.line_number {
+        let line_num = if self.config.search.line_number {
             Some(
                 self.context_offset
                     .map_or_else(|| format!("{}: ", self.line_num), |o| format!("{:+}: ", o)),
@@ -358,19 +358,20 @@ impl Entry for LineDisplay {
             None
         };
 
-        if self.config.core.select || self.config.core.menu {
+        if self.config.select || self.config.menu {
             let term_width = TERM_WIDTH.load(Ordering::SeqCst) as usize;
             let indicator_len = self.config.chars.selected_indicator.chars().count();
-            let prefix_len = self.config.prefix_len * self.prefix.len();
+            let branch_len = self.config.branch_len * self.prefix.len();
             let line_num_len = line_num.as_ref().map_or(0, |n| n.len());
             let content_width =
-                term_width.saturating_sub(indicator_len + prefix_len + line_num_len);
+                term_width.saturating_sub(indicator_len + branch_len + line_num_len);
             let cap = self
                 .config
+                .search
                 .max_length
                 .map_or(content_width, |m| m.min(content_width));
             content = &content[..content.floor_char_boundary(cap.min(content.len()))];
-        } else if let Some(max) = self.config.max_length {
+        } else if let Some(max) = self.config.search.max_length {
             content = &content[..content.floor_char_boundary(max.min(content.len()))];
         }
 
@@ -451,7 +452,7 @@ impl Entry for LineDisplay {
         false
     }
     fn filter_text(&self) -> Cow<'_, str> {
-        Cow::Borrowed(if self.config.trim {
+        Cow::Borrowed(if self.config.search.trim {
             self.content.trim_start()
         } else {
             &self.content
@@ -560,7 +561,7 @@ impl Entry for OverviewDisplay {
     }
     fn filter_text(&self) -> Cow<'_, str> {
         let mut s = String::new();
-        if !self.config.files {
+        if !self.config.search.files {
             s.push_str(&format!(
                 "found {} matches in {} lines across ",
                 self.count, self.lines
@@ -620,7 +621,7 @@ impl Directory {
                 &self.path,
                 &self.linked,
                 self.children.len() + self.files.len(),
-                !config.core.select && !config.core.menu,
+                !config.select && !config.menu,
                 true,
                 Arc::clone(config),
             )?));
@@ -654,7 +655,7 @@ impl Directory {
             )?;
         }
         if !files.is_empty() {
-            if config.branch_each > 1 {
+            if config.search.branch_each > 1 {
                 self.long_branch_files_to_lines(lines, child_prefix, config)?;
             } else {
                 for (i, file) in files.iter().enumerate() {
@@ -671,12 +672,12 @@ impl Directory {
         prefix: &[PrefixComponent],
         config: &Arc<Config>,
     ) -> Result<(), Message> {
-        let num_lines: usize = self.files.len().div_ceil(config.branch_each);
+        let num_lines: usize = self.files.len().div_ceil(config.search.branch_each);
 
         let prefix_no_next = with_push(prefix, PrefixComponent::MatchNoNext);
         let prefix_next = with_push(prefix, PrefixComponent::MatchWithNext);
 
-        for (i, branch) in self.files.chunks(config.branch_each).enumerate() {
+        for (i, branch) in self.files.chunks(config.search.branch_each).enumerate() {
             lines.push(Box::new(LongBranchDisplay {
                 prefix: if i + 1 == num_lines {
                     prefix_no_next.clone()
@@ -697,7 +698,7 @@ impl Directory {
                         )
                     })
                     .collect::<Result<Vec<PathDisplay>, Message>>()?,
-                new_line: !config.core.select && !config.core.menu,
+                new_line: !config.select && !config.menu,
                 config: Arc::clone(config),
             }));
         }
@@ -743,12 +744,12 @@ impl File {
             &self.path,
             &self.linked,
             self.count(),
-            !config.core.select && !config.core.menu,
+            !config.select && !config.menu,
             false,
             Arc::clone(config),
         )?));
 
-        if !config.files {
+        if !config.search.files {
             for (i, line) in self.lines.iter().enumerate() {
                 let prefix = if i + 1 != self.lines.len() {
                     with_push(&line_p, PrefixComponent::MatchWithNext)
@@ -762,7 +763,7 @@ impl File {
                     matches: line.matches.clone(),
                     line_num: line.line_num,
                     context_offset: line.context_offset,
-                    new_line: !config.core.select && !config.core.menu,
+                    new_line: !config.select && !config.menu,
                     config: Arc::clone(config),
                 }));
             }
@@ -781,13 +782,14 @@ pub fn matches_to_display_lines(
 ) -> Result<Vec<Box<dyn Entry>>, Message> {
     let mut lines: Vec<Box<dyn Entry>> = Vec::new();
     let mut overview: Option<Box<OverviewDisplay>> = config
+        .search
         .overview
         .then(|| OverviewDisplay {
             dirs: 0,
             files: usize::from(!config.is_dir),
             lines: 0,
             count: 0,
-            new_line: !config.core.select && !config.core.menu,
+            new_line: !config.select && !config.menu,
             config: Arc::clone(&config),
         })
         .map(Box::new);

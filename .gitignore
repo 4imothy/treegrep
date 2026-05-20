@@ -4,3 +4,4 @@ target
 ideas.md
 benchmarks/targets/
 install.sh
+plugin/treegrep.elc

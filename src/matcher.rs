@@ -99,14 +99,14 @@ impl<'a> Sink for MatchSink<'a> {
 }
 
 pub fn search(abort: Arc<AtomicBool>, config: Arc<Config>) -> Result<Option<Matches>, Message> {
-    let matchers = Matcher::new(&config.regexps)?;
+    let matchers = Matcher::new(&config.search.regexps)?;
     let mut searcher = SearcherBuilder::new()
         .line_number(true)
         .line_terminator(LineTerminator::byte(b'\n'))
         .binary_detection(BinaryDetection::quit(b'\x00'))
         .memory_map(unsafe { MmapChoice::auto() })
-        .before_context(config.before_context)
-        .after_context(config.after_context)
+        .before_context(config.search.before_context)
+        .after_context(config.search.after_context)
         .build();
 
     if config.is_dir {
@@ -119,8 +119,13 @@ pub fn search(abort: Arc<AtomicBool>, config: Arc<Config>) -> Result<Option<Matc
         )?))
     } else {
         Ok(wrap_file(
-            search_file(config.path.to_path_buf(), &matchers, &mut searcher, &config)?,
-            config.files && config.regexps.is_empty(),
+            search_file(
+                config.search.path.to_path_buf(),
+                &matchers,
+                &mut searcher,
+                &config,
+            )?,
+            config.search.files && config.search.regexps.is_empty(),
         ))
     }
 }
@@ -131,8 +136,8 @@ fn search_dir(
     abort: Arc<AtomicBool>,
     config: Arc<Config>,
 ) -> Result<Vec<Directory>, Message> {
-    let path = config.path.clone();
-    let globs = config.globs.clone();
+    let path = config.search.path.clone();
+    let globs = config.search.globs.clone();
     search_dir_impl(&path, &globs, matchers, searcher, abort, config)
 }
 
@@ -152,15 +157,15 @@ fn search_dir_impl(
     }
 
     let walker = WalkBuilder::new(path)
-        .hidden(!config.hidden)
-        .max_depth(config.max_depth)
-        .follow_links(config.links)
-        .ignore(config.ignore)
-        .git_global(config.ignore)
-        .git_ignore(config.ignore)
-        .git_exclude(config.ignore)
+        .hidden(!config.search.hidden)
+        .max_depth(config.search.max_depth)
+        .follow_links(config.search.links)
+        .ignore(config.search.ignore)
+        .git_global(config.search.ignore)
+        .git_ignore(config.search.ignore)
+        .git_exclude(config.search.ignore)
         .require_git(false)
-        .threads(config.core.threads)
+        .threads(config.threads)
         .overrides(
             override_builder
                 .build()
@@ -202,7 +207,7 @@ fn search_dir_impl(
     });
 
     drop(tx);
-    build_directory_tree(rx, path, config.links)
+    build_directory_tree(rx, path, config.search.links)
 }
 
 fn search_file(
@@ -211,8 +216,8 @@ fn search_file(
     searcher: &mut Searcher,
     config: &Config,
 ) -> Result<Option<File>, Message> {
-    if config.files && config.regexps.is_empty() {
-        return Ok(Some(File::from_pathbuf(pb, config.links)?));
+    if config.search.files && config.search.regexps.is_empty() {
+        return Ok(Some(File::from_pathbuf(pb, config.search.links)?));
     }
 
     let mut sink = MatchSink {
@@ -232,11 +237,11 @@ fn search_file(
         return Ok(None);
     }
 
-    if config.before_context > 0 || config.after_context > 0 {
+    if config.search.before_context > 0 || config.search.after_context > 0 {
         Line::compute_context_offsets(&mut sink.lines);
     }
 
-    let mut file = File::from_pathbuf(pb, config.links)?;
+    let mut file = File::from_pathbuf(pb, config.search.links)?;
     file.lines = sink.lines;
     Ok(Some(file))
 }
