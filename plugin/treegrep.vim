@@ -35,7 +35,8 @@ def g:TgrepWith(args: string)
 
     var original_win = win_getid()
     var tgrep = filereadable(tgrep_bin) ? tgrep_bin : 'tgrep'
-    var cmd = tgrep .. ' --selection-file=' .. fnameescape(g:tgrep_selection_file)
+    var cmd = tgrep .. ' --no-alternate-screen'
+        .. ' --selection-file=' .. fnameescape(g:tgrep_selection_file)
 
     if g:tgrep_repeat_file !=# ''
         cmd ..= ' --repeat-file=' .. fnameescape(g:tgrep_repeat_file)

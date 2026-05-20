@@ -1488,7 +1488,9 @@ impl<'a, 'b> Menu<'a, 'b> {
             }
 
             if !event::poll(Duration::from_millis(20))? {
-                if self.search_started.is_some_and(|t| t.elapsed() > Duration::from_millis(150))
+                if self
+                    .search_started
+                    .is_some_and(|t| t.elapsed() > Duration::from_millis(150))
                     && !self.visible.is_empty()
                 {
                     self.current = None;

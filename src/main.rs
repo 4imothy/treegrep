@@ -69,7 +69,13 @@ fn build_config_and_term(
     if let Some(repeated) = c.handle_repeat()? {
         c = repeated;
     }
-    let term = Term::new(out, c.core.menu || c.core.select).map_err(|e| mes!("{}", e))?;
+    let term = Term::new(
+        out,
+        c.core.menu || c.core.select,
+        c.core.mouse,
+        c.core.alternate_screen,
+    )
+    .map_err(|e| mes!("{}", e))?;
     Ok((c, term))
 }
 

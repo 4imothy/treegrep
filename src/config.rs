@@ -115,6 +115,8 @@ pub struct CoreConfig {
     pub completion_target: Option<clap_complete::Shell>,
     pub keys: KeyBindings,
     pub all_args: Vec<OsString>,
+    pub mouse: bool,
+    pub alternate_screen: bool,
 }
 
 #[derive(Clone)]
@@ -493,6 +495,8 @@ impl Config {
             completion_target: args.completions,
             all_args,
             keys: Config::get_key_bindings(&args, &matches),
+            mouse: !args.no_mouse,
+            alternate_screen: !args.no_alternate_screen,
         };
         apply_matches(core, &matches, false)
     }

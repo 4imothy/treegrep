@@ -17,10 +17,17 @@ pub struct Term<'a> {
     out: StdoutLock<'a>,
     in_alternate_screen: bool,
     panic_hook_set: bool,
+    with_mouse: bool,
+    with_alternate_screen: bool,
 }
 
 impl<'a> Term<'a> {
-    pub fn new(out: StdoutLock<'a>, need_ui: bool) -> io::Result<Term<'a>> {
+    pub fn new(
+        out: StdoutLock<'a>,
+        need_ui: bool,
+        with_mouse: bool,
+        with_alternate_screen: bool,
+    ) -> io::Result<Term<'a>> {
         let (width, height) = if need_ui { terminal::size()? } else { (0, 0) };
         TERM_WIDTH.store(width, Ordering::SeqCst);
         Ok(Term {
@@ -28,6 +35,8 @@ impl<'a> Term<'a> {
             height,
             in_alternate_screen: false,
             panic_hook_set: false,
+            with_mouse,
+            with_alternate_screen,
         })
     }
 
@@ -41,18 +50,22 @@ impl<'a> Term<'a> {
     }
 
     pub fn claim(&mut self) -> io::Result<()> {
-        execute!(
-            self,
-            cursor::Hide,
-            terminal::EnterAlternateScreen,
-            terminal::DisableLineWrap,
-            event::EnableMouseCapture
-        )?;
+        execute!(self, cursor::Hide, terminal::DisableLineWrap)?;
+        if self.with_alternate_screen {
+            execute!(self, terminal::EnterAlternateScreen)?;
+        } else {
+            execute!(self, terminal::Clear(ClearType::All), cursor::MoveTo(0, 0))?;
+        }
+        if self.with_mouse {
+            execute!(self, event::EnableMouseCapture)?;
+        }
         self.in_alternate_screen = true;
         if !self.panic_hook_set {
             let default_hook = panic::take_hook();
+            let with_mouse = self.with_mouse;
+            let with_alternate_screen = self.with_alternate_screen;
             panic::set_hook(Box::new(move |info| {
-                Term::exit(&mut io::stderr()).ok();
+                Term::exit(&mut io::stderr(), with_mouse, with_alternate_screen).ok();
                 default_hook(info);
             }));
             self.panic_hook_set = true;
@@ -61,7 +74,7 @@ impl<'a> Term<'a> {
         terminal::enable_raw_mode()
     }
 
-    fn exit<W>(w: &mut W) -> io::Result<()>
+    fn exit<W>(w: &mut W, with_mouse: bool, with_alternate_screen: bool) -> io::Result<()>
     where
         W: Write,
     {
@@ -70,11 +83,16 @@ impl<'a> Term<'a> {
             w,
             style::ResetColor,
             cursor::SetCursorStyle::DefaultUserShape,
-            terminal::LeaveAlternateScreen,
             terminal::EnableLineWrap,
-            event::DisableMouseCapture,
             cursor::Show,
-        )
+        )?;
+        if with_alternate_screen {
+            execute!(w, terminal::LeaveAlternateScreen)?;
+        }
+        if with_mouse {
+            execute!(w, event::DisableMouseCapture)?;
+        }
+        Ok(())
     }
 
     pub fn width(&self) -> u16 {
@@ -83,7 +101,7 @@ impl<'a> Term<'a> {
 
     pub fn give(&mut self) -> io::Result<()> {
         self.flush()?;
-        Term::exit(self)?;
+        Term::exit(self, self.with_mouse, self.with_alternate_screen)?;
         self.in_alternate_screen = false;
         if self.panic_hook_set {
             let _ = panic::take_hook();

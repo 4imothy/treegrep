@@ -54,6 +54,7 @@ function M.tgrep_with(args)
     local win = vim.api.nvim_open_win(buf, true, M.win_opts())
     local cmd = {
         vim.uv.fs_stat(tgrep_bin) and tgrep_bin or 'tgrep',
+        '--no-alternate-screen',
         '--selection-file=' .. vim.fn.fnameescape(config.selection_file)
     }
 

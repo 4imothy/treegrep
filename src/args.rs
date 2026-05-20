@@ -420,7 +420,7 @@ pub struct Args {
     )]
     pub max_length: Option<usize>,
 
-    #[arg(long, help = "don't use ignore files")]
+    #[arg(long, help = "disable ignore files")]
     pub no_ignore: bool,
 
     #[arg(
@@ -461,11 +461,17 @@ pub struct Args {
     #[arg(long, help = "repeats the last saved search")]
     pub repeat: bool,
 
-    #[arg(long, help = "don't use colors")]
+    #[arg(long, help = "disable colors")]
     pub no_color: bool,
 
-    #[arg(long, help = "don't bold anything")]
+    #[arg(long, help = "disable bold")]
     pub no_bold: bool,
+
+    #[arg(long, help = "disable mouse events")]
+    pub no_mouse: bool,
+
+    #[arg(long, help = "disable the terminal alternate screen")]
+    pub no_alternate_screen: bool,
 
     #[arg(long, value_parser = ColorParser, value_name = "", hide_short_help = true, help = COLOR_HELP)]
     pub file_color: Option<Color>,
