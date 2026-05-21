@@ -1,9 +1,9 @@
 ;;; treegrep.el --- Run tgrep in a terminal window -*- lexical-binding: t -*-
 
-;; Copyright (C) 2024 Timothy Cronin
+;; Copyright (C) 2026 Timothy Cronin
 ;;
-;; Author: Timothy Cronin
-;; Homepage: https://github.com/4imothy/treegrep
+;; Author: Timothy Cronin <tcroniniv@gmail.com>
+;; URL: https://github.com/4imothy/treegrep
 ;; SPDX-License-Identifier: MIT
 
 ;;; Commentary:

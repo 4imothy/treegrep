@@ -371,6 +371,13 @@ pub struct Args {
 
     #[arg(
         long,
+        hide_short_help = true,
+        help = "trigger search on every keystroke in the menu"
+    )]
+    pub live: bool,
+
+    #[arg(
+        long,
         short = 'f',
         help = "if an expression is given, hide matched content, otherwise, show the files that would be searched"
     )]
@@ -428,9 +435,6 @@ pub struct Args {
     )]
     pub after_context: Option<usize>,
 
-    #[arg(long, help = "trigger search on every keystroke in the menu")]
-    pub live: bool,
-
     #[arg(
         long,
         value_name = "",
@@ -449,27 +453,11 @@ pub struct Args {
     )]
     pub trim: bool,
 
-    #[arg(long, value_name = "", help = "set the number of threads to use")]
-    pub threads: Option<usize>,
-
-    #[arg(long, value_name = "", help = "command used to open selections")]
-    pub editor: Option<String>,
-
     #[arg(
         long,
         help = "if there is only one match, open it in the configured editor"
     )]
     pub auto_open: bool,
-
-    #[arg(
-        long,
-        value_name = "",
-        help = "command line syntax for opening a file at a line"
-    )]
-    pub open_like: Option<OpenStrategy>,
-
-    #[arg(long, value_name = "", help = "generate completions for given shell")]
-    pub completions: Option<clap_complete::Shell>,
 
     #[arg(long, help = "repeats the last saved search")]
     pub repeat: bool,
@@ -487,6 +475,7 @@ pub struct Args {
         long,
         default_value_t = 1,
         requires = FILES,
+        hide_short_help = true,
         value_name = "",
         help = "number of files to print on each branch"
     )]
@@ -498,10 +487,46 @@ pub struct Args {
     #[arg(long, help = "disable bold")]
     pub no_bold: bool,
 
-    #[arg(long, help = "disable mouse events")]
+    #[arg(
+        long,
+        value_name = "",
+        hide_short_help = true,
+        help = "set the number of threads to use"
+    )]
+    pub threads: Option<usize>,
+
+    #[arg(
+        long,
+        value_name = "",
+        hide_short_help = true,
+        help = "command used to open selections"
+    )]
+    pub editor: Option<String>,
+
+    #[arg(
+        long,
+        value_name = "",
+        hide_short_help = true,
+        help = "command line syntax for opening a file at a line"
+    )]
+    pub open_like: Option<OpenStrategy>,
+
+    #[arg(
+        long,
+        value_name = "",
+        hide_short_help = true,
+        help = "generate completions for given shell"
+    )]
+    pub completions: Option<clap_complete::Shell>,
+
+    #[arg(long, hide_short_help = true, help = "disable mouse events")]
     pub no_mouse: bool,
 
-    #[arg(long, help = "disable the terminal alternate screen")]
+    #[arg(
+        long,
+        hide_short_help = true,
+        help = "disable the terminal alternate screen"
+    )]
     pub no_alternate_screen: bool,
 
     #[arg(long, value_parser = ColorParser, value_name = "", hide_short_help = true, help = COLOR_HELP)]

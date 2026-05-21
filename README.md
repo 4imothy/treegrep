@@ -116,9 +116,9 @@ nnoremap <leader>tf :call TgrepWith('--files --select')<cr>
   (require 'term)
   (tgrep-build)
   :bind
-  ("C-c t t" . (lambda () (interactive) (delete-other-windows) (tgrep-with "--menu --live --no-mouse --path=/some/path")))
-  ("C-c t r" . (lambda () (interactive) (delete-other-windows) (tgrep-with "--repeat --select --live --no-mouse")))
-  ("C-c t f" . (lambda () (interactive) (delete-other-windows) (tgrep-with "--files --select --live --no-mouse --path=/some/path"))))
+  ("C-c t t" . (lambda () (interactive) (delete-other-windows) (tgrep-with "--menu --path=/some/path")))
+  ("C-c t r" . (lambda () (interactive) (delete-other-windows) (tgrep-with "--repeat --select")))
+  ("C-c t f" . (lambda () (interactive) (delete-other-windows) (tgrep-with "--files --select --path=/some/path"))))
 ```
 </details>
 
@@ -128,14 +128,14 @@ nnoremap <leader>tf :call TgrepWith('--files --select')<cr>
 
 ```
 src: 9
-├──style.rs: 1
-│  ├──-1: 
-│  ├──23: pub struct DisplayRepeater<T>(T, usize);
-│  ╰──+1: impl<T: Display> Display for DisplayRepeater<T> {
 ├──term.rs: 1
 │  ├──-1: 
 │  ├──15: pub struct Term<'a> {
 │  ╰──+1:     pub height: u16,
+├──style.rs: 1
+│  ├──-1: 
+│  ├──23: pub struct DisplayRepeater<T>(T, usize);
+│  ╰──+1: impl<T: Display> Display for DisplayRepeater<T> {
 ├──match_system.rs: 8
 │  ├──-1: 
 │  ├──23: pub struct Directory {
@@ -161,6 +161,16 @@ src: 9
 │  ├──-1: 
 │  ├──111: impl Line {
 │  ╰──+1:     pub fn new(content: String, mut matches: Vec<Match>, line_num: usize) -> Self {
+├──matcher.rs: 3
+│  ├──-1: 
+│  ├──29: struct Matcher {
+│  ├──+1:     combined: RegexMatcher,
+│  ├──-1: 
+│  ├──34: impl Matcher {
+│  ├──+1:     fn new(patterns: &[String]) -> Result<Self, Message> {
+│  ├──-1: 
+│  ├──53: struct MatchSink<'a> {
+│  ╰──+1:     lines: Vec<Line>,
 ├──errors.rs: 4
 │  ├──-1: 
 │  ├──14: pub struct Message {
@@ -174,16 +184,51 @@ src: 9
 │  ├──-1: 
 │  ├──40: impl fmt::Display for Message {
 │  ╰──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-├──matcher.rs: 3
+├──args.rs: 6
 │  ├──-1: 
-│  ├──29: struct Matcher {
-│  ├──+1:     combined: RegexMatcher,
+│  ├──25: impl ValueEnum for OpenStrategy {
+│  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
+│  ├──-1: #[derive(Clone)]
+│  ├──83: pub struct ColorParser;
+│  ├──+1: 
+│  ├──85: impl clap::builder::TypedValueParser for ColorParser {
+│  ├──+1:     type Value = Color;
+│  ├──-1: #[derive(Clone)]
+│  ├──142: pub struct KeyCodeParser;
+│  ├──+1: 
+│  ├──144: impl clap::builder::TypedValueParser for KeyCodeParser {
+│  ├──+1:     type Value = KeyCode;
+│  ├──-1: )]
+│  ├──329: pub struct Args {
+│  ╰──+1:     #[arg(
+├──config.rs: 9
+│  ├──-1: #[derive(Clone)]
+│  ├──28: pub struct KeyBindings {
+│  ├──+1:     pub down: Vec<KeyCode>,
+│  ├──-1: #[derive(Clone)]
+│  ├──52: pub struct Characters {
+│  ├──+1:     pub bl: char,
+│  ├──-1: #[derive(Clone)]
+│  ├──73: pub struct Colors {
+│  ├──+1:     pub file: Color,
 │  ├──-1: 
-│  ├──34: impl Matcher {
-│  ├──+1:     fn new(patterns: &[String]) -> Result<Self, Message> {
+│  ├──85: impl args::Color {
+│  ├──+1:     fn get(&self) -> Color {
+│  ├──-1: #[derive(Clone)]
+│  ├──104: pub struct SearchParams {
+│  ├──+1:     pub regexps: Vec<String>,
+│  ├──-1: #[derive(Clone)]
+│  ├──124: pub struct Config {
+│  ├──+1:     pub search: SearchParams,
 │  ├──-1: 
-│  ├──53: struct MatchSink<'a> {
-│  ╰──+1:     lines: Vec<Line>,
+│  ├──436: struct NonSearchFields {
+│  ├──+1:     selection_file: Option<PathBuf>,
+│  ├──-1: 
+│  ├──453: impl Config {
+│  ├──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
+│  ├──-1: 
+│  ├──754: impl SearchParams {
+│  ╰──+1:     fn to_args(&self) -> Vec<OsString> {
 ├──writer.rs: 19
 │  ├──-1: 
 │  ├──57: impl HighlightEvent<'_> {
@@ -242,51 +287,6 @@ src: 9
 │  ├──-1: 
 │  ├──709: impl File {
 │  ╰──+1:     fn to_lines(
-├──args.rs: 6
-│  ├──-1: 
-│  ├──25: impl ValueEnum for OpenStrategy {
-│  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
-│  ├──-1: #[derive(Clone)]
-│  ├──83: pub struct ColorParser;
-│  ├──+1: 
-│  ├──85: impl clap::builder::TypedValueParser for ColorParser {
-│  ├──+1:     type Value = Color;
-│  ├──-1: #[derive(Clone)]
-│  ├──142: pub struct KeyCodeParser;
-│  ├──+1: 
-│  ├──144: impl clap::builder::TypedValueParser for KeyCodeParser {
-│  ├──+1:     type Value = KeyCode;
-│  ├──-1: )]
-│  ├──328: pub struct Args {
-│  ╰──+1:     #[arg(
-├──config.rs: 9
-│  ├──-1: #[derive(Clone)]
-│  ├──28: pub struct KeyBindings {
-│  ├──+1:     pub down: Vec<KeyCode>,
-│  ├──-1: #[derive(Clone)]
-│  ├──52: pub struct Characters {
-│  ├──+1:     pub bl: char,
-│  ├──-1: #[derive(Clone)]
-│  ├──73: pub struct Colors {
-│  ├──+1:     pub file: Color,
-│  ├──-1: 
-│  ├──85: impl args::Color {
-│  ├──+1:     fn get(&self) -> Color {
-│  ├──-1: #[derive(Clone)]
-│  ├──104: pub struct SearchParams {
-│  ├──+1:     pub regexps: Vec<String>,
-│  ├──-1: #[derive(Clone)]
-│  ├──124: pub struct Config {
-│  ├──+1:     pub search: SearchParams,
-│  ├──-1: 
-│  ├──436: struct NonSearchFields {
-│  ├──+1:     selection_file: Option<PathBuf>,
-│  ├──-1: 
-│  ├──453: impl Config {
-│  ├──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
-│  ├──-1: 
-│  ├──754: impl SearchParams {
-│  ╰──+1:     fn to_args(&self) -> Vec<OsString> {
 ╰──menu.rs: 9
    ├──-1: 
    ├──59: impl ViewAnchor {
@@ -304,16 +304,16 @@ src: 9
    ├──106: impl Window {
    ├──+1:     fn new() -> Self {
    ├──-1: 
-   ├──451: struct CurrentResults {
+   ├──511: struct CurrentResults {
    ├──+1:     lines: Vec<Box<dyn Entry>>,
    ├──-1: 
-   ├──455: impl CurrentResults {
+   ├──515: impl CurrentResults {
    ├──+1:     fn new(matches: Matches, config: Arc<Config>) -> io::Result<Self> {
    ├──-1: 
-   ├──463: pub struct Menu<'a, 'b> {
+   ├──523: pub struct Menu<'a, 'b> {
    ├──+1:     in_menu: bool,
    ├──-1: 
-   ├──1633: impl OpenStrategy {
+   ├──1693: impl OpenStrategy {
    ╰──+1:     fn from(editor: &str) -> Self {
 ```
 </details>
@@ -324,19 +324,19 @@ src: 9
 ```
 menu.rs
 +--19: style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
-+--328: Print(format!(
-+--339: Print(format!(
-+--351: Print(format!(
-+--640: queue!(self.term, Print(WithFilter { entry, filter }))?;
-+--643: queue!(self.term, Print(&cfg.chars.ellipsis))?;
-+--662: Print(style::style_with(
-+--670: queue!(self.term, Print(cfg.chars.selected_indicator.as_str()))?;
-+--691: Print(cfg.chars.selected_indicator_clear.as_str()),
-+--1045: Print(top),
-+--1067: Print(display),
-+--1163: Print(line)
-+--1183: queue!(self.term, cursor::MoveTo(0, y), Print(msg))?;
-+--1398: Print(cfg.chars.selected_indicator_clear.as_str())
++--386: Print(format!(
++--397: Print(format!(
++--409: Print(format!(
++--700: queue!(self.term, Print(WithFilter { entry, filter }))?;
++--703: queue!(self.term, Print(&cfg.chars.ellipsis))?;
++--722: Print(style::style_with(
++--730: queue!(self.term, Print(cfg.chars.selected_indicator.as_str()))?;
++--751: Print(cfg.chars.selected_indicator_clear.as_str()),
++--1105: Print(top),
++--1127: Print(display),
++--1223: Print(line)
++--1243: queue!(self.term, cursor::MoveTo(0, y), Print(msg))?;
++--1458: Print(cfg.chars.selected_indicator_clear.as_str())
 ```
 </details>
 
@@ -371,13 +371,27 @@ treegrep
 │  ╰──times
 ├──lua
 │  ╰──treegrep.lua
-├──plugin
-│  ├──treegrep.el
-│  ╰──treegrep.vim
 ├──tests
 │  ├──pool
 │  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
+│  │  ├──files_1
+│  │  ├──wide_2
+│  │  ├──links_4
+│  │  ├──links_3
+│  │  ├──links_2
+│  │  ├──files_long_branch_expr_2
+│  │  ├──glob_exclusion
+│  │  ├──no_matches
+│  │  ├──files_long_branch_1
+│  │  ├──context_b1
+│  │  ├──context_a1
+│  │  ├──files_long_branch_expr_count_2
+│  │  ├──overview_dir
+│  │  ├──wide_1
+│  │  ├──files_2
+│  │  ├──line_number
+│  │  ├──deep
 │  │  ├──context_c1
 │  │  ├──links_1
 │  │  ├──count
@@ -389,33 +403,19 @@ treegrep
 │  │  ├──files_long_branch_2
 │  │  ├──glob_inclusion
 │  │  ├──files_long_branch_expr_count_1
-│  │  ├──files_with_expr
-│  │  ├──files_1
-│  │  ├──context_b1
-│  │  ├──wide_2
-│  │  ├──links_4
-│  │  ├──context_a1
-│  │  ├──links_3
-│  │  ├──files_long_branch_expr_count_2
-│  │  ├──links_2
-│  │  ├──files_2
-│  │  ├──overview_dir
-│  │  ├──files_long_branch_expr_2
-│  │  ├──line_number
-│  │  ├──wide_1
-│  │  ├──glob_exclusion
-│  │  ├──deep
-│  │  ├──no_matches
-│  │  ╰──files_long_branch_1
+│  │  ╰──files_with_expr
 │  ├──utils.rs
-│  ├──tests.rs
-│  ╰──file_system.rs
-├──.gitignore
+│  ├──file_system.rs
+│  ╰──tests.rs
+├──plugin
+│  ├──treegrep.el
+│  ╰──treegrep.vim
 ├──README.md
-├──Cargo.lock
 ├──LICENSE
 ├──rustfmt.toml
-╰──Cargo.toml
+├──Cargo.toml
+├──Cargo.lock
+╰──.gitignore
 ```
 </details>
 
@@ -437,21 +437,21 @@ treegrep
 │  ╰──runner, times
 ├──lua
 │  ╰──treegrep.lua
-├──plugin
-│  ╰──treegrep.el, treegrep.vim
 ├──tests
 │  ├──pool
 │  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
-│  │  ├──files_1, wide_2, links_4, links_3, links_2
-│  │  ├──files_long_branch_expr_2, glob_exclusion, no_matches, files_long_branch_1, context_b1
-│  │  ├──context_a1, files_long_branch_expr_count_2, overview_dir, wide_1, files_2
-│  │  ├──line_number, deep, context_c1, links_1, count
-│  │  ├──overview_file, files_long_branch_expr_1, overlapping, file, max_depth
-│  │  ╰──files_long_branch_2, glob_inclusion, files_long_branch_expr_count_1, files_with_expr
-│  ╰──utils.rs, tests.rs, file_system.rs
-├──.gitignore, README.md, Cargo.lock, LICENSE, rustfmt.toml
-╰──Cargo.toml
+│  │  ├──files_with_expr, files_long_branch_expr_count_1, glob_inclusion, files_1, wide_2
+│  │  ├──links_4, links_3, links_2, files_long_branch_expr_2, glob_exclusion
+│  │  ├──no_matches, files_long_branch_1, context_b1, context_a1, files_long_branch_expr_count_2
+│  │  ├──overview_dir, wide_1, files_2, line_number, deep
+│  │  ├──context_c1, links_1, count, overview_file, files_long_branch_expr_1
+│  │  ╰──overlapping, file, max_depth, files_long_branch_2
+│  ╰──utils.rs, file_system.rs, tests.rs
+├──plugin
+│  ╰──treegrep.el, treegrep.vim
+├──.gitignore, README.md, Cargo.lock, rustfmt.toml, Cargo.toml
+╰──LICENSE
 ```
 </details>
 
@@ -487,6 +487,9 @@ options:
   -m, --menu
           open a search and selection interface
 
+      --live
+          trigger search on every keystroke in the menu
+
   -f, --files
           if an expression is given, hide matched content, otherwise, show the files that would be searched (saved for repeat)
 
@@ -520,9 +523,6 @@ options:
   -A, --after-context <>
           number of lines to show after each match (saved for repeat)
 
-      --live
-          trigger search on every keystroke in the menu
-
       --max-length <>
           set the max length for a matched line (saved for repeat)
 
@@ -532,24 +532,8 @@ options:
       --trim
           trim whitespace at the beginning of lines (saved for repeat)
 
-      --threads <>
-          set the number of threads to use
-
-      --editor <>
-          command used to open selections
-
       --auto-open
           if there is only one match, open it in the configured editor
-
-      --open-like <>
-          command line syntax for opening a file at a line
-          
-          [possible values: vi, hx, code, jed, default]
-
-      --completions <>
-          generate completions for given shell
-          
-          [possible values: bash, elvish, fish, powershell, zsh]
 
       --repeat
           repeats the last saved search
@@ -569,6 +553,22 @@ options:
 
       --no-bold
           disable bold
+
+      --threads <>
+          set the number of threads to use
+
+      --editor <>
+          command used to open selections
+
+      --open-like <>
+          command line syntax for opening a file at a line
+          
+          [possible values: vi, hx, code, jed, default]
+
+      --completions <>
+          generate completions for given shell
+          
+          [possible values: bash, elvish, fish, powershell, zsh]
 
       --no-mouse
           disable mouse events

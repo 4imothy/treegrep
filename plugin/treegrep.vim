@@ -1,3 +1,4 @@
+" SPDX-License-Identifier: MIT
 " plugin/treegrep.vim
 
 if has('nvim')
