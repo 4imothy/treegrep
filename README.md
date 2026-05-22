@@ -457,7 +457,7 @@ treegrep
 
 ### *--help*
 ```
-tgrep 2.0.0
+tgrep 2.1.0
 
 by Timothy Cronin
 
