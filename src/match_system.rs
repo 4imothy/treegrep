@@ -102,14 +102,14 @@ impl Match {
 }
 
 pub struct Line {
-    pub content: String,
+    pub content: Vec<u8>,
     pub matches: Vec<Match>,
     pub line_num: usize,
     pub context_offset: Option<isize>,
 }
 
 impl Line {
-    pub fn new(content: String, mut matches: Vec<Match>, line_num: usize) -> Self {
+    pub fn new(content: Vec<u8>, mut matches: Vec<Match>, line_num: usize) -> Self {
         Match::remove_overlapping(&mut matches);
         Self {
             content,
@@ -119,7 +119,7 @@ impl Line {
         }
     }
 
-    pub fn new_context(content: String, line_num: usize) -> Self {
+    pub fn new_context(content: Vec<u8>, line_num: usize) -> Self {
         Self {
             content,
             matches: Vec::new(),

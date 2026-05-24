@@ -91,22 +91,55 @@ fn write_segment(
     }
 }
 
+fn byte_offsets(raw: &[u8]) -> Vec<(usize, usize)> {
+    let mut offsets = Vec::new();
+    let mut extra: usize = 0;
+    let mut pos = 0;
+    loop {
+        match std::str::from_utf8(&raw[pos..]) {
+            Ok(_) => break,
+            Err(e) => {
+                pos += e.valid_up_to();
+                let invalid_len = e.error_len().unwrap_or(1);
+                pos += invalid_len;
+                extra += 3_usize.saturating_sub(invalid_len);
+                offsets.push((pos, extra));
+            }
+        }
+    }
+    offsets
+}
+
+fn decoded_pos(offsets: &[(usize, usize)], raw_pos: usize) -> usize {
+    raw_pos
+        + offsets
+            .partition_point(|(p, _)| *p <= raw_pos)
+            .checked_sub(1)
+            .map_or(0, |i| offsets[i].1)
+}
+
 fn write_content_with_highlights(
     f: &mut fmt::Formatter,
-    content: &str,
+    raw: &[u8],
     matches: &[Match],
     cut: usize,
     text_fg: Option<Color>,
     filter: &str,
     config: &Config,
 ) -> fmt::Result {
+    let content_cow = String::from_utf8_lossy(raw);
+    let content: &str = &content_cow;
+    let offsets = byte_offsets(raw);
+
     let filter_ranges = filter_matches_in(content, filter);
 
     let mut events: Vec<(usize, HighlightEvent)> = Vec::new();
     for m in matches {
         if m.start < m.end {
-            let ms = m.start.saturating_sub(cut);
-            let me = m.end.saturating_sub(cut).min(content.len());
+            let ms_raw = m.start.saturating_sub(cut);
+            let me_raw = m.end.saturating_sub(cut).min(raw.len());
+            let ms = decoded_pos(&offsets, ms_raw);
+            let me = decoded_pos(&offsets, me_raw).min(content.len());
             if ms < content.len() {
                 events.push((ms, HighlightEvent::RegexStart(m)));
                 events.push((me, HighlightEvent::RegexEnd));
@@ -283,10 +316,10 @@ fn write_path(
             write!(f, " -> [ps]{}[pe]", l)?;
         }
     } else {
-        write_content_with_highlights(f, name, &[], 0, Some(color), filter, config)?;
+        write_content_with_highlights(f, name.as_bytes(), &[], 0, Some(color), filter, config)?;
         if let Some(l) = linked {
             f.write_str(" -> ")?;
-            write_content_with_highlights(f, l, &[], 0, Some(color), filter, config)?;
+            write_content_with_highlights(f, l.as_bytes(), &[], 0, Some(color), filter, config)?;
         }
     }
     if config.search.count && count > 0 {
@@ -322,7 +355,7 @@ fn write_prefix(
 
 struct LineDisplay {
     prefix: Vec<PrefixComponent>,
-    content: String,
+    content: Vec<u8>,
     path: PathBuf,
     matches: Vec<Match>,
     line_num: usize,
@@ -338,13 +371,12 @@ impl Entry for LineDisplay {
             write!(f, "{}", style::RESET)?;
         }
 
-        let mut content: &str = &self.content;
+        let mut raw: &[u8] = &self.content;
 
         let cut = if self.config.search.trim {
-            let trimmed = content.trim_start();
-            let cut = content.len() - trimmed.len();
-            content = trimmed;
-            cut
+            let n = raw.iter().take_while(|&&b| b.is_ascii_whitespace()).count();
+            raw = &raw[n..];
+            n
         } else {
             0
         };
@@ -370,9 +402,9 @@ impl Entry for LineDisplay {
                 .search
                 .max_length
                 .map_or(content_width, |m| m.min(content_width));
-            content = &content[..content.floor_char_boundary(cap.min(content.len()))];
+            raw = &raw[..cap.min(raw.len())];
         } else if let Some(max) = self.config.search.max_length {
-            content = &content[..content.floor_char_boundary(max.min(content.len()))];
+            raw = &raw[..max.min(raw.len())];
         }
 
         if let Some(n) = &line_num {
@@ -388,13 +420,18 @@ impl Entry for LineDisplay {
         }
 
         if cfg!(feature = "test") {
+            let content_cow = String::from_utf8_lossy(raw);
+            let content: &str = &content_cow;
+            let offsets = byte_offsets(raw);
             let mut last = 0;
             for m in self.matches.iter() {
-                if m.start >= m.end || m.start >= content.len() {
+                if m.start >= m.end {
                     continue;
                 }
-                let m_start = m.start.saturating_sub(cut);
-                let m_end = m.end.saturating_sub(cut).min(content.len());
+                let m_start_raw = m.start.saturating_sub(cut);
+                let m_end_raw = m.end.saturating_sub(cut).min(raw.len());
+                let m_start = decoded_pos(&offsets, m_start_raw);
+                let m_end = decoded_pos(&offsets, m_end_raw).min(content.len());
                 if m_start >= content.len() {
                     continue;
                 }
@@ -422,7 +459,7 @@ impl Entry for LineDisplay {
         } else {
             write_content_with_highlights(
                 f,
-                content,
+                raw,
                 &self.matches,
                 cut,
                 self.config.colors.text,
@@ -452,11 +489,17 @@ impl Entry for LineDisplay {
         false
     }
     fn filter_text(&self) -> Cow<'_, str> {
-        Cow::Borrowed(if self.config.search.trim {
-            self.content.trim_start()
+        let raw: &[u8] = if self.config.search.trim {
+            let n = self
+                .content
+                .iter()
+                .take_while(|&&b| b.is_ascii_whitespace())
+                .count();
+            &self.content[n..]
         } else {
             &self.content
-        })
+        };
+        String::from_utf8_lossy(raw)
     }
 }
 

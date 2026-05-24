@@ -80,8 +80,9 @@ impl<'a> Sink for MatchSink<'a> {
         }
 
         if !self.match_buf.is_empty() {
-            let content = String::from_utf8_lossy(trimmed_bytes).into_owned();
-            let matches = std::mem::replace(&mut self.match_buf, Vec::with_capacity(8));
+            let content = trimmed_bytes.to_vec();
+            let n = self.match_buf.len();
+            let matches = std::mem::replace(&mut self.match_buf, Vec::with_capacity(n));
             self.lines.push(Line::new(content, matches, line_num));
         }
 
@@ -91,7 +92,7 @@ impl<'a> Sink for MatchSink<'a> {
     fn context(&mut self, _searcher: &Searcher, ctx: &SinkContext<'_>) -> Result<bool, io::Error> {
         let line_bytes = ctx.bytes();
         let trimmed_bytes = strip_line_ending(line_bytes);
-        let content = String::from_utf8_lossy(trimmed_bytes).into_owned();
+        let content = trimmed_bytes.to_vec();
         let line_num = ctx.line_number().unwrap_or(0) as usize;
         self.lines.push(Line::new_context(content, line_num));
         Ok(true)
