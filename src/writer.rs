@@ -10,7 +10,6 @@ use crate::{
 use core::fmt::{self, Display};
 use crossterm::style::Color;
 use std::{
-    borrow::Cow,
     io::{self, Write},
     path::{Path, PathBuf},
     sync::{Arc, atomic::Ordering},
@@ -198,7 +197,7 @@ pub trait Entry: Display {
     fn open_info(&self) -> Result<OpenInfo<'_>, Message>;
     fn depth(&self) -> usize;
     fn is_path(&self) -> bool;
-    fn filter_text(&self) -> Cow<'_, str>;
+    fn filter_text(&self) -> String;
 }
 
 pub struct WithFilter<'a> {
@@ -287,10 +286,10 @@ impl Entry for PathDisplay {
     fn is_path(&self) -> bool {
         true
     }
-    fn filter_text(&self) -> Cow<'_, str> {
+    fn filter_text(&self) -> String {
         match &self.linked {
-            Some(l) => Cow::Owned(format!("{} {}", self.name, l)),
-            None => Cow::Borrowed(&self.name),
+            Some(l) => format!("{} {}", self.name, l),
+            None => self.name.clone(),
         }
     }
 }
@@ -488,7 +487,7 @@ impl Entry for LineDisplay {
     fn is_path(&self) -> bool {
         false
     }
-    fn filter_text(&self) -> Cow<'_, str> {
+    fn filter_text(&self) -> String {
         let raw: &[u8] = if self.config.search.trim {
             let n = self
                 .content
@@ -499,7 +498,7 @@ impl Entry for LineDisplay {
         } else {
             &self.content
         };
-        String::from_utf8_lossy(raw)
+        String::from_utf8_lossy(raw).into_owned()
     }
 }
 
@@ -553,17 +552,12 @@ impl Entry for LongBranchDisplay {
     fn is_path(&self) -> bool {
         true
     }
-    fn filter_text(&self) -> Cow<'_, str> {
-        let parts: Vec<&str> = self
-            .files
+    fn filter_text(&self) -> String {
+        self.files
             .iter()
             .flat_map(|f| std::iter::once(f.name.as_str()).chain(f.linked.as_deref()))
-            .collect();
-        if parts.len() == 1 {
-            Cow::Borrowed(parts[0])
-        } else {
-            Cow::Owned(parts.join(" "))
-        }
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
 
@@ -583,11 +577,12 @@ struct OverviewDisplay {
 }
 
 impl Entry for OverviewDisplay {
-    fn render(&self, f: &mut fmt::Formatter, _filter: &str) -> fmt::Result {
+    fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
         if self.config.with_colors || self.config.with_bold {
             write!(f, "{}", style::RESET)?;
         }
-        write!(f, "{}", self.filter_text())?;
+        let text = self.filter_text();
+        write_content_with_highlights(f, text.as_bytes(), &[], 0, None, filter, &self.config)?;
         if self.new_line {
             writeln!(f)?;
         }
@@ -602,7 +597,7 @@ impl Entry for OverviewDisplay {
     fn is_path(&self) -> bool {
         false
     }
-    fn filter_text(&self) -> Cow<'_, str> {
+    fn filter_text(&self) -> String {
         let mut s = String::new();
         if !self.config.search.files {
             s.push_str(&format!(
@@ -618,7 +613,7 @@ impl Entry for OverviewDisplay {
         if self.config.is_dir {
             s.push_str(&format!(" within {} directories", self.dirs));
         }
-        Cow::Owned(s)
+        s
     }
 }
 
