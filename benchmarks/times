@@ -146,3 +146,30 @@ files:
     tgrep: 0.259s +- 0.001s (min 0.258s)
 
 --------------------
+2026-05-25: 5 runs after 2 warmup
+
+subtitles:
+  threads=1
+    rg: 3.630s +- 0.025s (min 3.600s)
+    tgrep: 9.384s +- 0.177s (min 9.247s)
+  threads=10
+    rg: 3.565s +- 0.020s (min 3.531s)
+    tgrep: 9.211s +- 0.038s (min 9.173s)
+
+linux:
+  threads=1
+    rg: 3.124s +- 0.080s (min 2.982s)
+    tgrep: 3.349s +- 0.084s (min 3.199s)
+  threads=10
+    rg: 2.319s +- 0.048s (min 2.252s)
+    tgrep: 2.965s +- 0.038s (min 2.916s)
+
+files:
+  threads=1
+    rg: 0.312s +- 0.002s (min 0.310s)
+    tgrep: 0.473s +- 0.002s (min 0.470s)
+  threads=10
+    rg: 0.105s +- 0.001s (min 0.105s)
+    tgrep: 0.284s +- 0.002s (min 0.281s)
+
+--------------------

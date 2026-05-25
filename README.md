@@ -128,14 +128,14 @@ nnoremap <leader>tf :call TgrepWith('--files --select')<cr>
 
 ```
 src: 9
-├──term.rs: 1
-│  ├──-1: 
-│  ├──15: pub struct Term<'a> {
-│  ╰──+1:     pub height: u16,
 ├──style.rs: 1
 │  ├──-1: 
 │  ├──23: pub struct DisplayRepeater<T>(T, usize);
 │  ╰──+1: impl<T: Display> Display for DisplayRepeater<T> {
+├──term.rs: 1
+│  ├──-1: 
+│  ├──15: pub struct Term<'a> {
+│  ╰──+1:     pub height: u16,
 ├──match_system.rs: 8
 │  ├──-1: 
 │  ├──23: pub struct Directory {
@@ -157,20 +157,10 @@ src: 9
 │  ├──+1:     pub fn new(regexp_id: usize, start: usize, end: usize) -> Self {
 │  ├──-1: 
 │  ├──104: pub struct Line {
-│  ├──+1:     pub content: String,
+│  ├──+1:     pub content: Vec<u8>,
 │  ├──-1: 
 │  ├──111: impl Line {
-│  ╰──+1:     pub fn new(content: String, mut matches: Vec<Match>, line_num: usize) -> Self {
-├──matcher.rs: 3
-│  ├──-1: 
-│  ├──29: struct Matcher {
-│  ├──+1:     combined: RegexMatcher,
-│  ├──-1: 
-│  ├──34: impl Matcher {
-│  ├──+1:     fn new(patterns: &[String]) -> Result<Self, Message> {
-│  ├──-1: 
-│  ├──53: struct MatchSink<'a> {
-│  ╰──+1:     lines: Vec<Line>,
+│  ╰──+1:     pub fn new(content: Vec<u8>, mut matches: Vec<Match>, line_num: usize) -> Self {
 ├──errors.rs: 4
 │  ├──-1: 
 │  ├──14: pub struct Message {
@@ -184,6 +174,16 @@ src: 9
 │  ├──-1: 
 │  ├──40: impl fmt::Display for Message {
 │  ╰──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+├──matcher.rs: 3
+│  ├──-1: 
+│  ├──29: struct Matcher {
+│  ├──+1:     combined: RegexMatcher,
+│  ├──-1: 
+│  ├──34: impl Matcher {
+│  ├──+1:     fn new(patterns: &[String]) -> Result<Self, Message> {
+│  ├──-1: 
+│  ├──53: struct MatchSink<'a> {
+│  ╰──+1:     lines: Vec<Line>,
 ├──args.rs: 6
 │  ├──-1: 
 │  ├──25: impl ValueEnum for OpenStrategy {
@@ -231,61 +231,61 @@ src: 9
 │  ╰──+1:     fn to_args(&self) -> Vec<OsString> {
 ├──writer.rs: 19
 │  ├──-1: 
-│  ├──57: impl HighlightEvent<'_> {
+│  ├──56: impl HighlightEvent<'_> {
 │  ├──+1:     fn priority(&self) -> u8 {
 │  ├──-1: 
-│  ├──158: pub struct OpenInfo<'a> {
+│  ├──190: pub struct OpenInfo<'a> {
 │  ├──+1:     pub path: &'a Path,
 │  ├──-1: 
-│  ├──171: pub struct WithFilter<'a> {
+│  ├──203: pub struct WithFilter<'a> {
 │  ├──+1:     pub entry: &'a dyn Entry,
 │  ├──-1: 
-│  ├──176: impl Display for WithFilter<'_> {
+│  ├──208: impl Display for WithFilter<'_> {
 │  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 │  ├──-1: 
-│  ├──182: struct PathDisplay {
+│  ├──214: struct PathDisplay {
 │  ├──+1:     prefix: Option<Vec<PrefixComponent>>,
 │  ├──-1: 
-│  ├──193: impl PathDisplay {
+│  ├──225: impl PathDisplay {
 │  ├──+1:     fn new(
 │  ├──-1: 
-│  ├──226: impl Entry for PathDisplay {
+│  ├──258: impl Entry for PathDisplay {
 │  ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
 │  ├──-1: 
-│  ├──265: impl Display for PathDisplay {
+│  ├──297: impl Display for PathDisplay {
 │  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 │  ├──-1: 
-│  ├──323: struct LineDisplay {
+│  ├──355: struct LineDisplay {
 │  ├──+1:     prefix: Vec<PrefixComponent>,
 │  ├──-1: 
-│  ├──334: impl Entry for LineDisplay {
+│  ├──366: impl Entry for LineDisplay {
 │  ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
 │  ├──-1: 
-│  ├──463: impl Display for LineDisplay {
+│  ├──505: impl Display for LineDisplay {
 │  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 │  ├──-1: 
-│  ├──469: struct LongBranchDisplay {
+│  ├──511: struct LongBranchDisplay {
 │  ├──+1:     prefix: Vec<PrefixComponent>,
 │  ├──-1: 
-│  ├──476: impl Entry for LongBranchDisplay {
+│  ├──518: impl Entry for LongBranchDisplay {
 │  ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
 │  ├──-1: 
-│  ├──527: impl Display for LongBranchDisplay {
+│  ├──564: impl Display for LongBranchDisplay {
 │  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 │  ├──-1: 
-│  ├──533: struct OverviewDisplay {
+│  ├──570: struct OverviewDisplay {
 │  ├──+1:     dirs: usize,
 │  ├──-1: 
-│  ├──542: impl Entry for OverviewDisplay {
-│  ├──+1:     fn render(&self, f: &mut fmt::Formatter, _filter: &str) -> fmt::Result {
+│  ├──579: impl Entry for OverviewDisplay {
+│  ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
 │  ├──-1: 
-│  ├──582: impl Display for OverviewDisplay {
+│  ├──620: impl Display for OverviewDisplay {
 │  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 │  ├──-1: 
-│  ├──604: impl Directory {
+│  ├──642: impl Directory {
 │  ├──+1:     fn to_lines(
 │  ├──-1: 
-│  ├──709: impl File {
+│  ├──747: impl File {
 │  ╰──+1:     fn to_lines(
 ╰──menu.rs: 9
    ├──-1: 
@@ -371,10 +371,14 @@ treegrep
 │  ╰──times
 ├──lua
 │  ╰──treegrep.lua
+├──plugin
+│  ├──treegrep.vim
+│  ╰──treegrep.el
 ├──tests
 │  ├──pool
 │  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
+│  │  ├──files_with_expr
 │  │  ├──files_1
 │  │  ├──wide_2
 │  │  ├──links_4
@@ -402,20 +406,16 @@ treegrep
 │  │  ├──max_depth
 │  │  ├──files_long_branch_2
 │  │  ├──glob_inclusion
-│  │  ├──files_long_branch_expr_count_1
-│  │  ╰──files_with_expr
-│  ├──utils.rs
+│  │  ╰──files_long_branch_expr_count_1
 │  ├──file_system.rs
-│  ╰──tests.rs
-├──plugin
-│  ├──treegrep.el
-│  ╰──treegrep.vim
+│  ├──tests.rs
+│  ╰──utils.rs
+├──.gitignore
 ├──README.md
-├──LICENSE
 ├──rustfmt.toml
 ├──Cargo.toml
-├──Cargo.lock
-╰──.gitignore
+├──LICENSE
+╰──Cargo.lock
 ```
 </details>
 
@@ -437,19 +437,19 @@ treegrep
 │  ╰──runner, times
 ├──lua
 │  ╰──treegrep.lua
+├──plugin
+│  ╰──treegrep.vim, treegrep.el
 ├──tests
 │  ├──pool
 │  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
-│  │  ├──files_with_expr, files_long_branch_expr_count_1, glob_inclusion, files_1, wide_2
-│  │  ├──links_4, links_3, links_2, files_long_branch_expr_2, glob_exclusion
-│  │  ├──no_matches, files_long_branch_1, context_b1, context_a1, files_long_branch_expr_count_2
-│  │  ├──overview_dir, wide_1, files_2, line_number, deep
-│  │  ├──context_c1, links_1, count, overview_file, files_long_branch_expr_1
-│  │  ╰──overlapping, file, max_depth, files_long_branch_2
+│  │  ├──files_1, wide_2, links_4, links_3, links_2
+│  │  ├──files_long_branch_expr_2, glob_exclusion, no_matches, files_long_branch_1, context_b1
+│  │  ├──context_a1, files_long_branch_expr_count_2, overview_dir, wide_1, files_2
+│  │  ├──line_number, deep, context_c1, links_1, count
+│  │  ├──overview_file, files_long_branch_expr_1, overlapping, file, max_depth
+│  │  ╰──files_long_branch_2, glob_inclusion, files_long_branch_expr_count_1, files_with_expr
 │  ╰──utils.rs, file_system.rs, tests.rs
-├──plugin
-│  ╰──treegrep.el, treegrep.vim
 ├──.gitignore, README.md, Cargo.lock, rustfmt.toml, Cargo.toml
 ╰──LICENSE
 ```
@@ -457,7 +457,7 @@ treegrep
 
 ### *--help*
 ```
-tgrep 2.1.0
+tgrep 2.1.1
 
 by Timothy Cronin
 
