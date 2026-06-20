@@ -136,31 +136,6 @@ src: 9
 │  ├──-1: 
 │  ├──15: pub struct Term<'a> {
 │  ╰──+1:     pub height: u16,
-├──match_system.rs: 8
-│  ├──-1: 
-│  ├──23: pub struct Directory {
-│  ├──+1:     pub path: PathBuf,
-│  ├──-1: 
-│  ├──30: impl Directory {
-│  ├──+1:     pub fn new(path: &Path, links: bool) -> Result<Self, Message> {
-│  ├──-1: 
-│  ├──41: pub struct File {
-│  ├──+1:     pub path: PathBuf,
-│  ├──-1: 
-│  ├──47: impl File {
-│  ├──+1:     pub fn from_pathbuf(path: PathBuf, links: bool) -> Result<Self, Message> {
-│  ├──-1: #[cfg_attr(test, derive(PartialEq, Debug))]
-│  ├──73: pub struct Match {
-│  ├──+1:     pub regexp_id: usize,
-│  ├──-1: 
-│  ├──79: impl Match {
-│  ├──+1:     pub fn new(regexp_id: usize, start: usize, end: usize) -> Self {
-│  ├──-1: 
-│  ├──104: pub struct Line {
-│  ├──+1:     pub content: Vec<u8>,
-│  ├──-1: 
-│  ├──111: impl Line {
-│  ╰──+1:     pub fn new(content: Vec<u8>, mut matches: Vec<Match>, line_num: usize) -> Self {
 ├──errors.rs: 4
 │  ├──-1: 
 │  ├──14: pub struct Message {
@@ -199,8 +174,33 @@ src: 9
 │  ├──144: impl clap::builder::TypedValueParser for KeyCodeParser {
 │  ├──+1:     type Value = KeyCode;
 │  ├──-1: )]
-│  ├──329: pub struct Args {
+│  ├──331: pub struct Args {
 │  ╰──+1:     #[arg(
+├──match_system.rs: 8
+│  ├──-1: 
+│  ├──23: pub struct Directory {
+│  ├──+1:     pub path: PathBuf,
+│  ├──-1: 
+│  ├──30: impl Directory {
+│  ├──+1:     pub fn new(path: &Path, links: bool) -> Result<Self, Message> {
+│  ├──-1: 
+│  ├──41: pub struct File {
+│  ├──+1:     pub path: PathBuf,
+│  ├──-1: 
+│  ├──47: impl File {
+│  ├──+1:     pub fn from_pathbuf(path: PathBuf, links: bool) -> Result<Self, Message> {
+│  ├──-1: #[cfg_attr(test, derive(PartialEq, Debug))]
+│  ├──73: pub struct Match {
+│  ├──+1:     pub regexp_id: usize,
+│  ├──-1: 
+│  ├──79: impl Match {
+│  ├──+1:     pub fn new(regexp_id: usize, start: usize, end: usize) -> Self {
+│  ├──-1: 
+│  ├──104: pub struct Line {
+│  ├──+1:     pub content: Vec<u8>,
+│  ├──-1: 
+│  ├──111: impl Line {
+│  ╰──+1:     pub fn new(content: Vec<u8>, mut matches: Vec<Match>, line_num: usize) -> Self {
 ├──config.rs: 9
 │  ├──-1: #[derive(Clone)]
 │  ├──28: pub struct KeyBindings {
@@ -218,16 +218,16 @@ src: 9
 │  ├──104: pub struct SearchParams {
 │  ├──+1:     pub regexps: Vec<String>,
 │  ├──-1: #[derive(Clone)]
-│  ├──124: pub struct Config {
+│  ├──125: pub struct Config {
 │  ├──+1:     pub search: SearchParams,
 │  ├──-1: 
-│  ├──436: struct NonSearchFields {
+│  ├──444: struct NonSearchFields {
 │  ├──+1:     selection_file: Option<PathBuf>,
 │  ├──-1: 
-│  ├──453: impl Config {
+│  ├──462: impl Config {
 │  ├──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
 │  ├──-1: 
-│  ├──754: impl SearchParams {
+│  ├──765: impl SearchParams {
 │  ╰──+1:     fn to_args(&self) -> Vec<OsString> {
 ├──writer.rs: 19
 │  ├──-1: 
@@ -313,7 +313,7 @@ src: 9
    ├──523: pub struct Menu<'a, 'b> {
    ├──+1:     in_menu: bool,
    ├──-1: 
-   ├──1693: impl OpenStrategy {
+   ├──1718: impl OpenStrategy {
    ╰──+1:     fn from(editor: &str) -> Self {
 ```
 </details>
@@ -327,16 +327,16 @@ menu.rs
 +--386: Print(format!(
 +--397: Print(format!(
 +--409: Print(format!(
-+--700: queue!(self.term, Print(WithFilter { entry, filter }))?;
-+--703: queue!(self.term, Print(&cfg.chars.ellipsis))?;
-+--722: Print(style::style_with(
-+--730: queue!(self.term, Print(cfg.chars.selected_indicator.as_str()))?;
-+--751: Print(cfg.chars.selected_indicator_clear.as_str()),
-+--1105: Print(top),
-+--1127: Print(display),
-+--1223: Print(line)
-+--1243: queue!(self.term, cursor::MoveTo(0, y), Print(msg))?;
-+--1458: Print(cfg.chars.selected_indicator_clear.as_str())
++--702: queue!(self.term, Print(WithFilter { entry, filter }))?;
++--705: queue!(self.term, Print(&cfg.chars.ellipsis))?;
++--724: Print(style::style_with(
++--732: queue!(self.term, Print(cfg.chars.selected_indicator.as_str()))?;
++--753: Print(cfg.chars.selected_indicator_clear.as_str()),
++--1107: Print(top),
++--1129: Print(display),
++--1225: Print(line)
++--1245: queue!(self.term, cursor::MoveTo(0, y), Print(msg))?;
++--1460: Print(cfg.chars.selected_indicator_clear.as_str())
 ```
 </details>
 
@@ -379,12 +379,17 @@ treegrep
 │  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
 │  │  ├──files_with_expr
+│  │  ├──files_long_branch_expr_count_1
+│  │  ├──summary_dir
 │  │  ├──files_1
 │  │  ├──wide_2
 │  │  ├──links_4
 │  │  ├──links_3
 │  │  ├──links_2
+│  │  ├──menu_jump_2
 │  │  ├──files_long_branch_expr_2
+│  │  ├──summary_file
+│  │  ├──menu_navigate_1
 │  │  ├──glob_exclusion
 │  │  ├──no_matches
 │  │  ├──files_long_branch_1
@@ -392,28 +397,31 @@ treegrep
 │  │  ├──context_a1
 │  │  ├──files_long_branch_expr_count_2
 │  │  ├──overview_dir
+│  │  ├──menu_filter
 │  │  ├──wide_1
 │  │  ├──files_2
-│  │  ├──line_number
+│  │  ├──menu_search_mode
 │  │  ├──deep
 │  │  ├──context_c1
 │  │  ├──links_1
-│  │  ├──count
+│  │  ├──menu_jump_1
 │  │  ├──overview_file
 │  │  ├──files_long_branch_expr_1
 │  │  ├──overlapping
+│  │  ├──menu_navigate_2
 │  │  ├──file
 │  │  ├──max_depth
 │  │  ├──files_long_branch_2
 │  │  ├──glob_inclusion
-│  │  ╰──files_long_branch_expr_count_1
-│  ├──file_system.rs
+│  │  ╰──menu_custom_keys
+│  ├──tmux.rs
+│  ├──utils.rs
 │  ├──tests.rs
-│  ╰──utils.rs
-├──.gitignore
-├──README.md
+│  ╰──file_system.rs
 ├──rustfmt.toml
 ├──Cargo.toml
+├──README.md
+├──.gitignore
 ├──LICENSE
 ╰──Cargo.lock
 ```
@@ -438,18 +446,20 @@ treegrep
 ├──lua
 │  ╰──treegrep.lua
 ├──plugin
-│  ╰──treegrep.vim, treegrep.el
+│  ╰──treegrep.el, treegrep.vim
 ├──tests
 │  ├──pool
 │  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
-│  │  ├──files_1, wide_2, links_4, links_3, links_2
-│  │  ├──files_long_branch_expr_2, glob_exclusion, no_matches, files_long_branch_1, context_b1
-│  │  ├──context_a1, files_long_branch_expr_count_2, overview_dir, wide_1, files_2
-│  │  ├──line_number, deep, context_c1, links_1, count
-│  │  ├──overview_file, files_long_branch_expr_1, overlapping, file, max_depth
-│  │  ╰──files_long_branch_2, glob_inclusion, files_long_branch_expr_count_1, files_with_expr
-│  ╰──utils.rs, file_system.rs, tests.rs
+│  │  ├──files_with_expr, summary_dir, files_1, wide_2, links_4
+│  │  ├──links_3, links_2, menu_jump_2, files_long_branch_expr_2, summary_file
+│  │  ├──menu_navigate_1, glob_exclusion, no_matches, files_long_branch_1, context_b1
+│  │  ├──context_a1, files_long_branch_expr_count_2, overview_dir, menu_filter, wide_1
+│  │  ├──files_2, menu_search_mode, deep, context_c1, links_1
+│  │  ├──menu_jump_1, overview_file, files_long_branch_expr_1, overlapping, menu_navigate_2
+│  │  ├──file, max_depth, files_long_branch_2, glob_inclusion, menu_custom_keys
+│  │  ╰──files_long_branch_expr_count_1
+│  ╰──file_system.rs, utils.rs, tests.rs, tmux.rs
 ├──.gitignore, README.md, Cargo.lock, rustfmt.toml, Cargo.toml
 ╰──LICENSE
 ```
@@ -490,6 +500,9 @@ options:
       --live
           trigger search on every keystroke in the menu
 
+      --live-delay <>
+          milliseconds to wait after the last keystroke before triggering a live search
+
   -f, --files
           if an expression is given, hide matched content, otherwise, show the files that would be searched (saved for repeat)
 
@@ -510,6 +523,9 @@ options:
 
   -o, --overview
           conclude results with an overview (saved for repeat)
+
+  -S, --overview-only
+          only show the overview, not the results (saved for repeat)
 
   -d, --max-depth <>
           the max depth to search (saved for repeat)

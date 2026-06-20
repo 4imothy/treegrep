@@ -1,0 +1,8 @@
+-> [ps]menu_jump[pe]
+   +--[ps]dir_b[pe]
+   |  +--[ps]file_b[pe]~
+   +--[ps]dir_a[pe]
+      +--[ps]file_a[pe]
+         +--[m0s]word[m0e] found
+         +--[m0s]word[m0e] again
+         +--[m0s]word[m0e] three

@@ -33,9 +33,9 @@ crossterm = {version = "0.29.0", features = ["use-dev-tty"]}
 clap = { version = "4.6.1", features = ["derive"] }
 clap_complete = "4.6.5"
 dunce = "1.0.5"
-ignore = "0.4.25"
+ignore = "0.4.26"
 grep = "0.4.1"
-regex = "1.12.3"
+regex = "1.12.4"
 signal-hook = "0.4.4"
 shlex = "2.0.1"
 crossbeam-channel = "0.5"

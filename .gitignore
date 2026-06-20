@@ -1,7 +1,6 @@
 .DS_Store
 log
 target
-ideas.md
 benchmarks/targets/
 install.sh
 plugin/treegrep.elc

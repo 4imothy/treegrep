@@ -1,0 +1,5 @@
+-> [ps]menu_jump[pe]
+   +--[ps]dir_a[pe]~
+   +--[ps]dir_b[pe]
+      +--[ps]file_b[pe]
+         +--[m0s]word[m0e] here

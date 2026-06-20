@@ -117,6 +117,7 @@ pub struct SearchParams {
     pub before_context: usize,
     pub after_context: usize,
     pub overview: bool,
+    pub overview_only: bool,
     pub branch_each: usize,
 }
 
@@ -135,6 +136,7 @@ pub struct Config {
     pub select: bool,
     pub menu: bool,
     pub live: bool,
+    pub live_delay: Option<u64>,
     pub auto_open: bool,
     pub repeat: bool,
     pub editor: Option<String>,
@@ -211,6 +213,7 @@ fn apply_matches(
         c.select = base_non_search.select;
         c.menu = base_non_search.menu;
         c.live = base_non_search.live;
+        c.live_delay = base_non_search.live_delay;
         c.auto_open = base_non_search.auto_open;
         c.repeat = base_non_search.repeat;
         c.editor = base_non_search.editor;
@@ -280,8 +283,11 @@ fn apply_matches(
         if applies(args::NO_BOLD) {
             c.with_bold = !args.no_bold;
         }
-        if applies(args::OVERVIEW) {
-            c.search.overview = args.overview;
+        if applies(args::OVERVIEW) || applies(args::OVERVIEW_ONLY) {
+            c.search.overview = args.overview || args.overview_only;
+        }
+        if applies(args::OVERVIEW_ONLY) {
+            c.search.overview_only = args.overview_only;
         }
         if applies(args::BRANCH_LEN) {
             c.branch_len = args.branch_len;
@@ -407,7 +413,8 @@ fn apply_matches(
             max_length: args.max_length,
             before_context: args.before_context.unwrap_or(context),
             after_context: args.after_context.unwrap_or(context),
-            overview: args.overview,
+            overview: args.overview || args.overview_only,
+            overview_only: args.overview_only,
             branch_each: args.branch_each,
         },
         is_dir,
@@ -422,6 +429,7 @@ fn apply_matches(
         select: base_non_search.select,
         menu: base_non_search.menu,
         live: base_non_search.live,
+        live_delay: base_non_search.live_delay,
         auto_open: base_non_search.auto_open,
         repeat: base_non_search.repeat,
         editor: base_non_search.editor,
@@ -439,6 +447,7 @@ struct NonSearchFields {
     select: bool,
     menu: bool,
     live: bool,
+    live_delay: Option<u64>,
     auto_open: bool,
     repeat: bool,
     threads: usize,
@@ -493,6 +502,7 @@ impl Config {
                 c.select = self.select;
                 c.menu = self.menu;
                 c.live = self.live;
+                c.live_delay = self.live_delay;
                 c.auto_open = self.auto_open;
                 c.editor = self.editor.clone();
                 c.open_like = self.open_like.clone();
@@ -536,6 +546,7 @@ impl Config {
             select: args.select,
             menu: args.menu,
             live: args.live,
+            live_delay: args.live_delay,
             auto_open: args.auto_open,
             repeat: args.repeat,
             threads,
@@ -804,6 +815,9 @@ impl SearchParams {
         if self.overview {
             args.push(id_to_flag(args::OVERVIEW).into());
         }
+        if self.overview_only {
+            args.push(id_to_flag(args::OVERVIEW_ONLY).into());
+        }
         if self.branch_each > 1 {
             args.push(
                 format!(
@@ -876,6 +890,7 @@ pub fn parse_menu_query(query: &str) -> Result<Config, Message> {
         select: false,
         menu: true,
         live: base.live,
+        live_delay: base.live_delay,
         auto_open: base.auto_open,
         repeat: base.repeat,
         threads: base.threads,

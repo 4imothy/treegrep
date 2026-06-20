@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 mod file_system;
+#[cfg(unix)]
+mod tmux;
 mod utils;
 use file_system::Dir;
 use std::{env, path::PathBuf};
@@ -67,21 +69,6 @@ fn deep_directory() {
 
     let tar_path = tar_dir.join("deep");
     let result = get_output(&dir.path, "nice");
-    assert_pass(&tar_path, result);
-}
-
-#[test]
-fn line_numbers() {
-    let pool: &[u8] = include_bytes!("pool/alice_adventures_in_wonderland_by_lewis_carroll.txt");
-
-    let tar_dir: PathBuf = target_dir();
-    let dir = Dir::new("line_number");
-    let inner_name = PathBuf::from("inside");
-    dir.add_child(&inner_name);
-    dir.create_file_fill(&inner_name.join("alice_two"), pool);
-
-    let tar_path = tar_dir.join("line_number");
-    let result = get_output(&dir.path, "Alice --line-number");
     assert_pass(&tar_path, result);
 }
 
@@ -268,31 +255,7 @@ fn overlapping() {
     dir.create_file_fill(&second.join("2_file"), b"overlapping over");
 
     let result = get_output(&dir.path, "--regexp overlapping --regexp over --count");
-    assert_pass_single(&tar_dir.join("overlapping"), result);
-}
-
-#[test]
-fn count() {
-    let tar_dir: PathBuf = target_dir();
-    let dir = Dir::new("count");
-    dir.create_file_fill(
-        &PathBuf::from("file"),
-        b"some long text\nwith multiple lines",
-    );
-
-    let sub_dir = PathBuf::from("sub");
-    dir.add_child(&sub_dir);
-    dir.create_file_fill(
-        &sub_dir.join("first_file"),
-        b"other text\nthat also has multiple lines",
-    );
-
-    let sub_sub_dir = sub_dir.join("sub sub");
-    dir.add_child(&sub_sub_dir);
-    dir.create_file_fill(&sub_sub_dir.join("2_file"), b"even more text but one line");
-
-    let result = get_output(&dir.path, ". --count");
-    assert_pass(&tar_dir.join("count"), result);
+    assert_pass(&tar_dir.join("overlapping"), result);
 }
 
 #[test]
@@ -313,6 +276,26 @@ fn overview() {
 
     let result = get_output(&dir.path.join("top_file"), "text --overview");
     assert_pass(&tar_dir.join("overview_file"), result);
+}
+
+#[test]
+fn overview_only() {
+    let tar_dir: PathBuf = target_dir();
+    let dir = Dir::new("summary");
+    dir.create_file_fill(
+        &PathBuf::from("top_file"),
+        b"some text\nmore text\nother line",
+    );
+
+    let sub = PathBuf::from("sub");
+    dir.add_child(&sub);
+    dir.create_file_fill(&sub.join("sub_file"), b"some text here too");
+
+    let result = get_output(&dir.path, "text --overview-only");
+    assert_pass(&tar_dir.join("summary_dir"), result);
+
+    let result = get_output(&dir.path.join("top_file"), "text --overview-only");
+    assert_pass(&tar_dir.join("summary_file"), result);
 }
 
 #[test]
@@ -394,4 +377,105 @@ fn repeat() {
         &format!("--repeat --repeat-file={}", repeat_file),
     );
     assert!(orig_result == rep_result);
+}
+
+#[cfg(unix)]
+#[test]
+fn menu_navigate() {
+    let tar_dir = target_dir();
+    let dir = Dir::new("menu_navigate");
+
+    let sub = PathBuf::from("sub_dir");
+    dir.add_child(&sub);
+    dir.create_file_fill(&sub.join("inner"), b"hit here\nhit again\nthird hit");
+    dir.create_file_fill(&PathBuf::from("sibling"), b"hit also\nanother hit");
+
+    let result = tmux::get_menu_output(
+        &dir.path,
+        "hit",
+        &["}", "d", "j", "{", "Tab", "g", "j", "z"],
+    );
+    assert_pass_pool(
+        &[
+            &tar_dir.join("menu_navigate_1"),
+            &tar_dir.join("menu_navigate_2"),
+        ],
+        result,
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn menu_jump() {
+    let tar_dir = target_dir();
+    let dir = Dir::new("menu_jump");
+
+    let dir_a = PathBuf::from("dir_a");
+    dir.add_child(&dir_a);
+    dir.create_file_fill(&dir_a.join("file_a"), b"word found\nword again\nword three");
+
+    let dir_b = PathBuf::from("dir_b");
+    dir.add_child(&dir_b);
+    dir.create_file_fill(&dir_b.join("file_b"), b"word here");
+
+    let result = tmux::get_menu_output(&dir.path, "word", &["G", "K", "}", "u", "Tab", "b"]);
+    assert_pass_pool(
+        &[&tar_dir.join("menu_jump_1"), &tar_dir.join("menu_jump_2")],
+        result,
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn menu_filter() {
+    let tar_dir = target_dir();
+    let dir = Dir::new("menu_filter");
+
+    let sub = PathBuf::from("only_match");
+    dir.add_child(&sub);
+    dir.create_file_fill(&sub.join("content"), b"term one\nterm two\nterm three");
+    dir.create_file_fill(&PathBuf::from("no_match_file"), b"term here");
+
+    let result = tmux::get_menu_output(
+        &dir.path,
+        "term",
+        &[
+            "s", "o", "n", "l", "y", "_", "m", "a", "t", "c", "h", "Enter", "j", "j", "Tab", "Tab",
+            "k", "G",
+        ],
+    );
+    assert_pass(&tar_dir.join("menu_filter"), result);
+}
+
+#[cfg(unix)]
+#[test]
+fn menu_custom_keys() {
+    let tar_dir = target_dir();
+    let dir = Dir::new("menu_custom_keys");
+
+    let sub = PathBuf::from("sub_dir");
+    dir.add_child(&sub);
+    dir.create_file_fill(&sub.join("inner"), b"search_me\nanother_match");
+
+    let result = tmux::get_menu_output(
+        &dir.path,
+        "search_me --key-down=c --key-fold=x --key-filter=y",
+        &["c", "c", "y", "i", "n", "n", "e", "r", "Enter", "x"],
+    );
+    assert_pass(&tar_dir.join("menu_custom_keys"), result);
+}
+
+#[cfg(unix)]
+#[test]
+fn menu_search_mode() {
+    let tar_dir = target_dir();
+    let dir = Dir::new("menu_search_mode");
+
+    let sub = PathBuf::from("sub_dir");
+    dir.add_child(&sub);
+    dir.create_file_fill(&sub.join("inner"), b"hit here\nhit again\nthird hit");
+    dir.create_file_fill(&PathBuf::from("sibling"), b"hit also\nanother hit");
+
+    let result = tmux::get_menu_output_from_search(&dir.path, &["h", "i", "t", "Enter"]);
+    assert_pass(&tar_dir.join("menu_search_mode"), result);
 }

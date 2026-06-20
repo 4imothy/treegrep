@@ -547,6 +547,7 @@ pub struct Menu<'a, 'b> {
     term_height: u16,
     window: Window,
     pending_save: bool,
+    debounce_deadline: Option<Instant>,
 }
 
 impl<'a, 'b> Menu<'a, 'b> {
@@ -585,6 +586,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             term_height,
             window: Window::new(),
             pending_save: false,
+            debounce_deadline: None,
         }
     }
 
@@ -1037,6 +1039,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                     self.apply_results(None);
                     return;
                 }
+                self.error_msg = None;
                 let new_config = Arc::new(new_config);
                 let thread_config = Arc::clone(&new_config);
                 self.search_started = Some(Instant::now());
@@ -1469,6 +1472,13 @@ impl<'a, 'b> Menu<'a, 'b> {
     fn run(&mut self) -> io::Result<Option<(OsString, Option<usize>)>> {
         let mut dc = DoubleClick::new();
         loop {
+            if self.debounce_deadline.is_some_and(|d| Instant::now() >= d) {
+                self.debounce_deadline = None;
+                self.trigger_search();
+                self.draw_results()?;
+                self.draw_query()?;
+                self.draw_filter()?;
+            }
             let mut got_result = false;
             while let Ok((id, result)) = self.result_rx.try_recv() {
                 if id == self.search_gen {
@@ -1575,21 +1585,28 @@ impl<'a, 'b> Menu<'a, 'b> {
                                 if code == KeyCode::BackTab
                                     || cfg.keys.submit_search.contains(&code)
                                 {
+                                    let had_pending_debounce =
+                                        self.debounce_deadline.take().is_some();
                                     if cfg.live {
-                                        if self.current.is_some() && !self.search.is_empty() {
+                                        if had_pending_debounce && !self.search.is_empty() {
+                                            self.trigger_search();
+                                            self.pending_save = true;
+                                        } else if self.current.is_some() && !self.search.is_empty()
+                                        {
                                             self.save_query_for_repeat();
                                         }
                                     } else {
                                         if !self.search.is_empty() {
                                             self.trigger_search();
+                                            self.pending_save = true;
                                         }
-                                        self.pending_save = true;
                                     }
                                     self.mode = Mode::Navigate;
                                     self.draw_results()?;
                                     self.draw_query()?;
                                     self.draw_filter()?;
                                 } else if code == KeyCode::Esc {
+                                    self.debounce_deadline = None;
                                     self.mode = Mode::Navigate;
                                     self.draw_query()?;
                                 } else {
@@ -1603,11 +1620,21 @@ impl<'a, 'b> Menu<'a, 'b> {
                                     match changed {
                                         Some(true) => {
                                             if cfg.live {
-                                                self.trigger_search();
-                                                if !event::poll(Duration::ZERO)? {
-                                                    self.draw_results()?;
+                                                let delay = cfg.live_delay.unwrap_or(0);
+                                                if delay > 0 {
+                                                    self.debounce_deadline = Some(
+                                                        Instant::now()
+                                                            + Duration::from_millis(delay),
+                                                    );
                                                     self.draw_query()?;
                                                     self.draw_filter()?;
+                                                } else {
+                                                    self.trigger_search();
+                                                    if !event::poll(Duration::ZERO)? {
+                                                        self.draw_results()?;
+                                                        self.draw_query()?;
+                                                        self.draw_filter()?;
+                                                    }
                                                 }
                                             } else {
                                                 self.needs_search = !self.search.is_empty();

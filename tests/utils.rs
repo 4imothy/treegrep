@@ -2,7 +2,7 @@
 
 use core::panic;
 use std::{
-    env, fs,
+    fs,
     io::Write,
     path::{Path, PathBuf},
     process::Command,
@@ -55,11 +55,11 @@ pub fn assert_pass(tar_path: &Path, result: Vec<u8>) {
     check_results(tar_path, &result, true);
 }
 
-pub fn assert_pass_single(tar_path: &Path, results: Vec<u8>) {
-    check_results(tar_path, &results, true);
-}
-
 pub fn assert_pass_pool(tar_paths: &[&Path], results: Vec<u8>) {
+    if cfg!(feature = "overwrite") {
+        check_results(tar_paths[0], &results, true);
+        return;
+    }
     let mut has_match = false;
     for tar_path in tar_paths {
         if let Some(true) = check_results(tar_path, &results, false) {
@@ -70,19 +70,9 @@ pub fn assert_pass_pool(tar_paths: &[&Path], results: Vec<u8>) {
 }
 
 pub fn get_output(path: &Path, args: &str) -> Vec<u8> {
-    unsafe { env::set_var("TREEGREP_DEFAULT_OPTS", "") };
-
     let cmd_path = env!("CARGO_BIN_EXE_tgrep");
-    let mut tg: Command;
-    match cross_runner() {
-        None => {
-            tg = Command::new(cmd_path);
-        }
-        Some(runner) => {
-            tg = Command::new(&runner);
-            tg.arg(cmd_path);
-        }
-    }
+    let mut tg = Command::new(cmd_path);
+    tg.env("TREEGREP_DEFAULT_OPTS", "");
 
     tg.args(["--no-color", "--no-bold"]);
     tg.arg("--threads=1");
@@ -104,20 +94,6 @@ pub fn get_output(path: &Path, args: &str) -> Vec<u8> {
     normalize_newlines(&mut stdout);
 
     stdout
-}
-
-pub fn cross_runner() -> Option<String> {
-    let runner = std::env::var("CROSS_RUNNER").ok()?;
-    if runner.is_empty() {
-        return None;
-    }
-    if cfg!(target_arch = "powerpc64") {
-        Some("qemu-ppc64".to_string())
-    } else if cfg!(target_arch = "x86") {
-        Some("i386".to_string())
-    } else {
-        Some(format!("qemu-{}", std::env::consts::ARCH))
-    }
 }
 
 pub fn target_dir() -> PathBuf {

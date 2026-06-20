@@ -847,6 +847,9 @@ pub fn matches_to_display_lines(
         }
     }
     if let Some(o) = overview.take() {
+        if config.search.overview_only {
+            return Ok(vec![o]);
+        }
         lines.push(o);
     }
     Ok(lines)

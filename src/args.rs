@@ -269,6 +269,7 @@ pub const KEY_FILTER: &str = "key_filter";
 pub const KEY_SEARCH: &str = "key_search";
 pub const KEY_SUBMIT_SEARCH: &str = "key_submit_search";
 pub const OVERVIEW: &str = "overview";
+pub const OVERVIEW_ONLY: &str = "overview_only";
 pub const AUTO_OPEN: &str = "auto_open";
 pub const BRANCH_LEN: &str = "branch_len";
 pub const LINKS: &str = "links";
@@ -302,6 +303,7 @@ pub const REPEAT_STORED: &[&str] = &[
     BEFORE_CONTEXT,
     AFTER_CONTEXT,
     OVERVIEW,
+    OVERVIEW_ONLY,
     LONG_BRANCHES_EACH,
 ];
 
@@ -378,6 +380,14 @@ pub struct Args {
 
     #[arg(
         long,
+        hide_short_help = true,
+        value_name = "",
+        help = "milliseconds to wait after the last keystroke before triggering a live search"
+    )]
+    pub live_delay: Option<u64>,
+
+    #[arg(
+        long,
         short = 'f',
         help = "if an expression is given, hide matched content, otherwise, show the files that would be searched"
     )]
@@ -404,6 +414,9 @@ pub struct Args {
 
     #[arg(long, short = 'o', help = "conclude results with an overview")]
     pub overview: bool,
+
+    #[arg(long, short = 'S', help = "only show the overview, not the results")]
+    pub overview_only: bool,
 
     #[arg(long, short = 'd', value_name = "", help = "the max depth to search")]
     pub max_depth: Option<usize>,

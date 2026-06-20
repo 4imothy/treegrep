@@ -20,8 +20,8 @@ EXAMPLES_TO_RUN = [
 def run_and_capture_examples(examples):
     outputs = []
     for cmd in examples:
+        full_cmd = ['cargo', 'run', '--'] + cmd + ['--no-color', '--no-bold']
         try:
-            full_cmd = ['cargo', 'run', '--'] + cmd + ['--no-color', '--no-bold']
             result = subprocess.run(
                 full_cmd,
                 check=True,
@@ -38,9 +38,9 @@ def run_and_capture_examples(examples):
                 f'</details>'
             )
             outputs.append(output)
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError:
             print('error running example:')
-            print(f'{' '.join(full_cmd)}')
+            print(' '.join(full_cmd))
             return None
     return outputs
 
