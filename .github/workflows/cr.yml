@@ -37,9 +37,6 @@ jobs:
     name: build release
     needs: ['create-release']
     runs-on: ${{ matrix.job.os }}
-    env:
-      CARGO: cargo
-      CROSS_VERSION: v0.2.5
     strategy:
       fail-fast: true
       matrix:
@@ -62,22 +59,20 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.job.target }}
 
-      - name: Use Cross
-        if: matrix.job.os == 'ubuntu-latest'
-        shell: bash
-        run: |
-          dir="$RUNNER_TEMP/cross-download"
-          mkdir "$dir"
-          echo "$dir" >> $GITHUB_PATH
-          cd "$dir"
-          curl -LO "https://github.com/cross-rs/cross/releases/download/$CROSS_VERSION/cross-x86_64-unknown-linux-musl.tar.gz"
-          tar xf cross-x86_64-unknown-linux-musl.tar.gz
-          echo "CARGO=cross" >> $GITHUB_ENV
+      - name: Install musl tools
+        if: matrix.job.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get install -y musl-tools
+
+      - name: Install aarch64 cross-linker
+        if: matrix.job.target == 'aarch64-unknown-linux-musl'
+        run: sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Build binary
         shell: bash
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
         run: |
-          ${{ env.CARGO }} build --target ${{ matrix.job.target }} --locked --release
+          cargo build --target ${{ matrix.job.target }} --locked --release
           rm target/${{ matrix.job.target }}/release/tgrep.d
           export RELEASE_DIR=treegrep-${{ matrix.job.target }}
           echo "RELEASE_DIR=$RELEASE_DIR" >> $GITHUB_ENV

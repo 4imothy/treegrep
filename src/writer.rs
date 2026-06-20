@@ -819,9 +819,8 @@ pub fn matches_to_display_lines(
     config: Arc<Config>,
 ) -> Result<Vec<Box<dyn Entry>>, Message> {
     let mut lines: Vec<Box<dyn Entry>> = Vec::new();
-    let mut overview: Option<Box<OverviewDisplay>> = config
-        .search
-        .overview
+    let mut overview: Option<Box<OverviewDisplay>> = (config.search.overview
+        || config.search.overview_only)
         .then(|| OverviewDisplay {
             dirs: 0,
             files: usize::from(!config.is_dir),

@@ -533,8 +533,8 @@ pub struct Menu<'a, 'b> {
     search_gen: u64,
     search_started: Option<Instant>,
     abort: Arc<AtomicBool>,
-    result_rx: Receiver<(u64, Option<SearchResult>)>,
-    result_tx: Sender<(u64, Option<SearchResult>)>,
+    result_rx: Receiver<(u64, Result<Option<SearchResult>, String>)>,
+    result_tx: Sender<(u64, Result<Option<SearchResult>, String>)>,
     selected_id: usize,
     cursor_y: u16,
     max: usize,
@@ -1028,14 +1028,15 @@ impl<'a, 'b> Menu<'a, 'b> {
         let search_id = self.search_gen;
         self.abort.store(true, Ordering::Relaxed);
         self.abort = Arc::new(AtomicBool::new(false));
-        self.error_msg = None;
         if self.search.is_empty() {
+            self.error_msg = None;
             self.apply_results(None);
             return;
         }
         match config::parse_menu_query(&self.search) {
             Ok(new_config) => {
                 if new_config.search.regexps.is_empty() && !new_config.search.files {
+                    self.error_msg = None;
                     self.apply_results(None);
                     return;
                 }
@@ -1047,9 +1048,8 @@ impl<'a, 'b> Menu<'a, 'b> {
                 let tx = self.result_tx.clone();
                 std::thread::spawn(move || {
                     let result = matcher::search(abort, thread_config.clone())
-                        .ok()
-                        .flatten()
-                        .map(|m| (m, thread_config));
+                        .map(|opt| opt.map(|m| (m, thread_config)))
+                        .map_err(|e| e.mes);
                     let _ = tx.send((search_id, result));
                 });
             }
@@ -1482,7 +1482,16 @@ impl<'a, 'b> Menu<'a, 'b> {
             let mut got_result = false;
             while let Ok((id, result)) = self.result_rx.try_recv() {
                 if id == self.search_gen {
-                    self.apply_results(result);
+                    match result {
+                        Ok(r) => {
+                            self.error_msg = None;
+                            self.apply_results(r);
+                        }
+                        Err(e) => {
+                            self.error_msg = Some(e);
+                            self.apply_results(None);
+                        }
+                    }
                     got_result = true;
                 }
             }

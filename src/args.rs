@@ -284,6 +284,7 @@ pub const REPEAT_FILE: &str = "repeat_file";
 pub const BEFORE_CONTEXT: &str = "before_context";
 pub const AFTER_CONTEXT: &str = "after_context";
 pub const CONTEXT: &str = "context";
+pub const PCRE2: &str = "pcre2";
 
 pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
 
@@ -305,6 +306,7 @@ pub const REPEAT_STORED: &[&str] = &[
     OVERVIEW,
     OVERVIEW_ONLY,
     LONG_BRANCHES_EACH,
+    PCRE2,
 ];
 
 pub const HELP_TEMPLATE: &str = concat!(
@@ -458,6 +460,9 @@ pub struct Args {
 
     #[arg(long, help = "disable ignore files")]
     pub no_ignore: bool,
+
+    #[arg(long, help = "use PCRE2 instead of the default regex engine")]
+    pub pcre2: bool,
 
     #[arg(
         long,

@@ -21,18 +21,49 @@ use std::{
     io,
     path::{Path, PathBuf},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
 };
 
-struct Matcher {
-    combined: RegexMatcher,
-    individual: Vec<regex::bytes::Regex>,
+enum Matcher {
+    Regex {
+        combined: RegexMatcher,
+        individual: Vec<regex::bytes::Regex>,
+    },
+    #[cfg(feature = "pcre2")]
+    Pcre2 {
+        combined: grep_pcre2::RegexMatcher,
+        individual: Vec<pcre2::bytes::Regex>,
+    },
 }
 
 impl Matcher {
-    fn new(patterns: &[String]) -> Result<Self, Message> {
+    fn new(patterns: &[String], use_pcre2: bool) -> Result<Self, Message> {
+        #[cfg(feature = "pcre2")]
+        if use_pcre2 {
+            let combined = grep_pcre2::RegexMatcherBuilder::new()
+                .build_many(patterns)
+                .map_err(|e| mes!("pcre2 expression is invalid: {}", e))?;
+            let individual = patterns
+                .iter()
+                .map(|p| {
+                    pcre2::bytes::RegexBuilder::new()
+                        .jit_if_available(true)
+                        .build(p)
+                        .map_err(|_| mes!("pcre2 expression `{}` is invalid", p))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            return Ok(Self::Pcre2 {
+                combined,
+                individual,
+            });
+        }
+        #[cfg(not(feature = "pcre2"))]
+        if use_pcre2 {
+            return Err(mes!("PCRE2 is not available in this build"));
+        }
+
         let combined = RegexMatcherBuilder::new()
             .line_terminator(Some(b'\n'))
             .build_many(patterns)
@@ -43,10 +74,40 @@ impl Matcher {
                 regex::bytes::Regex::new(p).map_err(|_| mes!("regex expression `{}` is invalid", p))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Self {
+        Ok(Self::Regex {
             combined,
             individual,
         })
+    }
+
+    fn find_all_matches(&self, bytes: &[u8], buf: &mut Vec<Match>) -> Result<(), io::Error> {
+        match self {
+            Self::Regex { individual, .. } => {
+                for (id, regex) in individual.iter().enumerate() {
+                    for m in regex.find_iter(bytes) {
+                        buf.push(Match::new(id, m.start(), m.end()));
+                    }
+                }
+            }
+            #[cfg(feature = "pcre2")]
+            Self::Pcre2 { individual, .. } => {
+                for (id, regex) in individual.iter().enumerate() {
+                    for m in regex.find_iter(bytes) {
+                        let m = m.map_err(io::Error::other)?;
+                        buf.push(Match::new(id, m.start(), m.end()));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn search_into(&self, searcher: &mut Searcher, pb: &Path, sink: &mut MatchSink<'_>) -> bool {
+        match self {
+            Self::Regex { combined, .. } => searcher.search_path(combined, pb, sink).is_err(),
+            #[cfg(feature = "pcre2")]
+            Self::Pcre2 { combined, .. } => searcher.search_path(combined, pb, sink).is_err(),
+        }
     }
 }
 
@@ -54,6 +115,7 @@ struct MatchSink<'a> {
     lines: Vec<Line>,
     matcher: &'a Matcher,
     match_buf: Vec<Match>,
+    match_error: Option<String>,
 }
 
 fn strip_line_ending(bytes: &[u8]) -> &[u8] {
@@ -72,11 +134,12 @@ impl<'a> Sink for MatchSink<'a> {
         let trimmed_bytes = strip_line_ending(line_bytes);
 
         self.match_buf.clear();
-        for (pattern_id, regex) in self.matcher.individual.iter().enumerate() {
-            for m in regex.find_iter(trimmed_bytes) {
-                self.match_buf
-                    .push(Match::new(pattern_id, m.start(), m.end()));
-            }
+        if let Err(e) = self
+            .matcher
+            .find_all_matches(trimmed_bytes, &mut self.match_buf)
+        {
+            self.match_error = Some(e.to_string());
+            return Ok(false);
         }
 
         if !self.match_buf.is_empty() {
@@ -100,7 +163,7 @@ impl<'a> Sink for MatchSink<'a> {
 }
 
 pub fn search(abort: Arc<AtomicBool>, config: Arc<Config>) -> Result<Option<Matches>, Message> {
-    let matchers = Matcher::new(&config.search.regexps)?;
+    let matchers = Matcher::new(&config.search.regexps, config.search.pcre2)?;
     let mut searcher = SearcherBuilder::new()
         .line_number(true)
         .line_terminator(LineTerminator::byte(b'\n'))
@@ -175,6 +238,7 @@ fn search_dir_impl(
         .build_parallel();
 
     let (tx, rx): (Sender<File>, Receiver<File>) = crossbeam_channel::unbounded();
+    let first_err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
 
     walker.run(|| {
         let tx = tx.clone();
@@ -182,6 +246,7 @@ fn search_dir_impl(
         let mut searcher = searcher.clone();
         let abort = Arc::clone(&abort);
         let config = Arc::clone(&config);
+        let first_err = Arc::clone(&first_err);
 
         Box::new(move |entry_result| {
             if abort.load(Ordering::Relaxed) {
@@ -199,8 +264,18 @@ fn search_dir_impl(
             }
 
             let path = entry.into_path();
-            if let Ok(Some(file)) = search_file(path, &matchers, &mut searcher, &config) {
-                let _ = tx.send(file);
+            match search_file(path, &matchers, &mut searcher, &config) {
+                Ok(Some(file)) => {
+                    let _ = tx.send(file);
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    if let Ok(mut guard) = first_err.lock()
+                        && guard.is_none()
+                    {
+                        *guard = Some(e.mes);
+                    }
+                }
             }
 
             WalkState::Continue
@@ -208,7 +283,11 @@ fn search_dir_impl(
     });
 
     drop(tx);
-    build_directory_tree(rx, path, config.search.links)
+    let dirs = build_directory_tree(rx, path, config.search.links)?;
+    if let Some(mes) = first_err.lock().ok().and_then(|mut g| g.take()) {
+        return Err(Message { mes });
+    }
+    Ok(dirs)
 }
 
 fn search_file(
@@ -225,13 +304,14 @@ fn search_file(
         lines: Vec::with_capacity(32),
         match_buf: Vec::with_capacity(8),
         matcher,
+        match_error: None,
     };
 
-    if searcher
-        .search_path(&matcher.combined, &pb, &mut sink)
-        .is_err()
-    {
+    if matcher.search_into(searcher, &pb, &mut sink) {
         return Ok(None);
+    }
+    if let Some(e) = sink.match_error {
+        return Err(mes!("pcre2 match error on {}: {}", pb.display(), e));
     }
 
     if sink.lines.is_empty() {

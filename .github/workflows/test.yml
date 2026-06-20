@@ -34,6 +34,10 @@ jobs:
         shell: bash
         run: |
           cargo test --features=test
+      - name: Test pcre2
+        shell: bash
+        run: |
+          cargo test --features=test,pcre2
 
   rustfmt:
     runs-on: ubuntu-latest

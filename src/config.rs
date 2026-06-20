@@ -119,6 +119,7 @@ pub struct SearchParams {
     pub overview: bool,
     pub overview_only: bool,
     pub branch_each: usize,
+    pub pcre2: bool,
 }
 
 #[derive(Clone)]
@@ -257,6 +258,9 @@ fn apply_matches(
         if applies(args::NO_IGNORE) {
             c.search.ignore = !args.no_ignore;
         }
+        if applies(args::PCRE2) {
+            c.search.pcre2 = args.pcre2;
+        }
         if applies(args::MAX_DEPTH) {
             c.search.max_depth = args.max_depth;
         }
@@ -283,8 +287,8 @@ fn apply_matches(
         if applies(args::NO_BOLD) {
             c.with_bold = !args.no_bold;
         }
-        if applies(args::OVERVIEW) || applies(args::OVERVIEW_ONLY) {
-            c.search.overview = args.overview || args.overview_only;
+        if applies(args::OVERVIEW) {
+            c.search.overview = args.overview;
         }
         if applies(args::OVERVIEW_ONLY) {
             c.search.overview_only = args.overview_only;
@@ -413,9 +417,10 @@ fn apply_matches(
             max_length: args.max_length,
             before_context: args.before_context.unwrap_or(context),
             after_context: args.after_context.unwrap_or(context),
-            overview: args.overview || args.overview_only,
+            overview: args.overview,
             overview_only: args.overview_only,
             branch_each: args.branch_each,
+            pcre2: args.pcre2,
         },
         is_dir,
         with_bold: !args.no_bold,
@@ -792,6 +797,9 @@ impl SearchParams {
         }
         if !self.ignore {
             args.push(id_to_flag(args::NO_IGNORE).into());
+        }
+        if self.pcre2 {
+            args.push(id_to_flag(args::PCRE2).into());
         }
         if let Some(d) = self.max_depth {
             args.push(format!("{}={d}", id_to_flag(args::MAX_DEPTH)).into());

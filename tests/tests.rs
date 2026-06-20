@@ -465,6 +465,24 @@ fn menu_custom_keys() {
     assert_pass(&tar_dir.join("menu_custom_keys"), result);
 }
 
+#[cfg(feature = "pcre2")]
+#[test]
+fn pcre2_lookbehind() {
+    let tar_dir: PathBuf = target_dir();
+    let dir = Dir::new("pcre2");
+
+    let sub = PathBuf::from("sub_dir");
+    dir.add_child(&sub);
+    dir.create_file_fill(
+        &sub.join("matched"),
+        b"overlook the problem\ncan't look away",
+    );
+    dir.create_file_fill(&PathBuf::from("no_match"), b"look before you leap");
+
+    let result = get_output(&dir.path, r"(?<=over)look --pcre2 --line-number");
+    assert_pass(&tar_dir.join("pcre2_lookbehind"), result);
+}
+
 #[cfg(unix)]
 #[test]
 fn menu_search_mode() {
