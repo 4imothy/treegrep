@@ -94,16 +94,22 @@
 ;;;###autoload
 (defun tgrep-build ()
   "Build the tgrep binary from source using cargo."
+  (interactive)
   (let* ((manifest (expand-file-name "../Cargo.toml" tgrep--dir))
-         (cmd (format "cargo build --release --manifest-path=%s"
-                      (shell-quote-argument manifest))))
+         (cmd (format "cargo build --release --color never --manifest-path=%s"
+                      (shell-quote-argument manifest)))
+         (buffer (get-buffer-create "*tgrep-build*")))
+    (with-current-buffer buffer (erase-buffer))
     (message "treegrep: building tgrep...")
     (set-process-sentinel
-      (start-process-shell-command "tgrep-build" nil cmd)
-      (lambda (_proc event)
-        (if (string-prefix-p "finished" event)
-            (message "treegrep: tgrep built")
-          (message "treegrep: tgrep build failed"))))))
+      (start-process-shell-command "tgrep-build" buffer cmd)
+      (lambda (proc _event)
+        (when (memq (process-status proc) '(exit signal))
+          (if (eq (process-exit-status proc) 0)
+              (message "treegrep: tgrep built")
+            (display-buffer (process-buffer proc))
+            (message "treegrep: tgrep build failed; see *tgrep-build*")))))
+    nil))
 
 (provide 'treegrep)
 

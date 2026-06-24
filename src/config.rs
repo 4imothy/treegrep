@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    args::{self, Args, OpenStrategy, REPEAT_FILE, generate_command},
+    args::{self, Args, CompletionShell, OpenStrategy, REPEAT_FILE, generate_command},
     errors::Message,
     mes, style,
 };
@@ -142,7 +142,7 @@ pub struct Config {
     pub repeat: bool,
     pub editor: Option<String>,
     pub open_like: Option<OpenStrategy>,
-    pub completion_target: Option<clap_complete::Shell>,
+    pub completion_target: Option<CompletionShell>,
     pub keys: KeyBindings,
     pub mouse: bool,
     pub alternate_screen: bool,
@@ -458,7 +458,7 @@ struct NonSearchFields {
     threads: usize,
     editor: Option<String>,
     open_like: Option<OpenStrategy>,
-    completion_target: Option<clap_complete::Shell>,
+    completion_target: Option<CompletionShell>,
     keys: KeyBindings,
     mouse: bool,
     alternate_screen: bool,
@@ -663,6 +663,7 @@ impl Config {
             args::KEY_FOLD,
             args::KEY_FILTER,
             args::KEY_SEARCH,
+            args::KEY_SUBMIT_SEARCH,
         ];
         let is_user_set = |id: &str| -> bool {
             matches.value_source(id) == Some(clap::parser::ValueSource::CommandLine)
@@ -729,6 +730,7 @@ fn key_field_by_id<'a>(args: &'a Args, id: &str) -> &'a [KeyCode] {
         _ if id == args::KEY_FOLD => &args.key_fold,
         _ if id == args::KEY_FILTER => &args.key_filter,
         _ if id == args::KEY_SEARCH => &args.key_search,
+        _ if id == args::KEY_SUBMIT_SEARCH => &args.key_submit_search,
         _ => &[],
     }
 }

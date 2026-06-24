@@ -132,10 +132,6 @@ src: 9
 │  ├──-1: 
 │  ├──15: pub struct Term<'a> {
 │  ╰──+1:     pub height: u16,
-├──style.rs: 1
-│  ├──-1: 
-│  ├──23: pub struct DisplayRepeater<T>(T, usize);
-│  ╰──+1: impl<T: Display> Display for DisplayRepeater<T> {
 ├──matcher.rs: 2
 │  ├──-1: 
 │  ├──41: impl Matcher {
@@ -143,19 +139,6 @@ src: 9
 │  ├──-1: 
 │  ├──114: struct MatchSink<'a> {
 │  ╰──+1:     lines: Vec<Line>,
-├──errors.rs: 4
-│  ├──-1: 
-│  ├──14: pub struct Message {
-│  ├──+1:     pub mes: String,
-│  ├──-1: }
-│  ├──17: impl Error for Message {}
-│  ├──+1: 
-│  ├──-1: 
-│  ├──34: impl fmt::Debug for Message {
-│  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-│  ├──-1: 
-│  ├──40: impl fmt::Display for Message {
-│  ╰──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 ├──match_system.rs: 8
 │  ├──-1: 
 │  ├──23: pub struct Directory {
@@ -181,22 +164,73 @@ src: 9
 │  ├──-1: 
 │  ├──111: impl Line {
 │  ╰──+1:     pub fn new(content: Vec<u8>, mut matches: Vec<Match>, line_num: usize) -> Self {
-├──args.rs: 6
+├──errors.rs: 4
+│  ├──-1: 
+│  ├──14: pub struct Message {
+│  ├──+1:     pub mes: String,
+│  ├──-1: }
+│  ├──17: impl Error for Message {}
+│  ├──+1: 
+│  ├──-1: 
+│  ├──34: impl fmt::Debug for Message {
+│  ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+│  ├──-1: 
+│  ├──40: impl fmt::Display for Message {
+│  ╰──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+├──style.rs: 1
+│  ├──-1: 
+│  ├──23: pub struct DisplayRepeater<T>(T, usize);
+│  ╰──+1: impl<T: Display> Display for DisplayRepeater<T> {
+├──config.rs: 9
+│  ├──-1: #[derive(Clone)]
+│  ├──28: pub struct KeyBindings {
+│  ├──+1:     pub down: Vec<KeyCode>,
+│  ├──-1: #[derive(Clone)]
+│  ├──52: pub struct Characters {
+│  ├──+1:     pub bl: char,
+│  ├──-1: #[derive(Clone)]
+│  ├──73: pub struct Colors {
+│  ├──+1:     pub file: Color,
+│  ├──-1: 
+│  ├──85: impl args::Color {
+│  ├──+1:     fn get(&self) -> Color {
+│  ├──-1: #[derive(Clone)]
+│  ├──104: pub struct SearchParams {
+│  ├──+1:     pub regexps: Vec<String>,
+│  ├──-1: #[derive(Clone)]
+│  ├──126: pub struct Config {
+│  ├──+1:     pub search: SearchParams,
+│  ├──-1: 
+│  ├──449: struct NonSearchFields {
+│  ├──+1:     selection_file: Option<PathBuf>,
+│  ├──-1: 
+│  ├──467: impl Config {
+│  ├──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
+│  ├──-1: 
+│  ├──770: impl SearchParams {
+│  ╰──+1:     fn to_args(&self) -> Vec<OsString> {
+├──args.rs: 8
 │  ├──-1: 
 │  ├──25: impl ValueEnum for OpenStrategy {
 │  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
+│  ├──-1: 
+│  ├──59: impl ValueEnum for CompletionShell {
+│  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
+│  ├──-1: 
+│  ├──85: impl CompletionShell {
+│  ├──+1:     pub fn generate(&self, cmd: &mut Command, bin: &str, out: &mut dyn std::io::Write) {
 │  ├──-1: #[derive(Clone)]
-│  ├──83: pub struct ColorParser;
+│  ├──144: pub struct ColorParser;
 │  ├──+1: 
-│  ├──85: impl clap::builder::TypedValueParser for ColorParser {
+│  ├──146: impl clap::builder::TypedValueParser for ColorParser {
 │  ├──+1:     type Value = Color;
 │  ├──-1: #[derive(Clone)]
-│  ├──142: pub struct KeyCodeParser;
+│  ├──203: pub struct KeyCodeParser;
 │  ├──+1: 
-│  ├──144: impl clap::builder::TypedValueParser for KeyCodeParser {
+│  ├──205: impl clap::builder::TypedValueParser for KeyCodeParser {
 │  ├──+1:     type Value = KeyCode;
 │  ├──-1: )]
-│  ├──333: pub struct Args {
+│  ├──394: pub struct Args {
 │  ╰──+1:     #[arg(
 ├──writer.rs: 19
 │  ├──-1: 
@@ -256,34 +290,6 @@ src: 9
 │  ├──-1: 
 │  ├──747: impl File {
 │  ╰──+1:     fn to_lines(
-├──config.rs: 9
-│  ├──-1: #[derive(Clone)]
-│  ├──28: pub struct KeyBindings {
-│  ├──+1:     pub down: Vec<KeyCode>,
-│  ├──-1: #[derive(Clone)]
-│  ├──52: pub struct Characters {
-│  ├──+1:     pub bl: char,
-│  ├──-1: #[derive(Clone)]
-│  ├──73: pub struct Colors {
-│  ├──+1:     pub file: Color,
-│  ├──-1: 
-│  ├──85: impl args::Color {
-│  ├──+1:     fn get(&self) -> Color {
-│  ├──-1: #[derive(Clone)]
-│  ├──104: pub struct SearchParams {
-│  ├──+1:     pub regexps: Vec<String>,
-│  ├──-1: #[derive(Clone)]
-│  ├──126: pub struct Config {
-│  ├──+1:     pub search: SearchParams,
-│  ├──-1: 
-│  ├──449: struct NonSearchFields {
-│  ├──+1:     selection_file: Option<PathBuf>,
-│  ├──-1: 
-│  ├──467: impl Config {
-│  ├──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
-│  ├──-1: 
-│  ├──770: impl SearchParams {
-│  ╰──+1:     fn to_args(&self) -> Vec<OsString> {
 ╰──menu.rs: 9
    ├──-1: 
    ├──59: impl ViewAnchor {
@@ -357,24 +363,22 @@ treegrep
 ├──doc
 │  ├──treegrep.vim9.txt
 │  ╰──treegrep.nvim.txt
+├──plugin
+│  ├──treegrep.el
+│  ╰──treegrep.vim
 ├──.github
 │  ╰──workflows
 │     ├──update_readme
 │     ├──test.yml
 │     ├──update_readme.yml
 │     ╰──cr.yml
-├──benchmarks
-│  ├──runner
-│  ╰──times
-├──lua
-│  ╰──treegrep.lua
-├──plugin
-│  ├──treegrep.vim
-│  ╰──treegrep.el
 ├──tests
 │  ├──pool
 │  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
+│  │  ├──files_long_branch_expr_count_1
+│  │  ├──files_with_expr
+│  │  ├──menu_custom_keys
 │  │  ├──summary_dir
 │  │  ├──files_1
 │  │  ├──wide_2
@@ -407,19 +411,21 @@ treegrep
 │  │  ├──menu_navigate_2
 │  │  ├──file
 │  │  ├──max_depth
-│  │  ├──files_long_branch_2
-│  │  ├──menu_custom_keys
-│  │  ├──files_long_branch_expr_count_1
-│  │  ╰──files_with_expr
+│  │  ╰──files_long_branch_2
 │  ├──utils.rs
 │  ├──tests.rs
 │  ├──file_system.rs
 │  ╰──tmux.rs
+├──benchmarks
+│  ├──runner
+│  ╰──times
+├──lua
+│  ╰──treegrep.lua
+├──.gitignore
+├──README.md
+├──LICENSE
 ├──rustfmt.toml
 ├──Cargo.toml
-├──README.md
-├──.gitignore
-├──LICENSE
 ╰──Cargo.lock
 ```
 </details>
@@ -448,17 +454,17 @@ treegrep
 │  ├──pool
 │  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
-│  │  ├──files_long_branch_expr_count_1, files_with_expr, menu_custom_keys, files_long_branch_2, summary_dir
-│  │  ├──files_1, wide_2, links_4, links_3, links_2
-│  │  ├──menu_jump_2, files_long_branch_expr_2, summary_file, menu_navigate_1, glob_exclusion
-│  │  ├──no_matches, files_long_branch_1, context_b1, context_a1, files_long_branch_expr_count_2
-│  │  ├──pcre2_lookbehind, overview_dir, menu_filter, wide_1, files_2
-│  │  ├──menu_search_mode, deep, context_c1, links_1, menu_jump_1
-│  │  ├──overview_file, files_long_branch_expr_1, overlapping, menu_navigate_2, file
-│  │  ╰──max_depth
-│  ╰──tmux.rs, utils.rs, file_system.rs, tests.rs
-├──.gitignore, README.md, Cargo.lock, LICENSE, Cargo.toml
-╰──rustfmt.toml
+│  │  ├──summary_dir, files_1, wide_2, links_4, links_3
+│  │  ├──links_2, menu_jump_2, files_long_branch_expr_2, summary_file, menu_navigate_1
+│  │  ├──glob_exclusion, no_matches, files_long_branch_1, context_b1, context_a1
+│  │  ├──files_long_branch_expr_count_2, pcre2_lookbehind, overview_dir, menu_filter, wide_1
+│  │  ├──files_2, menu_search_mode, deep, context_c1, links_1
+│  │  ├──menu_jump_1, overview_file, files_long_branch_expr_1, overlapping, menu_navigate_2
+│  │  ├──file, max_depth, files_long_branch_2, menu_custom_keys, files_long_branch_expr_count_1
+│  │  ╰──files_with_expr
+│  ╰──utils.rs, tests.rs, file_system.rs, tmux.rs
+├──rustfmt.toml, Cargo.toml, .gitignore, README.md, LICENSE
+╰──Cargo.lock
 ```
 </details>
 
@@ -584,7 +590,7 @@ options:
       --completions <>
           generate completions for given shell
           
-          [possible values: bash, elvish, fish, powershell, zsh]
+          [possible values: bash, elvish, fish, powershell, zsh, nushell]
 
       --no-mouse
           disable mouse events

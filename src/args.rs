@@ -47,6 +47,75 @@ impl ValueEnum for OpenStrategy {
 }
 
 #[derive(Clone, Copy)]
+pub enum CompletionShell {
+    Bash,
+    Elvish,
+    Fish,
+    PowerShell,
+    Zsh,
+    Nushell,
+}
+
+impl ValueEnum for CompletionShell {
+    fn value_variants<'a>() -> &'a [Self] {
+        static VARIANTS: [CompletionShell; 6] = [
+            CompletionShell::Bash,
+            CompletionShell::Elvish,
+            CompletionShell::Fish,
+            CompletionShell::PowerShell,
+            CompletionShell::Zsh,
+            CompletionShell::Nushell,
+        ];
+        &VARIANTS
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        let name = match self {
+            CompletionShell::Bash => "bash",
+            CompletionShell::Elvish => "elvish",
+            CompletionShell::Fish => "fish",
+            CompletionShell::PowerShell => "powershell",
+            CompletionShell::Zsh => "zsh",
+            CompletionShell::Nushell => "nushell",
+        };
+        Some(PossibleValue::new(name))
+    }
+}
+
+impl CompletionShell {
+    pub fn generate(&self, cmd: &mut Command, bin: &str, out: &mut dyn std::io::Write) {
+        match self {
+            CompletionShell::Bash => {
+                clap_complete::generate(clap_complete::Shell::Bash, cmd, bin, out)
+            }
+            CompletionShell::Elvish => {
+                clap_complete::generate(clap_complete::Shell::Elvish, cmd, bin, out)
+            }
+            CompletionShell::Fish => {
+                clap_complete::generate(clap_complete::Shell::Fish, cmd, bin, out)
+            }
+            CompletionShell::PowerShell => {
+                clap_complete::generate(clap_complete::Shell::PowerShell, cmd, bin, out)
+            }
+            CompletionShell::Zsh => {
+                clap_complete::generate(clap_complete::Shell::Zsh, cmd, bin, out)
+            }
+            CompletionShell::Nushell => {
+                clap_complete::generate(clap_complete_nushell::Nushell, cmd, bin, out)
+            }
+        }
+    }
+}
+
+fn positive(s: &str) -> Result<usize, String> {
+    match s.parse::<usize>() {
+        Ok(n) if n >= 1 => Ok(n),
+        Ok(_) => Err("must be at least 1".to_string()),
+        Err(_) => Err(format!("`{s}` is not a number")),
+    }
+}
+
+#[derive(Clone, Copy)]
 pub enum Color {
     Black,
     White,
@@ -420,12 +489,19 @@ pub struct Args {
     #[arg(long, short = 'S', help = "only show the overview, not the results")]
     pub overview_only: bool,
 
-    #[arg(long, short = 'd', value_name = "", help = "the max depth to search")]
+    #[arg(
+        long,
+        short = 'd',
+        value_parser = positive,
+        value_name = "",
+        help = "the max depth to search"
+    )]
     pub max_depth: Option<usize>,
 
     #[arg(
         long,
         short = 'C',
+        value_parser = positive,
         value_name = "",
         requires = "expressions",
         help = "number of lines to show before and after each match"
@@ -435,6 +511,7 @@ pub struct Args {
     #[arg(
         long,
         short = 'B',
+        value_parser = positive,
         value_name = "",
         requires = "expressions",
         help = "number of lines to show before each match"
@@ -444,6 +521,7 @@ pub struct Args {
     #[arg(
         long,
         short = 'A',
+        value_parser = positive,
         value_name = "",
         requires = "expressions",
         help = "number of lines to show after each match"
@@ -452,6 +530,7 @@ pub struct Args {
 
     #[arg(
         long,
+        value_parser = positive,
         value_name = "",
         requires = "expressions",
         help = "set the max length for a matched line"
@@ -483,6 +562,7 @@ pub struct Args {
     #[arg(
         long,
         default_value_t = 3,
+        value_parser = positive,
         hide_short_help = true,
         value_name = "",
         help = "number of characters to show before a match"
@@ -492,6 +572,7 @@ pub struct Args {
     #[arg(
         long,
         default_value_t = 1,
+        value_parser = positive,
         requires = FILES,
         hide_short_help = true,
         value_name = "",
@@ -507,6 +588,7 @@ pub struct Args {
 
     #[arg(
         long,
+        value_parser = positive,
         value_name = "",
         hide_short_help = true,
         help = "set the number of threads to use"
@@ -535,7 +617,7 @@ pub struct Args {
         hide_short_help = true,
         help = "generate completions for given shell"
     )]
-    pub completions: Option<clap_complete::Shell>,
+    pub completions: Option<CompletionShell>,
 
     #[arg(long, hide_short_help = true, help = "disable mouse events")]
     pub no_mouse: bool,

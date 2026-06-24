@@ -11,7 +11,6 @@ mod style;
 mod term;
 mod writer;
 use clap::ArgMatches;
-use clap_complete::generate;
 use config::Config;
 use errors::Message;
 use match_system::Matches;
@@ -37,8 +36,7 @@ fn main() {
         std::process::exit(1);
     });
     if let Some(shell) = c.completion_target {
-        generate(
-            shell,
+        shell.generate(
             &mut args::generate_command(),
             args::names::TREEGREP_BIN,
             &mut std::io::stdout(),
