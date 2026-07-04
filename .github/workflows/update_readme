@@ -14,7 +14,8 @@ EXAMPLES_TO_RUN = [
     ['--regexp', r'\bstruct\s+\w+', '--regexp', r'\bimpl\s+\w+', '--path', 'src', '--line-number', '--context=1', '--count'],
     ['Print', os.path.join('src', 'menu.rs'), '--trim', '--line-number', '--char-vertical=|', '--char-horizontal=-', '--char-top-left=+', '--char-top-right=+', '--char-bottom-left=+', '--char-bottom-right=+', '--char-tee=+'],
     ['--files', '--hidden', '--glob=!.git'],
-    ['--files', '--branch-each=5', '--hidden', '--glob=!.git']
+    ['--files', '--branch-each=5', '--hidden', '--glob=!.git'],
+    ['--regexp-glob', '*.rs=_mouse', '--regexp-glob', '*.lua=path', '--line-number']
 ]
 
 def run_and_capture_examples(examples):

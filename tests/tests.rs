@@ -106,6 +106,23 @@ fn glob_exclusion() {
 }
 
 #[test]
+fn regexp_glob() {
+    let tar_dir: PathBuf = target_dir();
+    let dir = Dir::new("regexp_glob");
+    dir.create_file_fill(&PathBuf::from("code.rs"), b"alpha\nbeta");
+    dir.create_file_fill(&PathBuf::from("code.py"), b"alpha\nbeta");
+
+    let result = get_output(
+        &dir.path,
+        "--regexp-glob=*.rs=alpha --regexp-glob=*.py=beta -n",
+    );
+    let tar_rs_py = tar_dir.join("regexp_glob_1");
+    let tar_py_rs = tar_dir.join("regexp_glob_2");
+    let tars = [tar_rs_py.as_path(), tar_py_rs.as_path()];
+    assert_pass_pool(&tars, result);
+}
+
+#[test]
 fn file() {
     let tar_dir: PathBuf = target_dir();
 

@@ -130,7 +130,7 @@ pub enum Color {
     Ansi(u8),
 }
 
-pub const EXPR_HELP: &str = "a regex expression to search for";
+pub const REGEXP_HELP: &str = "a regex expression to search for";
 pub const PATH_HELP: &str = "the path to search, if not provided, search the current directory";
 const COLOR_HELP: &str =
     "black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)";
@@ -291,10 +291,60 @@ pub fn key_display(code: KeyCode) -> String {
     }
 }
 
+#[derive(Clone)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
+pub struct ScopedRegexp {
+    pub glob: String,
+    pub regexp: String,
+}
+
+#[derive(Clone)]
+pub struct RegexpGlobParser;
+
+impl clap::builder::TypedValueParser for RegexpGlobParser {
+    type Value = ScopedRegexp;
+
+    fn parse_ref(
+        &self,
+        cmd: &Command,
+        arg: Option<&clap::Arg>,
+        value: &OsStr,
+    ) -> Result<Self::Value, Error> {
+        let s = value.to_string_lossy();
+
+        if let Some((glob, regexp)) = s.split_once('=')
+            && !glob.is_empty()
+            && !regexp.is_empty()
+        {
+            return Ok(ScopedRegexp {
+                glob: glob.to_string(),
+                regexp: regexp.to_string(),
+            });
+        }
+
+        let mut err = Error::new(ErrorKind::ValueValidation).with_cmd(cmd);
+        err.insert(
+            ContextKind::InvalidArg,
+            ContextValue::String(arg.map(|a| a.to_string()).unwrap_or_default()),
+        );
+        err.insert(
+            ContextKind::InvalidValue,
+            ContextValue::String(s.into_owned()),
+        );
+        err.insert(
+            ContextKind::Suggested,
+            ContextValue::StyledStrs(vec!["expected '<glob>=<regexp>'".into()]),
+        );
+        Err(err)
+    }
+}
+
 pub const LONG_BRANCHES_EACH: &str = "branch_each";
 pub const NO_BOLD: &str = "no_bold";
-pub const EXPRESSION_POSITIONAL: &str = "positional_regexp";
-pub const EXPRESSION: &str = "regexp";
+pub const POSITIONAL_REGEXP: &str = "positional_regexp";
+pub const REGEXP: &str = "regexp";
+pub const REGEXP_GROUP: &str = "regexp_group";
+pub const REGEXP_GLOB: &str = "regexp_glob";
 pub const PATH_POSITIONAL: &str = "positional_path";
 pub const PATH: &str = "path";
 pub const NO_COLORS: &str = "no_color";
@@ -358,7 +408,8 @@ pub const PCRE2: &str = "pcre2";
 pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
 
 pub const REPEAT_STORED: &[&str] = &[
-    EXPRESSION,
+    REGEXP,
+    REGEXP_GLOB,
     PATH,
     GLOB,
     HIDDEN,
@@ -395,8 +446,8 @@ pub const HELP_TEMPLATE: &str = concat!(
     disable_help_flag = true,
     disable_version_flag = true,
     next_help_heading = "options",
-    group(ArgGroup::new("mode").required(true).multiple(true).args([EXPRESSION_POSITIONAL, EXPRESSION, FILES, COMPLETIONS, MENU, REPEAT])),
-    group(ArgGroup::new("expressions").args([EXPRESSION_POSITIONAL, EXPRESSION]).multiple(true)),
+    group(ArgGroup::new("mode").required(true).multiple(true).args([POSITIONAL_REGEXP, REGEXP, REGEXP_GLOB, FILES, COMPLETIONS, MENU, REPEAT])),
+    group(ArgGroup::new(REGEXP_GROUP).multiple(true).args([POSITIONAL_REGEXP, REGEXP, REGEXP_GLOB])),
     group(ArgGroup::new("paths").args([PATH_POSITIONAL, PATH])),
 )]
 pub struct Args {
@@ -405,7 +456,7 @@ pub struct Args {
         help_heading = "arguments",
         display_order = 1,
         index = 1,
-        help = EXPR_HELP,
+        help = REGEXP_HELP,
     )]
     pub positional_regexp: Option<String>,
 
@@ -425,9 +476,18 @@ pub struct Args {
         value_name = "",
         value_hint = ValueHint::Other,
         action = ArgAction::Append,
-        help = EXPR_HELP,
+        help = REGEXP_HELP,
     )]
     pub regexp: Vec<String>,
+
+    #[arg(
+        long,
+        value_name = "glob=regexp",
+        value_parser = RegexpGlobParser,
+        action = ArgAction::Append,
+        help = "search for a regex expression only in files matching a glob",
+    )]
+    pub regexp_glob: Vec<ScopedRegexp>,
 
     #[arg(long, short = 'p', value_name = "", help = PATH_HELP)]
     pub path: Option<PathBuf>,
@@ -503,7 +563,7 @@ pub struct Args {
         short = 'C',
         value_parser = positive,
         value_name = "",
-        requires = "expressions",
+        requires = REGEXP_GROUP,
         help = "number of lines to show before and after each match"
     )]
     pub context: Option<usize>,
@@ -513,7 +573,7 @@ pub struct Args {
         short = 'B',
         value_parser = positive,
         value_name = "",
-        requires = "expressions",
+        requires = REGEXP_GROUP,
         help = "number of lines to show before each match"
     )]
     pub before_context: Option<usize>,
@@ -523,7 +583,7 @@ pub struct Args {
         short = 'A',
         value_parser = positive,
         value_name = "",
-        requires = "expressions",
+        requires = REGEXP_GROUP,
         help = "number of lines to show after each match"
     )]
     pub after_context: Option<usize>,
@@ -532,7 +592,7 @@ pub struct Args {
         long,
         value_parser = positive,
         value_name = "",
-        requires = "expressions",
+        requires = REGEXP_GROUP,
         help = "set the max length for a matched line"
     )]
     pub max_length: Option<usize>,
@@ -545,7 +605,7 @@ pub struct Args {
 
     #[arg(
         long,
-        requires = "expressions",
+        requires = REGEXP_GROUP,
         help = "trim whitespace at the beginning of lines"
     )]
     pub trim: bool,

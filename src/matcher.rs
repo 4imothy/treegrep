@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    config::Config,
+    config::{Config, SearchParams},
     errors::Message,
     match_system::{Directory, File, Line, Match, Matches, wrap_dirs, wrap_file},
     mes,
@@ -14,7 +14,10 @@ use grep::{
         BinaryDetection, MmapChoice, Searcher, SearcherBuilder, Sink, SinkContext, SinkMatch,
     },
 };
-use ignore::{WalkBuilder, WalkState, overrides::OverrideBuilder};
+use ignore::{
+    WalkBuilder, WalkState,
+    overrides::{Override, OverrideBuilder},
+};
 use std::{
     collections::HashMap,
     ffi::OsString,
@@ -26,38 +29,46 @@ use std::{
     },
 };
 
-enum Matcher {
-    Regex {
-        combined: RegexMatcher,
-        individual: Vec<regex::bytes::Regex>,
-    },
-    #[cfg(feature = "pcre2")]
-    Pcre2 {
-        combined: grep_pcre2::RegexMatcher,
-        individual: Vec<pcre2::bytes::Regex>,
-    },
+struct Matcher {
+    patterns: Vec<String>,
+    pcre2: bool,
+    overrides: Vec<Option<Override>>,
+    individual: Individual,
+    base_combined: Arc<Combined>,
+    full_mask: u64,
+    cache: Mutex<HashMap<u64, Arc<Combined>>>,
 }
 
-impl Matcher {
-    fn new(patterns: &[String], use_pcre2: bool) -> Result<Self, Message> {
+enum Combined {
+    Regex(RegexMatcher),
+    #[cfg(feature = "pcre2")]
+    Pcre2(grep_pcre2::RegexMatcher),
+}
+
+enum Individual {
+    Regex(Vec<regex::bytes::Regex>),
+    #[cfg(feature = "pcre2")]
+    Pcre2(Vec<pcre2::bytes::Regex>),
+}
+
+fn build_scoped_override(root: &Path, glob: &str) -> Result<Override, Message> {
+    let mut builder = OverrideBuilder::new(root);
+    builder
+        .add(glob)
+        .map_err(|_| mes!("glob {} is invalid", glob))?;
+    builder
+        .build()
+        .map_err(|_| mes!("failed to build override for glob {}", glob))
+}
+
+impl Combined {
+    fn new(patterns: &[&str], use_pcre2: bool) -> Result<Self, Message> {
         #[cfg(feature = "pcre2")]
         if use_pcre2 {
             let combined = grep_pcre2::RegexMatcherBuilder::new()
                 .build_many(patterns)
                 .map_err(|e| mes!("pcre2 expression is invalid: {}", e))?;
-            let individual = patterns
-                .iter()
-                .map(|p| {
-                    pcre2::bytes::RegexBuilder::new()
-                        .jit_if_available(true)
-                        .build(p)
-                        .map_err(|_| mes!("pcre2 expression `{}` is invalid", p))
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            return Ok(Self::Pcre2 {
-                combined,
-                individual,
-            });
+            return Ok(Self::Pcre2(combined));
         }
         #[cfg(not(feature = "pcre2"))]
         if use_pcre2 {
@@ -68,30 +79,131 @@ impl Matcher {
             .line_terminator(Some(b'\n'))
             .build_many(patterns)
             .map_err(|e| mes!("regex expression is invalid: {}", e))?;
+        Ok(Self::Regex(combined))
+    }
+
+    fn search_into(&self, searcher: &mut Searcher, pb: &Path, sink: &mut MatchSink<'_>) -> bool {
+        match self {
+            Self::Regex(combined) => searcher.search_path(combined, pb, sink).is_err(),
+            #[cfg(feature = "pcre2")]
+            Self::Pcre2(combined) => searcher.search_path(combined, pb, sink).is_err(),
+        }
+    }
+}
+
+impl Individual {
+    fn new(patterns: &[String], use_pcre2: bool) -> Result<Self, Message> {
+        #[cfg(feature = "pcre2")]
+        if use_pcre2 {
+            let individual = patterns
+                .iter()
+                .map(|p| {
+                    pcre2::bytes::RegexBuilder::new()
+                        .jit_if_available(true)
+                        .build(p)
+                        .map_err(|_| mes!("pcre2 expression `{}` is invalid", p))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            return Ok(Self::Pcre2(individual));
+        }
+        #[cfg(not(feature = "pcre2"))]
+        if use_pcre2 {
+            return Err(mes!("PCRE2 is not available in this build"));
+        }
+
         let individual = patterns
             .iter()
             .map(|p| {
                 regex::bytes::Regex::new(p).map_err(|_| mes!("regex expression `{}` is invalid", p))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Self::Regex {
-            combined,
+        Ok(Self::Regex(individual))
+    }
+}
+
+impl Matcher {
+    fn new(search: &SearchParams, root: &Path) -> Result<Self, Message> {
+        let mut patterns: Vec<String> = search.regexps.clone();
+        let mut overrides: Vec<Option<Override>> = search.regexps.iter().map(|_| None).collect();
+        for s in &search.scoped {
+            patterns.push(s.regexp.clone());
+            overrides.push(Some(build_scoped_override(root, &s.glob)?));
+        }
+        if patterns.len() > 64 {
+            return Err(mes!("at most 64 patterns are supported"));
+        }
+
+        let individual = Individual::new(&patterns, search.pcre2)?;
+        let refs: Vec<&str> = patterns.iter().map(String::as_str).collect();
+        let base_combined = Arc::new(Combined::new(&refs, search.pcre2)?);
+        let full_mask = (0..patterns.len()).fold(0u64, |m, id| m | (1 << id));
+        Ok(Self {
+            patterns,
+            pcre2: search.pcre2,
+            overrides,
             individual,
+            base_combined,
+            full_mask,
+            cache: Mutex::new(HashMap::new()),
         })
     }
 
-    fn find_all_matches(&self, bytes: &[u8], buf: &mut Vec<Match>) -> Result<(), io::Error> {
-        match self {
-            Self::Regex { individual, .. } => {
+    fn allowed_mask(&self, path: &Path) -> u64 {
+        let mut mask = 0;
+        for (id, ov) in self.overrides.iter().enumerate() {
+            if ov
+                .as_ref()
+                .is_none_or(|ov| !ov.matched(path, false).is_ignore())
+            {
+                mask |= 1 << id;
+            }
+        }
+        mask
+    }
+
+    fn combined_for(&self, mask: u64) -> Result<Arc<Combined>, Message> {
+        if mask == self.full_mask {
+            return Ok(Arc::clone(&self.base_combined));
+        }
+        let mut cache = self.cache.lock().unwrap();
+        if let Some(combined) = cache.get(&mask) {
+            return Ok(Arc::clone(combined));
+        }
+        let refs: Vec<&str> = self
+            .patterns
+            .iter()
+            .enumerate()
+            .filter(|(id, _)| mask & (1 << id) != 0)
+            .map(|(_, p)| p.as_str())
+            .collect();
+        let combined = Arc::new(Combined::new(&refs, self.pcre2)?);
+        cache.insert(mask, Arc::clone(&combined));
+        Ok(combined)
+    }
+
+    fn find_all_matches(
+        &self,
+        bytes: &[u8],
+        mask: u64,
+        buf: &mut Vec<Match>,
+    ) -> Result<(), io::Error> {
+        match &self.individual {
+            Individual::Regex(individual) => {
                 for (id, regex) in individual.iter().enumerate() {
+                    if mask & (1 << id) == 0 {
+                        continue;
+                    }
                     for m in regex.find_iter(bytes) {
                         buf.push(Match::new(id, m.start(), m.end()));
                     }
                 }
             }
             #[cfg(feature = "pcre2")]
-            Self::Pcre2 { individual, .. } => {
+            Individual::Pcre2(individual) => {
                 for (id, regex) in individual.iter().enumerate() {
+                    if mask & (1 << id) == 0 {
+                        continue;
+                    }
                     for m in regex.find_iter(bytes) {
                         let m = m.map_err(io::Error::other)?;
                         buf.push(Match::new(id, m.start(), m.end()));
@@ -101,19 +213,12 @@ impl Matcher {
         }
         Ok(())
     }
-
-    fn search_into(&self, searcher: &mut Searcher, pb: &Path, sink: &mut MatchSink<'_>) -> bool {
-        match self {
-            Self::Regex { combined, .. } => searcher.search_path(combined, pb, sink).is_err(),
-            #[cfg(feature = "pcre2")]
-            Self::Pcre2 { combined, .. } => searcher.search_path(combined, pb, sink).is_err(),
-        }
-    }
 }
 
 struct MatchSink<'a> {
     lines: Vec<Line>,
     matcher: &'a Matcher,
+    allowed: u64,
     match_buf: Vec<Match>,
     match_error: Option<String>,
 }
@@ -134,9 +239,9 @@ impl<'a> Sink for MatchSink<'a> {
         let trimmed_bytes = strip_line_ending(line_bytes);
 
         self.match_buf.clear();
-        if let Err(e) = self
-            .matcher
-            .find_all_matches(trimmed_bytes, &mut self.match_buf)
+        if let Err(e) =
+            self.matcher
+                .find_all_matches(trimmed_bytes, self.allowed, &mut self.match_buf)
         {
             self.match_error = Some(e.to_string());
             return Ok(false);
@@ -163,7 +268,17 @@ impl<'a> Sink for MatchSink<'a> {
 }
 
 pub fn search(abort: Arc<AtomicBool>, config: Arc<Config>) -> Result<Option<Matches>, Message> {
-    let matchers = Matcher::new(&config.search.regexps, config.search.pcre2)?;
+    let override_root = if config.is_dir {
+        config.search.path.clone()
+    } else {
+        config
+            .search
+            .path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."))
+    };
+    let matchers = Matcher::new(&config.search, &override_root)?;
     let mut searcher = SearcherBuilder::new()
         .line_number(true)
         .line_terminator(LineTerminator::byte(b'\n'))
@@ -189,7 +304,7 @@ pub fn search(abort: Arc<AtomicBool>, config: Arc<Config>) -> Result<Option<Matc
                 &mut searcher,
                 &config,
             )?,
-            config.search.files && config.search.regexps.is_empty(),
+            config.search.files && !config.search.has_expr(),
         ))
     }
 }
@@ -296,18 +411,25 @@ fn search_file(
     searcher: &mut Searcher,
     config: &Config,
 ) -> Result<Option<File>, Message> {
-    if config.search.files && config.search.regexps.is_empty() {
+    if config.search.files && !config.search.has_expr() {
         return Ok(Some(File::from_pathbuf(pb, config.search.links)?));
     }
 
+    let mask = matcher.allowed_mask(&pb);
+    if mask == 0 {
+        return Ok(None);
+    }
+    let combined = matcher.combined_for(mask)?;
+
     let mut sink = MatchSink {
         lines: Vec::with_capacity(32),
+        allowed: mask,
         match_buf: Vec::with_capacity(8),
         matcher,
         match_error: None,
     };
 
-    if matcher.search_into(searcher, &pb, &mut sink) {
+    if combined.search_into(searcher, &pb, &mut sink) {
         return Ok(None);
     }
     if let Some(e) = sink.match_error {

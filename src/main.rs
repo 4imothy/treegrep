@@ -112,7 +112,7 @@ fn run(term: &mut Term, c: Config) -> Result<(), Message> {
     config::set_config(c);
     let c = config::base_config();
 
-    let matches = if c.menu && c.search.regexps.is_empty() && !c.search.files {
+    let matches = if c.menu && !c.search.has_expr() && !c.search.files {
         None
     } else {
         matcher::search(Arc::new(AtomicBool::new(false)), Arc::clone(&c))?

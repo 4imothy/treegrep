@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    args::{self, Args, CompletionShell, OpenStrategy, REPEAT_FILE, generate_command},
+    args::{
+        self, Args, CompletionShell, OpenStrategy, REPEAT_FILE, ScopedRegexp, generate_command,
+    },
     errors::Message,
     mes, style,
 };
@@ -103,6 +105,7 @@ impl args::Color {
 #[derive(Clone)]
 pub struct SearchParams {
     pub regexps: Vec<String>,
+    pub scoped: Vec<ScopedRegexp>,
     pub path: PathBuf,
     pub globs: Vec<String>,
     pub hidden: bool,
@@ -227,12 +230,15 @@ fn apply_matches(
             c.search.path = process_path(p, true)?;
             c.is_dir = c.search.path.is_dir();
         }
-        if applies(args::EXPRESSION_POSITIONAL) || applies(args::EXPRESSION) {
+        if applies(args::POSITIONAL_REGEXP) || applies(args::REGEXP) {
             c.search.regexps.clear();
             if let Some(expr) = &args.positional_regexp {
                 c.search.regexps.push(expr.clone());
             }
             c.search.regexps.extend(args.regexp.iter().cloned());
+        }
+        if applies(args::REGEXP_GLOB) {
+            c.search.scoped = args.regexp_glob.clone();
         }
         if applies(args::GLOB) {
             c.search.globs = args.glob.clone();
@@ -405,6 +411,7 @@ fn apply_matches(
         search: SearchParams {
             path,
             regexps,
+            scoped: args.regexp_glob.clone(),
             globs: args.glob.clone(),
             hidden: args.hidden,
             line_number: args.line_number,
@@ -516,7 +523,7 @@ impl Config {
                 c.alternate_screen = self.alternate_screen;
                 Ok(Some(c))
             } else {
-                if !self.search.regexps.is_empty() {
+                if self.search.has_expr() {
                     save_search_params(f, self)?;
                 }
                 Ok(None)
@@ -770,10 +777,17 @@ fn id_to_flag(id: &str) -> String {
 }
 
 impl SearchParams {
+    pub fn has_expr(&self) -> bool {
+        !self.regexps.is_empty() || !self.scoped.is_empty()
+    }
+
     fn to_args(&self) -> Vec<OsString> {
         let mut args: Vec<OsString> = Vec::new();
         for r in &self.regexps {
-            args.push(format!("{}={r}", id_to_flag(args::EXPRESSION)).into());
+            args.push(format!("{}={r}", id_to_flag(args::REGEXP)).into());
+        }
+        for s in &self.scoped {
+            args.push(format!("{}={}={}", id_to_flag(args::REGEXP_GLOB), s.glob, s.regexp).into());
         }
         args.push(format!("{}={}", id_to_flag(args::PATH), self.path.display()).into());
         for g in &self.globs {
@@ -912,7 +926,7 @@ pub fn parse_menu_query(query: &str) -> Result<Config, Message> {
         alternate_screen: base.alternate_screen,
     };
     let mut c = apply_matches(non_search, &matches, true)?;
-    let explicit_pattern = explicit(args::EXPRESSION_POSITIONAL) || explicit(args::EXPRESSION);
+    let explicit_pattern = explicit(args::POSITIONAL_REGEXP) || explicit(args::REGEXP);
     if explicit(args::FILES) && !explicit_pattern {
         c.search.regexps.clear();
     }
@@ -1019,6 +1033,30 @@ mod tests {
         assert_eq!(config.search.after_context, 2);
         assert_eq!(config.search.before_context, 3);
         assert_eq!(config.search.regexps, vec!["posexpr", "regexp1", "regexp2"]);
+    }
+
+    #[test]
+    fn test_regexp_glob() {
+        let config = get_config_from([
+            "--regexp-glob=*.rs=alpha",
+            "--regexp-glob=*.py=x == y",
+            "--line-number",
+        ]);
+        assert!(config.search.regexps.is_empty());
+        assert!(config.search.has_expr());
+        assert_eq!(
+            config.search.scoped,
+            vec![
+                crate::args::ScopedRegexp {
+                    glob: "*.rs".to_string(),
+                    regexp: "alpha".to_string(),
+                },
+                crate::args::ScopedRegexp {
+                    glob: "*.py".to_string(),
+                    regexp: "x == y".to_string(),
+                },
+            ]
+        );
     }
 
     #[test]

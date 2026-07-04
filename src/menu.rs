@@ -1035,7 +1035,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         }
         match config::parse_menu_query(&self.search) {
             Ok(new_config) => {
-                if new_config.search.regexps.is_empty() && !new_config.search.files {
+                if !new_config.search.has_expr() && !new_config.search.files {
                     self.error_msg = None;
                     self.apply_results(None);
                     return;
