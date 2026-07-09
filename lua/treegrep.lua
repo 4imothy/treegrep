@@ -21,6 +21,7 @@ function M.setup(user_opts)
 end
 
 local current_file_path = debug.getinfo(1, 'S').source:sub(2)
+local plugin_name = vim.fn.fnamemodify(current_file_path, ':t:r')
 local project_root = vim.fs.abspath(vim.fs.dirname(vim.fs.dirname(current_file_path)))
 local tgrep_bin = vim.fs.joinpath(project_root, 'target', 'release', 'tgrep')
 
@@ -53,6 +54,17 @@ function M.tgrep_with(args)
     local original_win = vim.api.nvim_get_current_win()
 
     local win = vim.api.nvim_open_win(buf, true, M.win_opts())
+
+    local augroup = vim.api.nvim_create_augroup(plugin_name .. '_resize', { clear = true })
+    vim.api.nvim_create_autocmd('VimResized', {
+        group = augroup,
+        callback = function()
+            if vim.api.nvim_win_is_valid(win) then
+                vim.api.nvim_win_set_config(win, M.win_opts())
+            end
+        end,
+    })
+
     local cmd = {
         vim.uv.fs_stat(tgrep_bin) and tgrep_bin or 'tgrep',
         '--no-alternate-screen',
@@ -70,6 +82,7 @@ function M.tgrep_with(args)
     vim.fn.jobstart(cmd, {
         term = true,
         on_exit = function()
+            vim.api.nvim_del_augroup_by_id(augroup)
             vim.api.nvim_win_close(win, true)
             vim.api.nvim_buf_delete(buf, { force = true })
             vim.api.nvim_set_current_win(original_win)

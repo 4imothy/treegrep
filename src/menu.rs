@@ -66,6 +66,23 @@ impl ViewAnchor {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum FoldCycle {
+    None,
+    Dirs,
+    Files,
+}
+
+impl FoldCycle {
+    fn next(&mut self) {
+        *self = match *self {
+            Self::None => Self::Dirs,
+            Self::Dirs => Self::Files,
+            Self::Files => Self::None,
+        };
+    }
+}
+
 struct DoubleClick {
     down_row: u16,
     last_click: Option<(Instant, u16)>,
@@ -486,6 +503,7 @@ fn help_popup() -> String {
         (format_keys(&k.page_down), "page down"),
         (format_keys(&k.cycle_view), "cycle cursor position"),
         (format_keys(&k.fold), "fold/unfold"),
+        (format_keys(&k.fold_cycle), "cycle fold (dirs/files/none)"),
         ("scroll/click".into(), "scroll/click"),
         (format_keys(&k.open), "open"),
         (format_keys(&k.help), "help"),
@@ -540,6 +558,7 @@ pub struct Menu<'a, 'b> {
     max: usize,
     jump: ViewAnchor,
     folded: HashSet<usize>,
+    fold_cycle: FoldCycle,
     visible: Vec<usize>,
     big_jump: u16,
     filter_cursor: usize,
@@ -578,6 +597,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             max: 0,
             jump: ViewAnchor::Middle,
             folded: HashSet::new(),
+            fold_cycle: FoldCycle::None,
             visible: Vec::new(),
             big_jump: (term_height / 5).max(1),
             filter: String::new(),
@@ -687,6 +707,43 @@ impl<'a, 'b> Menu<'a, 'b> {
         if !self.folded.remove(&orig) {
             self.folded.insert(orig);
         }
+        self.fold_cycle = FoldCycle::None;
+        self.update_visible();
+        true
+    }
+
+    fn cycle_fold(&mut self) -> bool {
+        if self.visible.is_empty() {
+            return false;
+        }
+        self.fold_cycle.next();
+        let state = self.fold_cycle;
+        let lines = self.lines();
+        let folded = match state {
+            FoldCycle::None => HashSet::new(),
+            FoldCycle::Dirs => (0..lines.len())
+                .filter(|&i| {
+                    lines[i].is_path() && {
+                        let depth = lines[i].depth();
+                        let end = fold_end(i, lines);
+                        end > i + 1
+                            && !(i + 1..end)
+                                .any(|j| lines[j].is_path() && lines[j].depth() > depth + 1)
+                    }
+                })
+                .collect(),
+            FoldCycle::Files => (0..lines.len())
+                .filter(|&i| {
+                    lines[i].is_path() && {
+                        let end = fold_end(i, lines);
+                        end > i + 1 && !(i + 1..end).any(|j| lines[j].is_path())
+                    }
+                })
+                .collect(),
+        };
+        self.folded = folded;
+        self.selected_id = 0;
+        self.cursor_y = self.start_y();
         self.update_visible();
         true
     }
@@ -1077,6 +1134,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         self.selected_id = 0;
         self.cursor_y = self.start_y();
         self.folded.clear();
+        self.fold_cycle = FoldCycle::None;
         self.update_visible();
     }
 
@@ -1441,6 +1499,8 @@ impl<'a, 'b> Menu<'a, 'b> {
                     (self.bottom(), false)
                 } else if keys.fold.contains(&code) {
                     (self.toggle_fold(), true)
+                } else if keys.fold_cycle.contains(&code) {
+                    (self.cycle_fold(), true)
                 } else {
                     (false, false)
                 }

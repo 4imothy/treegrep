@@ -30,6 +30,38 @@ const file_path = resolve(expand('<sfile>:p'))
 const project_root = fnamemodify(file_path, ':h:h')
 const tgrep_bin = project_root .. '/target/release/tgrep'
 
+def TgrepWinOpts(): dict<any>
+    if g:Tgrep_win_opts_fn != v:null
+        return g:Tgrep_win_opts_fn()
+    endif
+
+    var width = float2nr(&columns * g:tgrep_win_width_pct)
+    var height = float2nr(&lines * g:tgrep_win_height_pct)
+
+    return {
+        line: float2nr((&lines - height) / 2),
+        col: float2nr((&columns - width) / 2),
+        minwidth: width,
+        minheight: height,
+        maxwidth: width,
+        maxheight: height,
+        border: [1, 1, 1, 1],
+        borderchars: g:tgrep_borderchars,
+        padding: [0, 0, 0, 0],
+        zindex: 1,
+        drag: 1,
+        pos: 'center',
+    }
+enddef
+
+var active_popup: number = -1
+
+def TgrepResize()
+    if active_popup >= 0 && !empty(popup_getpos(active_popup))
+        popup_setoptions(active_popup, TgrepWinOpts())
+    endif
+enddef
+
 def g:TgrepWith(args: string)
     assert_true(g:tgrep_selection_file !=# '', '`selection_file` must be provided')
     assert_true(args !=# '', 'arguments must be provided to `TgrepWith`')
@@ -47,28 +79,7 @@ def g:TgrepWith(args: string)
         cmd ..= ' ' .. args
     endif
 
-    var popup_opts: dict<any>
-    if g:Tgrep_win_opts_fn != v:null
-        popup_opts = g:Tgrep_win_opts_fn()
-    else
-        var width = float2nr(&columns * g:tgrep_win_width_pct)
-        var height = float2nr(&lines * g:tgrep_win_height_pct)
-
-        popup_opts = {
-            line: float2nr((&lines - height) / 2),
-            col: float2nr((&columns - width) / 2),
-            minwidth: width,
-            minheight: height,
-            maxwidth: width,
-            maxheight: height,
-            border: [1, 1, 1, 1],
-            borderchars: g:tgrep_borderchars,
-            padding: [0, 0, 0, 0],
-            zindex: 1,
-            drag: 1,
-            pos: 'center',
-        }
-    endif
+    var popup_opts = TgrepWinOpts()
 
     var win: number
     var buf: number
@@ -78,6 +89,8 @@ def g:TgrepWith(args: string)
         hidden: true,
         term_finish: 'close',
         exit_cb: (_, _) => {
+            active_popup = -1
+            autocmd_delete([{group: 'tgrep_resize'}])
             popup_close(win)
             if bufexists(buf)
                 execute 'bdelete!' .. buf
@@ -98,6 +111,14 @@ def g:TgrepWith(args: string)
     })
 
     win = popup_create(buf, popup_opts)
+    active_popup = win
+    autocmd_add([{
+        group: 'tgrep_resize',
+        event: 'VimResized',
+        pattern: '*',
+        replace: true,
+        cmd: 'TgrepResize()',
+    }])
 enddef
 
 def TgrepBuildCallback(job: job, exit_status: number)

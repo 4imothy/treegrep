@@ -384,6 +384,7 @@ pub const KEY_HELP: &str = "key_help";
 pub const KEY_QUIT: &str = "key_quit";
 pub const KEY_OPEN: &str = "key_open";
 pub const KEY_FOLD: &str = "key_fold";
+pub const KEY_FOLD_CYCLE: &str = "key_fold_cycle";
 pub const KEY_FILTER: &str = "key_filter";
 pub const KEY_SEARCH: &str = "key_search";
 pub const KEY_SUBMIT_SEARCH: &str = "key_submit_search";
@@ -874,6 +875,9 @@ pub struct Args {
 
     #[arg(long, value_parser = KeyCodeParser, default_values = ["tab"], hide_short_help = true, value_name = "", help = "fold/unfold path")]
     pub key_fold: Vec<KeyCode>,
+
+    #[arg(long, value_parser = KeyCodeParser, default_values = ["Z"], hide_short_help = true, value_name = "", help = "cycle global fold (dirs/files/none)")]
+    pub key_fold_cycle: Vec<KeyCode>,
 
     #[arg(long, value_parser = KeyCodeParser, default_values = ["/", "s"], hide_short_help = true, value_name = "", help = "filter within results")]
     pub key_filter: Vec<KeyCode>,

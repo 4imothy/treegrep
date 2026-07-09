@@ -482,6 +482,21 @@ fn menu_custom_keys() {
     assert_pass(&tar_dir.join("menu_custom_keys"), result);
 }
 
+#[cfg(unix)]
+#[test]
+fn menu_fold_cycle() {
+    let tar_dir = target_dir();
+    let dir = Dir::new("menu_fold_cycle");
+
+    let sub = PathBuf::from("sub_dir");
+    dir.add_child(&sub);
+    dir.create_file_fill(&sub.join("inner"), b"match one\nmatch two");
+    dir.create_file_fill(&PathBuf::from("sibling"), b"match here\nmatch again");
+
+    let result = tmux::get_menu_output(&dir.path, "match", &["Z"]);
+    assert_pass(&tar_dir.join("menu_fold_cycle"), result);
+}
+
 #[cfg(feature = "pcre2")]
 #[test]
 fn pcre2_lookbehind() {
