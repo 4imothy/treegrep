@@ -1,0 +1,7 @@
+- hit --glob=!sibling --count
+-> [ps]menu_search_args[pe]: 1
+   +--[ps]sub_dir[pe]: 1
+      +--[ps]inner[pe]: 3
+         +--1: [m0s]hit[m0e] here
+         +--2: [m0s]hit[m0e] again
+         +--3: third [m0s]hit[m0e]

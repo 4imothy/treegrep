@@ -54,6 +54,13 @@ pub fn style_with<D: Display>(orig: D, color: Color, config: &Config) -> StyledC
     styled
 }
 
+pub fn with_bg<D: Display>(s: StyledContent<D>, bg: Option<Color>) -> StyledContent<D> {
+    match bg {
+        Some(c) => s.on(c),
+        None => s,
+    }
+}
+
 pub fn match_substring<'a>(
     orig: &'a str,
     regexp_id: usize,

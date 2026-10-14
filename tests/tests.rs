@@ -5,12 +5,14 @@ mod file_system;
 mod tmux;
 mod utils;
 use file_system::Dir;
-use std::{env, path::PathBuf};
+use std::{env, fs, path::PathBuf};
 use utils::*;
 
 #[test]
 fn setup() {
-    assert!(cfg!(feature = "test"));
+    const {
+        assert!(cfg!(feature = "test"));
+    }
 }
 
 #[test]
@@ -33,11 +35,8 @@ fn wide_directory() {
     dir.add_child(&second);
     dir.create_file_fill(&second.join("file_in_second"), b"text in second directory");
 
-    let result = get_output(&dir.path, "text -e this");
-    let tar_12 = tar_dir.join("wide_1");
-    let tar_21 = tar_dir.join("wide_2");
-    let tars = [tar_12.as_path(), tar_21.as_path()];
-    assert_pass_pool(&tars, result);
+    let result = get_output(&dir.path, &["text", "-e", "this"]);
+    assert_pass(&tar_dir.join("wide"), result);
 }
 
 #[test]
@@ -68,7 +67,7 @@ fn deep_directory() {
     );
 
     let tar_path = tar_dir.join("deep");
-    let result = get_output(&dir.path, "nice");
+    let result = get_output(&dir.path, &["nice"]);
     assert_pass(&tar_path, result);
 }
 
@@ -82,7 +81,7 @@ fn max_depth() {
     dir.create_file_fill(&PathBuf::from("valid_file"), b"should show");
 
     let tar_path = tar_dir.join("max_depth");
-    let result = get_output(&dir.path, ". --max-depth=1");
+    let result = get_output(&dir.path, &[".", "--max-depth=1"]);
     assert_pass(&tar_path, result);
 }
 
@@ -100,7 +99,7 @@ fn glob_exclusion() {
 
     let result = get_output(
         &dir.path,
-        &format!(". --glob=!{}", excluded.to_string_lossy()),
+        &[".", &format!("--glob=!{}", excluded.to_string_lossy())],
     );
     assert_pass(&tar_path, result);
 }
@@ -114,12 +113,9 @@ fn regexp_glob() {
 
     let result = get_output(
         &dir.path,
-        "--regexp-glob=*.rs=alpha --regexp-glob=*.py=beta -n",
+        &["--regexp-glob=*.rs=alpha", "--regexp-glob=*.py=beta", "-n"],
     );
-    let tar_rs_py = tar_dir.join("regexp_glob_1");
-    let tar_py_rs = tar_dir.join("regexp_glob_2");
-    let tars = [tar_rs_py.as_path(), tar_py_rs.as_path()];
-    assert_pass_pool(&tars, result);
+    assert_pass(&tar_dir.join("regexp_glob"), result);
 }
 
 #[test]
@@ -132,7 +128,7 @@ fn file() {
     dir.create_file_fill(&file, pool);
 
     let tar_path = tar_dir.join("file");
-    let result = get_output(&dir.path.join(file), "hat --line-number");
+    let result = get_output(&dir.path.join(file), &["hat", "--line-number"]);
     assert_pass(&tar_path, result);
 }
 
@@ -149,18 +145,8 @@ fn links() {
     dir.create_file_fill(&linked_dir.join("file"), b"child file content");
     dir.link_dir(&linked_dir, "link_to_dir");
 
-    let result = get_output(&dir.path, ". --links");
-    let tar_1 = tar_dir.join("links_1");
-    let tar_2 = tar_dir.join("links_2");
-    let tar_3 = tar_dir.join("links_3");
-    let tar_4 = tar_dir.join("links_4");
-    let tars = [
-        tar_1.as_path(),
-        tar_2.as_path(),
-        tar_3.as_path(),
-        tar_4.as_path(),
-    ];
-    assert_pass_pool(&tars, result);
+    let result = get_output(&dir.path, &[".", "--links"]);
+    assert_pass(&tar_dir.join("links"), result);
 }
 
 #[test]
@@ -173,10 +159,10 @@ fn no_matches() {
     dir.create_file_fill(&sub.join("two"), b"some text");
 
     let tar_path = tar_dir.join("no_matches");
-    let result = get_output(&dir.path, "nomatches");
+    let result = get_output(&dir.path, &["nomatches"]);
     assert_pass(&tar_path, result);
 
-    let result = get_output(&dir.path.join("one"), "nomatches --line-number");
+    let result = get_output(&dir.path.join("one"), &["nomatches", "--line-number"]);
     assert_pass(&tar_path, result);
 }
 
@@ -195,24 +181,15 @@ fn files() {
     dir.create_file_fill(&sub.join("file with some text"), text.as_bytes());
     dir.create_file_fill(&sub.join("another file"), b"won't be matched");
 
-    let results = get_output(&dir.path, &format!("{} --files", text));
+    let results = get_output(&dir.path, &[text, "--files"]);
     let tar = tar_dir.join("files_with_expr");
     assert_pass(&tar, results);
 
-    let result = get_output(&dir.path, "--files");
-    let tar_1 = tar_dir.join("files_1");
-    let tar_2 = tar_dir.join("files_2");
-    let tars = [tar_1.as_path(), tar_2.as_path()];
-    assert_pass_pool(&tars, result);
+    let result = get_output(&dir.path, &["--files"]);
+    assert_pass(&tar_dir.join("files"), result);
 
-    let result = get_output(&dir.path, "--files --branch-each 2");
-    assert_pass_pool(
-        &[
-            tar_dir.join("files_long_branch_1").as_path(),
-            tar_dir.join("files_long_branch_2").as_path(),
-        ],
-        result,
-    );
+    let result = get_output(&dir.path, &["--files", "--branch-each", "2"]);
+    assert_pass(&tar_dir.join("files_long_branch"), result);
 }
 
 #[test]
@@ -235,26 +212,14 @@ fn long_branch_with_expr() {
     dir.create_file_fill(&sub.join("one"), b"ausntha");
     dir.create_file_fill(&sub.join("two"), b"ausntha");
 
-    let result = get_output(&dir.path, &format!("{} --files --branch-each 5", text));
-    assert_pass_pool(
-        &[
-            tar_dir.join("files_long_branch_expr_1").as_path(),
-            tar_dir.join("files_long_branch_expr_2").as_path(),
-        ],
-        result,
-    );
+    let result = get_output(&dir.path, &[text, "--files", "--branch-each", "5"]);
+    assert_pass(&tar_dir.join("files_long_branch_expr"), result);
 
     let result = get_output(
         &dir.path,
-        &format!("{} --files --branch-each 5 --count", text),
+        &[text, "--files", "--branch-each", "5", "--count"],
     );
-    assert_pass_pool(
-        &[
-            tar_dir.join("files_long_branch_expr_count_1").as_path(),
-            tar_dir.join("files_long_branch_expr_count_2").as_path(),
-        ],
-        result,
-    );
+    assert_pass(&tar_dir.join("files_long_branch_expr_count"), result);
 }
 
 #[test]
@@ -271,7 +236,10 @@ fn overlapping() {
     dir.add_child(&second);
     dir.create_file_fill(&second.join("2_file"), b"overlapping over");
 
-    let result = get_output(&dir.path, "--regexp overlapping --regexp over --count");
+    let result = get_output(
+        &dir.path,
+        &["--regexp", "overlapping", "--regexp", "over", "--count"],
+    );
     assert_pass(&tar_dir.join("overlapping"), result);
 }
 
@@ -288,10 +256,10 @@ fn overview() {
     dir.add_child(&sub);
     dir.create_file_fill(&sub.join("sub_file"), b"some text here too");
 
-    let result = get_output(&dir.path, "text --overview");
+    let result = get_output(&dir.path, &["text", "--overview"]);
     assert_pass(&tar_dir.join("overview_dir"), result);
 
-    let result = get_output(&dir.path.join("top_file"), "text --overview");
+    let result = get_output(&dir.path.join("top_file"), &["text", "--overview"]);
     assert_pass(&tar_dir.join("overview_file"), result);
 }
 
@@ -308,10 +276,10 @@ fn overview_only() {
     dir.add_child(&sub);
     dir.create_file_fill(&sub.join("sub_file"), b"some text here too");
 
-    let result = get_output(&dir.path, "text --overview-only");
+    let result = get_output(&dir.path, &["text", "--overview-only"]);
     assert_pass(&tar_dir.join("summary_dir"), result);
 
-    let result = get_output(&dir.path.join("top_file"), "text --overview-only");
+    let result = get_output(&dir.path.join("top_file"), &["text", "--overview-only"]);
     assert_pass(&tar_dir.join("summary_file"), result);
 }
 
@@ -325,18 +293,21 @@ fn context() {
         b"line one\nline two\nline three match\nline four\nline five\nline six match\nline seven\nline eight",
     );
 
-    let result = get_output(&dir.path.join(&file), "match --line-number --context 1");
+    let result = get_output(
+        &dir.path.join(&file),
+        &["match", "--line-number", "--context", "1"],
+    );
     assert_pass(&tar_dir.join("context_c1"), result);
 
     let result = get_output(
         &dir.path.join(&file),
-        "match --line-number --before-context 1",
+        &["match", "--line-number", "--before-context", "1"],
     );
     assert_pass(&tar_dir.join("context_b1"), result);
 
     let result = get_output(
         &dir.path.join(&file),
-        "match --line-number --after-context 1",
+        &["match", "--line-number", "--after-context", "1"],
     );
     assert_pass(&tar_dir.join("context_a1"), result);
 }
@@ -371,27 +342,64 @@ fn repeat() {
 
     let mut orig_result = get_output(
         &dir.path,
-        &format!(
-            "some --line-number --count --glob=!4ourth --repeat-file={} --overview --trim",
-            repeat_file
-        ),
+        &[
+            "some",
+            "--line-number",
+            "--count",
+            "--glob=!4ourth",
+            &format!("--repeat-file={}", repeat_file),
+            "--overview",
+            "--trim",
+        ],
     );
     let mut rep_result = get_output(
         &dir.path,
-        &format!("--repeat --repeat-file={}", repeat_file),
+        &["--repeat", &format!("--repeat-file={}", repeat_file)],
     );
     assert!(orig_result == rep_result);
 
-    (orig_result) = get_output(
+    orig_result = get_output(
         &dir.path,
-        &format!(
-            "in --files --glob=!4ourth_nice_file --repeat-file={} --overview",
-            repeat_file
-        ),
+        &[
+            "in",
+            "--files",
+            "--glob=!4ourth_nice_file",
+            &format!("--repeat-file={}", repeat_file),
+            "--overview",
+        ],
     );
-    (rep_result) = get_output(
+    rep_result = get_output(
         &dir.path,
-        &format!("--repeat --repeat-file={}", repeat_file),
+        &["--repeat", &format!("--repeat-file={}", repeat_file)],
+    );
+    assert!(orig_result == rep_result);
+
+    orig_result = get_output(
+        &dir.path,
+        &[
+            "nice",
+            &format!("-p={}", dir.path.join(&second).to_string_lossy()),
+            &format!("--repeat-file={}", repeat_file),
+            "--overview",
+        ],
+    );
+    rep_result = get_output(
+        &dir.path,
+        &["--repeat", &format!("--repeat-file={}", repeat_file)],
+    );
+    assert!(orig_result == rep_result);
+
+    orig_result = get_output(
+        &dir.path,
+        &[
+            "--files",
+            "--glob=!top_file",
+            &format!("--repeat-file={}", repeat_file),
+        ],
+    );
+    rep_result = get_output(
+        &dir.path,
+        &["--repeat", &format!("--repeat-file={}", repeat_file)],
     );
     assert!(orig_result == rep_result);
 }
@@ -412,13 +420,7 @@ fn menu_navigate() {
         "hit",
         &["}", "d", "j", "{", "Tab", "g", "j", "z"],
     );
-    assert_pass_pool(
-        &[
-            &tar_dir.join("menu_navigate_1"),
-            &tar_dir.join("menu_navigate_2"),
-        ],
-        result,
-    );
+    assert_pass(&tar_dir.join("menu_navigate"), result);
 }
 
 #[cfg(unix)]
@@ -436,10 +438,7 @@ fn menu_jump() {
     dir.create_file_fill(&dir_b.join("file_b"), b"word here");
 
     let result = tmux::get_menu_output(&dir.path, "word", &["G", "K", "}", "u", "Tab", "b"]);
-    assert_pass_pool(
-        &[&tar_dir.join("menu_jump_1"), &tar_dir.join("menu_jump_2")],
-        result,
-    );
+    assert_pass(&tar_dir.join("menu_jump"), result);
 }
 
 #[cfg(unix)]
@@ -511,8 +510,35 @@ fn pcre2_lookbehind() {
     );
     dir.create_file_fill(&PathBuf::from("no_match"), b"look before you leap");
 
-    let result = get_output(&dir.path, r"(?<=over)look --pcre2 --line-number");
+    let result = get_output(&dir.path, &[r"(?<=over)look", "--pcre2", "--line-number"]);
     assert_pass(&tar_dir.join("pcre2_lookbehind"), result);
+}
+
+#[test]
+fn multiple_paths() {
+    let tar_dir: PathBuf = target_dir();
+    let dir = Dir::new("multiple_paths");
+
+    let first = PathBuf::from("first");
+    dir.add_child(&first);
+    dir.create_file_fill(&first.join("first_file"), b"nice text in first");
+    let inner = first.join("inner");
+    dir.add_child(&inner);
+    dir.create_file_fill(&inner.join("inner_file"), b"nice text in inner");
+    dir.create_file_fill(&PathBuf::from("top_file"), b"some nice top text");
+    dir.create_file_fill(&PathBuf::from("skipped"), b"nice but not searched");
+
+    let result = get_output(
+        &dir.path.join(&first),
+        &[
+            "nice",
+            &dir.path.join(&inner).to_string_lossy(),
+            &dir.path.join("top_file").to_string_lossy(),
+            "--line-number",
+            "--overview",
+        ],
+    );
+    assert_pass(&tar_dir.join("multiple_paths"), result);
 }
 
 #[cfg(unix)]
@@ -526,6 +552,150 @@ fn menu_search_mode() {
     dir.create_file_fill(&sub.join("inner"), b"hit here\nhit again\nthird hit");
     dir.create_file_fill(&PathBuf::from("sibling"), b"hit also\nanother hit");
 
-    let result = tmux::get_menu_output_from_search(&dir.path, &["h", "i", "t", "Enter"]);
+    let result = tmux::get_menu_output_from_search(&dir.path, "", &["h", "i", "t", "Enter"]);
     assert_pass(&tar_dir.join("menu_search_mode"), result);
+}
+
+#[cfg(unix)]
+#[test]
+fn menu_search_args() {
+    let tar_dir = target_dir();
+    let dir = Dir::new("menu_search_args");
+
+    let sub = PathBuf::from("sub_dir");
+    dir.add_child(&sub);
+    dir.create_file_fill(&sub.join("inner"), b"hit here\nhit again\nthird hit");
+    dir.create_file_fill(&PathBuf::from("sibling"), b"hit also\nanother hit");
+
+    let result = tmux::get_menu_output_from_search(
+        &dir.path,
+        "--line-number",
+        &["hit --glob=!sibling --count", "Enter"],
+    );
+    assert_pass(&tar_dir.join("menu_search_args"), result);
+}
+
+#[cfg(unix)]
+#[test]
+fn menu_search_unsupported() {
+    let dir = Dir::new("menu_search_unsupported");
+
+    dir.create_file_fill(&PathBuf::from("file"), b"hit here");
+
+    let result =
+        tmux::get_menu_output_from_search(&dir.path, "", &["hit --select --key-down=x", "Enter"]);
+    let result = String::from_utf8_lossy(&result);
+    assert!(result.contains("unsupported in menu search: select, key_down"));
+}
+
+#[cfg(unix)]
+#[test]
+fn menu_repeat() {
+    let dir = Dir::new("menu_repeat");
+    let repeat_file_path = env::temp_dir().join("menu-repeat-file");
+    let repeat_file = repeat_file_path.to_string_lossy();
+
+    let sub = PathBuf::from("sub_dir");
+    dir.add_child(&sub);
+    dir.create_file_fill(&sub.join("inner"), b"hit here\nhit again\nthird hit");
+    dir.create_file_fill(&PathBuf::from("sibling"), b"hit also\nanother hit");
+
+    let _ = fs::remove_file(&repeat_file_path);
+    tmux::get_menu_output_from_search(
+        &dir.path,
+        &format!("--line-number --repeat-file={}", repeat_file),
+        &["hit --glob=!sibling --count", "Enter"],
+    );
+    assert!(repeat_file_path.exists());
+
+    let expected = get_output(
+        &dir.path,
+        &["hit", "--glob=!sibling", "--count", "--line-number"],
+    );
+    let repeated = get_output(
+        &dir.path,
+        &["--repeat", &format!("--repeat-file={}", repeat_file)],
+    );
+    assert!(expected == repeated);
+}
+
+fn input_dir(name: &str) -> Dir {
+    let dir = Dir::new(name);
+    dir.create_file_fill(&PathBuf::from("a"), b"nice in a");
+    dir.create_file_fill(&PathBuf::from("b"), b"nice in b");
+    dir.create_file_fill(&PathBuf::from("c"), b"nice in c");
+    let sub = PathBuf::from("sub");
+    dir.add_child(&sub);
+    dir.create_file_fill(&sub.join("inner"), b"nice in inner");
+    dir
+}
+
+#[test]
+fn input_stdin() {
+    let tar_dir = target_dir();
+    let dir = input_dir("input_stdin");
+
+    let result = get_output_in(
+        &dir.path,
+        &["nice", "--input-type=paths", "--line-number"],
+        b"a\nmissing\n\nsub\n",
+    );
+    assert_pass(&tar_dir.join("input_stdin"), result);
+}
+
+#[cfg(unix)]
+#[test]
+fn input_cmd() {
+    let tar_dir = target_dir();
+    let dir = input_dir("input_cmd");
+
+    let result = get_output(
+        &dir.path.join("c"),
+        &[
+            "nice",
+            &format!(
+                "--input-cmd=printf '%s\\n' {} {}",
+                dir.path.join("a").to_string_lossy(),
+                dir.path.join("sub").to_string_lossy(),
+            ),
+            "--input-type=paths",
+            "--line-number",
+        ],
+    );
+    assert_pass(&tar_dir.join("input_cmd"), result);
+}
+
+#[cfg(unix)]
+#[test]
+fn menu_input_cmd() {
+    let tar_dir = target_dir();
+    let dir = input_dir("menu_input_cmd");
+
+    let result = tmux::get_menu_output_from_search(
+        &dir.path,
+        "",
+        &["nice --input-cmd='printf a' --input-type=paths", "Enter"],
+    );
+    assert_pass(&tar_dir.join("menu_input_cmd"), result);
+}
+
+#[cfg(unix)]
+#[test]
+fn menu_input_repeat() {
+    let dir = input_dir("menu_input_repeat");
+    let repeat_file_path = env::temp_dir().join("menu-input-repeat-file");
+    let repeat_file = format!("--repeat-file={}", repeat_file_path.to_string_lossy());
+
+    let _ = fs::remove_file(&repeat_file_path);
+    tmux::get_menu_output_from_search(
+        &dir.path,
+        &repeat_file,
+        &["nice --input-cmd='printf a' --input-type=paths", "Enter"],
+    );
+    assert!(repeat_file_path.exists());
+
+    let expected = get_output_in(&dir.path, &["nice", "--input-type=paths"], b"a\n");
+    let repeated = get_output_in(&dir.path, &["--repeat", &repeat_file], b"");
+    assert!(!expected.is_empty());
+    assert!(expected == repeated);
 }

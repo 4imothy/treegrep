@@ -1,5 +1,0 @@
-[ps]regexp_glob[pe]
-├──[ps]code.rs[pe]
-│  ╰──1: [m0s]alpha[m0e]
-╰──[ps]code.py[pe]
-   ╰──2: [m1s]beta[m1e]

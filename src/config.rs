@@ -2,17 +2,20 @@
 
 use crate::{
     args::{
-        self, Args, CompletionShell, OpenStrategy, REPEAT_FILE, ScopedRegexp, generate_command,
+        self, Args, CompletionShell, InputType, OpenStrategy, REPEAT_FILE, ScopedRegexp,
+        generate_command,
     },
     errors::Message,
     mes, style,
 };
-use clap::{ArgMatches, Error, FromArgMatches};
+use clap::{ArgMatches, Error, FromArgMatches, ValueEnum};
 use crossterm::{event::KeyCode, style::Color};
 use std::{
     collections::HashSet,
-    ffi::OsString,
+    ffi::{OsStr, OsString},
+    io::{IsTerminal, Read},
     path::{Component, Path, PathBuf},
+    process::Command,
     sync::{Arc, OnceLock},
 };
 
@@ -85,29 +88,13 @@ pub struct Colors {
     pub filter_highlight: Color,
 }
 
-impl args::Color {
-    fn get(&self) -> Color {
-        match *self {
-            args::Color::Black => Color::Black,
-            args::Color::White => Color::White,
-            args::Color::Red => Color::Red,
-            args::Color::Green => Color::Green,
-            args::Color::Yellow => Color::Yellow,
-            args::Color::Blue => Color::Blue,
-            args::Color::Magenta => Color::Magenta,
-            args::Color::Cyan => Color::Cyan,
-            args::Color::Grey => Color::Grey,
-            args::Color::Rgb(r, g, b) => Color::Rgb { r, g, b },
-            args::Color::Ansi(value) => Color::AnsiValue(value),
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct SearchParams {
     pub regexps: Vec<String>,
     pub scoped: Vec<ScopedRegexp>,
-    pub path: PathBuf,
+    pub paths: Vec<PathBuf>,
+    pub input_type: Option<InputType>,
+    pub input: Option<Arc<[u8]>>,
     pub globs: Vec<String>,
     pub hidden: bool,
     pub line_number: bool,
@@ -129,7 +116,6 @@ pub struct SearchParams {
 #[derive(Clone)]
 pub struct Config {
     pub search: SearchParams,
-    pub is_dir: bool,
     pub with_bold: bool,
     pub with_colors: bool,
     pub branch_len: usize,
@@ -184,6 +170,47 @@ fn process_path(input: &Path, check_exists: bool) -> Result<PathBuf, Message> {
     }
 }
 
+fn process_paths(args: &Args) -> Result<Vec<PathBuf>, Message> {
+    args.positional_path
+        .iter()
+        .chain(&args.path)
+        .map(|p| process_path(p, true))
+        .collect()
+}
+
+pub fn run_input_cmd(cmd: &str) -> Result<Arc<[u8]>, Message> {
+    let out = if cfg!(windows) {
+        Command::new("cmd").args(["/C", cmd]).output()
+    } else {
+        Command::new("sh").args(["-c", cmd]).output()
+    }
+    .map_err(|e| mes!("{}", e))?;
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    if !out.status.success() && !stderr.trim().is_empty() {
+        return Err(mes!("input command `{}` failed: {}", cmd, stderr.trim()));
+    }
+    Ok(out.stdout.into())
+}
+
+fn read_stdin() -> Result<Arc<[u8]>, Message> {
+    if std::io::stdin().is_terminal() {
+        return Err(mes!("expected input on stdin"));
+    }
+    let mut buf = Vec::new();
+    std::io::stdin()
+        .read_to_end(&mut buf)
+        .map_err(|e| mes!("{}", e))?;
+    Ok(buf.into())
+}
+
+fn parse_paths(bytes: &[u8]) -> Vec<PathBuf> {
+    String::from_utf8_lossy(bytes)
+        .lines()
+        .filter(|l| !l.is_empty())
+        .filter_map(|l| process_path(Path::new(l), true).ok())
+        .collect()
+}
+
 fn get_all_args(mut args: Vec<OsString>) -> Vec<OsString> {
     if let Some(env_args) = std::env::var_os(args::DEFAULT_OPTS_ENV_NAME) {
         args.splice(
@@ -202,274 +229,166 @@ pub fn get_matches(args: Vec<OsString>) -> Result<ArgMatches, Error> {
     generate_command().try_get_matches_from(get_all_args(args))
 }
 
-fn apply_matches(
-    base_non_search: NonSearchFields,
-    matches: &ArgMatches,
-    only_explicit: bool,
-) -> Result<Config, Message> {
-    let args = Args::from_arg_matches(matches).map_err(|e| mes!("{}", e))?;
-
-    if only_explicit {
-        let applies =
-            |id: &str| matches.value_source(id) == Some(clap::parser::ValueSource::CommandLine);
-        let mut c = (*base_config()).clone();
-        c.selection_file = base_non_search.selection_file;
-        c.repeat_file = base_non_search.repeat_file;
-        c.select = base_non_search.select;
-        c.menu = base_non_search.menu;
-        c.live = base_non_search.live;
-        c.live_delay = base_non_search.live_delay;
-        c.auto_open = base_non_search.auto_open;
-        c.repeat = base_non_search.repeat;
-        c.editor = base_non_search.editor;
-        c.open_like = base_non_search.open_like;
-        c.completion_target = base_non_search.completion_target;
-        c.keys = base_non_search.keys;
-        c.mouse = base_non_search.mouse;
-        c.alternate_screen = base_non_search.alternate_screen;
-        if let Some(p) = args.positional_path.as_ref().or(args.path.as_ref()) {
-            c.search.path = process_path(p, true)?;
-            c.is_dir = c.search.path.is_dir();
-        }
-        if applies(args::POSITIONAL_REGEXP) || applies(args::REGEXP) {
-            c.search.regexps.clear();
-            if let Some(expr) = &args.positional_regexp {
-                c.search.regexps.push(expr.clone());
-            }
-            c.search.regexps.extend(args.regexp.iter().cloned());
-        }
-        if applies(args::REGEXP_GLOB) {
-            c.search.scoped = args.regexp_glob.clone();
-        }
-        if applies(args::GLOB) {
-            c.search.globs = args.glob.clone();
-        }
-        if applies(args::HIDDEN) {
-            c.search.hidden = args.hidden;
-        }
-        if applies(args::LINE_NUMBER) {
-            c.search.line_number = args.line_number;
-        }
-        if applies(args::FILES) {
-            c.search.files = args.files;
-        }
-        if applies(args::COUNT) {
-            c.search.count = args.count;
-        }
-        if applies(args::LINKS) {
-            c.search.links = args.links;
-        }
-        if applies(args::TRIM_LEFT) {
-            c.search.trim = args.trim;
-        }
-        if applies(args::NO_IGNORE) {
-            c.search.ignore = !args.no_ignore;
-        }
-        if applies(args::PCRE2) {
-            c.search.pcre2 = args.pcre2;
-        }
-        if applies(args::MAX_DEPTH) {
-            c.search.max_depth = args.max_depth;
-        }
-        if applies(args::MAX_LENGTH) {
-            c.search.max_length = args.max_length;
-        }
-        if applies(args::LONG_BRANCHES_EACH) {
-            c.search.branch_each = args.branch_each;
-        }
-        let context_both = if applies(args::CONTEXT) {
-            args.context.unwrap_or(0)
-        } else {
-            0
-        };
-        if applies(args::BEFORE_CONTEXT) || applies(args::CONTEXT) {
-            c.search.before_context = args.before_context.unwrap_or(context_both);
-        }
-        if applies(args::AFTER_CONTEXT) || applies(args::CONTEXT) {
-            c.search.after_context = args.after_context.unwrap_or(context_both);
-        }
-        if applies(args::NO_COLORS) {
-            c.with_colors = !args.no_color;
-        }
-        if applies(args::NO_BOLD) {
-            c.with_bold = !args.no_bold;
-        }
-        if applies(args::OVERVIEW) {
-            c.search.overview = args.overview;
-        }
-        if applies(args::OVERVIEW_ONLY) {
-            c.search.overview_only = args.overview_only;
-        }
-        if applies(args::BRANCH_LEN) {
-            c.branch_len = args.branch_len;
-        }
-        if applies(args::CHAR_VERTICAL) {
-            c.chars.v = args.char_vertical;
-        }
-        if applies(args::CHAR_HORIZONTAL) {
-            c.chars.h = args.char_horizontal;
-        }
-        if applies(args::CHAR_TOP_LEFT) {
-            c.chars.tl = args.char_top_left;
-        }
-        if applies(args::CHAR_TOP_RIGHT) {
-            c.chars.tr = args.char_top_right;
-        }
-        if applies(args::CHAR_BOTTOM_LEFT) {
-            c.chars.bl = args.char_bottom_left;
-        }
-        if applies(args::CHAR_BOTTOM_RIGHT) {
-            c.chars.br = args.char_bottom_right;
-        }
-        if applies(args::CHAR_TEE) {
-            c.chars.tee = args.char_tee;
-        }
-        let s = c.branch_len;
-        c.chars.match_with_next = format!("{}{}", c.chars.tee, style::repeat(c.chars.h, s - 1));
-        c.chars.match_no_next = format!("{}{}", c.chars.bl, style::repeat(c.chars.h, s - 1));
-        c.chars.spacer_vert = format!("{}{}", c.chars.v, style::repeat(' ', s - 1));
-        c.chars.spacer = " ".repeat(s);
-        if applies(args::SELECTED_INDICATOR) {
-            c.chars.selected_indicator_clear = " ".repeat(args.selected_indicator.chars().count());
-            c.chars.selected_indicator = args.selected_indicator.clone();
-        }
-        if applies(args::ELLIPSES) {
-            c.chars.ellipsis = args.ellipsis.clone();
-        }
-        if applies(args::SEARCH_PROMPT) {
-            c.chars.search_prompt = args.search_prompt.clone();
-        }
-        if applies(args::SEARCH_PROMPT_INACTIVE) {
-            c.chars.search_prompt_inactive = args.search_prompt_inactive.clone();
-        }
-        if applies(args::FILTER_PROMPT) {
-            c.chars.filter_prompt = args.filter_prompt.clone();
-        }
-        if applies("file_color")
-            && let Some(v) = &args.file_color
-        {
-            c.colors.file = v.get();
-        }
-        if applies("dir_color")
-            && let Some(v) = &args.dir_color
-        {
-            c.colors.dir = v.get();
-        }
-        if applies("text_color") {
-            c.colors.text = args.text_color.as_ref().map(|v| v.get());
-        }
-        if applies("branch_color") {
-            c.colors.branch = args.branch_color.as_ref().map(|v| v.get());
-        }
-        if applies("line_number_color")
-            && let Some(v) = &args.line_number_color
-        {
-            c.colors.line_number = v.get();
-        }
-        if applies("match_colors") && !args.match_colors.is_empty() {
-            c.colors.matches = args.match_colors.iter().map(|v| v.get()).collect();
-        }
-        if applies("selected_indicator_color") {
-            c.colors.selected_indicator = args.selected_indicator_color.as_ref().map(|v| v.get());
-        }
-        if applies("selected_bg_color")
-            && let Some(v) = &args.selected_bg_color
-        {
-            c.colors.selected_bg = v.get();
-        }
-        if applies("filter_highlight_color")
-            && let Some(v) = &args.filter_highlight_color
-        {
-            c.colors.filter_highlight = v.get();
-        }
-        return Ok(c);
+fn apply_explicit(c: &mut Config, args: &Args, matches: &ArgMatches) -> Result<(), Message> {
+    let applies =
+        |id: &str| matches.value_source(id) == Some(clap::parser::ValueSource::CommandLine);
+    if applies(args::PATH_POSITIONAL) || applies(args::PATH) || applies(args::INPUT_CMD) {
+        c.search.paths = process_paths(args)?;
+        c.search.input = None;
+        c.search.input_type = args.input_type;
     }
-
-    let (path, is_dir) = match args.positional_path.as_ref().or(args.path.as_ref()) {
-        Some(p) => {
-            let p = process_path(p, true)?;
-            let d = p.is_dir();
-            (p, d)
+    if applies(args::POSITIONAL_REGEXP) || applies(args::REGEXP) {
+        c.search.regexps.clear();
+        if let Some(expr) = &args.positional_regexp {
+            c.search.regexps.push(expr.clone());
         }
-        None => {
-            let p = canonicalize(
-                &std::env::current_dir()
-                    .map_err(|_| mes!("failed to get current working directory"))?,
-            )?;
-            let d = p.is_dir();
-            (p, d)
-        }
+        c.search.regexps.extend(args.regexp.iter().cloned());
+    }
+    if applies(args::REGEXP_GLOB) {
+        c.search.scoped = args.regexp_glob.clone();
+    }
+    if applies(args::GLOB) {
+        c.search.globs = args.glob.clone();
+    }
+    if applies(args::HIDDEN) {
+        c.search.hidden = args.hidden;
+    }
+    if applies(args::LINE_NUMBER) {
+        c.search.line_number = args.line_number;
+    }
+    if applies(args::FILES) {
+        c.search.files = args.files;
+    }
+    if applies(args::COUNT) {
+        c.search.count = args.count;
+    }
+    if applies(args::LINKS) {
+        c.search.links = args.links;
+    }
+    if applies(args::TRIM_LEFT) {
+        c.search.trim = args.trim;
+    }
+    if applies(args::NO_IGNORE) {
+        c.search.ignore = !args.no_ignore;
+    }
+    if applies(args::PCRE2) {
+        c.search.pcre2 = args.pcre2;
+    }
+    if applies(args::MAX_DEPTH) {
+        c.search.max_depth = args.max_depth;
+    }
+    if applies(args::MAX_LENGTH) {
+        c.search.max_length = args.max_length;
+    }
+    if applies(args::LONG_BRANCHES_EACH) {
+        c.search.branch_each = args.branch_each;
+    }
+    let context_both = if applies(args::CONTEXT) {
+        args.context.unwrap_or(0)
+    } else {
+        0
     };
-    let mut regexps = Vec::new();
-    if let Some(expr) = &args.positional_regexp {
-        regexps.push(expr.clone());
+    if applies(args::BEFORE_CONTEXT) || applies(args::CONTEXT) {
+        c.search.before_context = args.before_context.unwrap_or(context_both);
     }
-    regexps.extend(args.regexp.iter().cloned());
-    let context = args.context.unwrap_or(0);
-    let branch_len = args.branch_len;
-    let chars = Config::get_characters(&args);
-    Ok(Config {
-        search: SearchParams {
-            path,
-            regexps,
-            scoped: args.regexp_glob.clone(),
-            globs: args.glob.clone(),
-            hidden: args.hidden,
-            line_number: args.line_number,
-            files: args.files,
-            count: args.count,
-            links: args.links,
-            trim: args.trim,
-            ignore: !args.no_ignore,
-            max_depth: args.max_depth,
-            max_length: args.max_length,
-            before_context: args.before_context.unwrap_or(context),
-            after_context: args.after_context.unwrap_or(context),
-            overview: args.overview,
-            overview_only: args.overview_only,
-            branch_each: args.branch_each,
-            pcre2: args.pcre2,
-        },
-        is_dir,
-        with_bold: !args.no_bold,
-        with_colors: !args.no_color,
-        branch_len,
-        threads: base_non_search.threads,
-        chars,
-        colors: Config::get_colors(&args),
-        selection_file: base_non_search.selection_file,
-        repeat_file: base_non_search.repeat_file,
-        select: base_non_search.select,
-        menu: base_non_search.menu,
-        live: base_non_search.live,
-        live_delay: base_non_search.live_delay,
-        auto_open: base_non_search.auto_open,
-        repeat: base_non_search.repeat,
-        editor: base_non_search.editor,
-        open_like: base_non_search.open_like,
-        completion_target: base_non_search.completion_target,
-        keys: base_non_search.keys,
-        mouse: base_non_search.mouse,
-        alternate_screen: base_non_search.alternate_screen,
-    })
-}
-
-struct NonSearchFields {
-    selection_file: Option<PathBuf>,
-    repeat_file: Option<PathBuf>,
-    select: bool,
-    menu: bool,
-    live: bool,
-    live_delay: Option<u64>,
-    auto_open: bool,
-    repeat: bool,
-    threads: usize,
-    editor: Option<String>,
-    open_like: Option<OpenStrategy>,
-    completion_target: Option<CompletionShell>,
-    keys: KeyBindings,
-    mouse: bool,
-    alternate_screen: bool,
+    if applies(args::AFTER_CONTEXT) || applies(args::CONTEXT) {
+        c.search.after_context = args.after_context.unwrap_or(context_both);
+    }
+    if applies(args::NO_COLORS) {
+        c.with_colors = !args.no_color;
+    }
+    if applies(args::NO_BOLD) {
+        c.with_bold = !args.no_bold;
+    }
+    if applies(args::OVERVIEW) {
+        c.search.overview = args.overview;
+    }
+    if applies(args::OVERVIEW_ONLY) {
+        c.search.overview_only = args.overview_only;
+    }
+    if applies(args::BRANCH_LEN) {
+        c.branch_len = args.branch_len;
+    }
+    if applies(args::CHAR_VERTICAL) {
+        c.chars.v = args.char_vertical;
+    }
+    if applies(args::CHAR_HORIZONTAL) {
+        c.chars.h = args.char_horizontal;
+    }
+    if applies(args::CHAR_TOP_LEFT) {
+        c.chars.tl = args.char_top_left;
+    }
+    if applies(args::CHAR_TOP_RIGHT) {
+        c.chars.tr = args.char_top_right;
+    }
+    if applies(args::CHAR_BOTTOM_LEFT) {
+        c.chars.bl = args.char_bottom_left;
+    }
+    if applies(args::CHAR_BOTTOM_RIGHT) {
+        c.chars.br = args.char_bottom_right;
+    }
+    if applies(args::CHAR_TEE) {
+        c.chars.tee = args.char_tee;
+    }
+    let s = c.branch_len;
+    c.chars.match_with_next = format!("{}{}", c.chars.tee, style::repeat(c.chars.h, s - 1));
+    c.chars.match_no_next = format!("{}{}", c.chars.bl, style::repeat(c.chars.h, s - 1));
+    c.chars.spacer_vert = format!("{}{}", c.chars.v, style::repeat(' ', s - 1));
+    c.chars.spacer = " ".repeat(s);
+    if applies(args::SELECTED_INDICATOR) {
+        c.chars.selected_indicator_clear = " ".repeat(args.selected_indicator.chars().count());
+        c.chars.selected_indicator = args.selected_indicator.clone();
+    }
+    if applies(args::ELLIPSES) {
+        c.chars.ellipsis = args.ellipsis.clone();
+    }
+    if applies(args::SEARCH_PROMPT) {
+        c.chars.search_prompt = args.search_prompt.clone();
+    }
+    if applies(args::SEARCH_PROMPT_INACTIVE) {
+        c.chars.search_prompt_inactive = args.search_prompt_inactive.clone();
+    }
+    if applies(args::FILTER_PROMPT) {
+        c.chars.filter_prompt = args.filter_prompt.clone();
+    }
+    if applies("file_color")
+        && let Some(v) = &args.file_color
+    {
+        c.colors.file = *v;
+    }
+    if applies("dir_color")
+        && let Some(v) = &args.dir_color
+    {
+        c.colors.dir = *v;
+    }
+    if applies("text_color") {
+        c.colors.text = args.text_color;
+    }
+    if applies("branch_color") {
+        c.colors.branch = args.branch_color;
+    }
+    if applies("line_number_color")
+        && let Some(v) = &args.line_number_color
+    {
+        c.colors.line_number = *v;
+    }
+    if applies("match_colors") && !args.match_colors.is_empty() {
+        c.colors.matches = args.match_colors.clone();
+    }
+    if applies("selected_indicator_color") {
+        c.colors.selected_indicator = args.selected_indicator_color;
+    }
+    if applies("selected_bg_color")
+        && let Some(v) = &args.selected_bg_color
+    {
+        c.colors.selected_bg = *v;
+    }
+    if applies("filter_highlight_color")
+        && let Some(v) = &args.filter_highlight_color
+    {
+        c.colors.filter_highlight = *v;
+    }
+    Ok(())
 }
 
 impl Config {
@@ -478,53 +397,35 @@ impl Config {
         (!args.no_bold, !args.no_color)
     }
 
-    fn read_repeat_file(f: &Path) -> Result<Vec<OsString>, Message> {
+    fn read_repeat_file(f: &Path) -> Result<(Vec<OsString>, Option<Vec<u8>>), Message> {
         let data = std::fs::read(f).map_err(|e| mes!("{}", e))?;
         let mut pos = 0;
+        let count = read_u32(&data, &mut pos)?;
         let mut args = Vec::new();
-        while pos < data.len() {
-            let len = u32::from_le_bytes(
-                data[pos..pos + size_of::<u32>()]
-                    .try_into()
-                    .map_err(|e| mes!("{}", e))?,
-            ) as usize;
-            pos += size_of::<u32>();
-            let bytes = &data[pos..pos + len];
-            pos += len;
+        for _ in 0..count {
+            let bytes = read_record(&data, &mut pos)?;
             unsafe {
                 args.push(OsString::from_encoded_bytes_unchecked(bytes.to_vec()));
             }
         }
-        Ok(args)
+        let input = (pos < data.len())
+            .then(|| read_record(&data, &mut pos).map(<[u8]>::to_vec))
+            .transpose()?;
+        Ok((args, input))
     }
 
     pub fn handle_repeat(&self) -> Result<Option<Self>, Message> {
         if let Some(f) = &self.repeat_file {
             if self.repeat {
-                let args = Self::read_repeat_file(f)?;
-                let matches = get_matches(args).map_err(|e| mes!("{}", e))?;
-                let mut c = Self::get_config(matches)?;
-                c.is_dir = c.search.path.is_dir();
-                c.with_bold = self.with_bold;
-                c.with_colors = self.with_colors;
-                c.branch_len = self.branch_len;
-                c.chars = self.chars.clone();
-                c.colors = self.colors.clone();
-                c.selection_file = self.selection_file.clone();
-                c.repeat_file = self.repeat_file.clone();
-                c.select = self.select;
-                c.menu = self.menu;
-                c.live = self.live;
-                c.live_delay = self.live_delay;
-                c.auto_open = self.auto_open;
-                c.editor = self.editor.clone();
-                c.open_like = self.open_like.clone();
-                c.keys = self.keys.clone();
-                c.mouse = self.mouse;
-                c.alternate_screen = self.alternate_screen;
+                let (args, input) = Self::read_repeat_file(f)?;
+                let matches = generate_command()
+                    .try_get_matches_from(args)
+                    .map_err(|e| mes!("{}", e))?;
+                let mut c = self.clone();
+                c.search = Self::get_config(matches, input)?.search;
                 Ok(Some(c))
             } else {
-                if self.search.has_expr() {
+                if self.search.has_expr() || self.search.files {
                     save_search_params(f, self)?;
                 }
                 Ok(None)
@@ -536,7 +437,7 @@ impl Config {
         }
     }
 
-    pub fn get_config(matches: ArgMatches) -> Result<Self, Message> {
+    pub fn get_config(matches: ArgMatches, saved_input: Option<Vec<u8>>) -> Result<Self, Message> {
         let args = Args::from_arg_matches(&matches).map_err(|e| mes!("{}", e))?;
 
         let threads = args.threads.unwrap_or_else(|| {
@@ -555,60 +456,92 @@ impl Config {
             .map(|p| process_path(p, false))
             .transpose()?;
 
-        let non_search = NonSearchFields {
+        let input = match (saved_input, &args.input_cmd) {
+            (Some(raw), _) => Some(raw.into()),
+            (None, _) if args.repeat => None,
+            (None, Some(cmd)) => Some(run_input_cmd(cmd)?),
+            (None, None) if args.input_type.is_some() => Some(read_stdin()?),
+            (None, None) => None,
+        };
+        let mut paths = process_paths(&args)?;
+        if paths.is_empty() && input.is_none() {
+            let cwd = std::env::current_dir()
+                .map_err(|_| mes!("failed to get current working directory"))?;
+            paths.push(canonicalize(&cwd)?);
+        }
+        let mut regexps = Vec::new();
+        if let Some(expr) = &args.positional_regexp {
+            regexps.push(expr.clone());
+        }
+        regexps.extend(args.regexp.iter().cloned());
+        let context = args.context.unwrap_or(0);
+        let branch_len = args.branch_len;
+        let chars = Config::get_characters(&args);
+        Ok(Config {
+            search: SearchParams {
+                paths,
+                input_type: args.input_type,
+                input,
+                regexps,
+                scoped: args.regexp_glob.clone(),
+                globs: args.glob.clone(),
+                hidden: args.hidden,
+                line_number: args.line_number,
+                files: args.files,
+                count: args.count,
+                links: args.links,
+                trim: args.trim,
+                ignore: !args.no_ignore,
+                max_depth: args.max_depth,
+                max_length: args.max_length,
+                before_context: args.before_context.unwrap_or(context),
+                after_context: args.after_context.unwrap_or(context),
+                overview: args.overview,
+                overview_only: args.overview_only,
+                branch_each: args.branch_each,
+                pcre2: args.pcre2,
+            },
+            with_bold: !args.no_bold,
+            with_colors: !args.no_color,
+            branch_len,
+            threads,
+            chars,
+            colors: Config::get_colors(&args),
+            selection_file,
+            repeat_file,
             select: args.select,
             menu: args.menu,
             live: args.live,
             live_delay: args.live_delay,
             auto_open: args.auto_open,
             repeat: args.repeat,
-            threads,
             editor: args.editor.clone(),
             open_like: args.open_like.clone(),
-            selection_file,
-            repeat_file,
             completion_target: args.completions,
             keys: Config::get_key_bindings(&args, &matches),
             mouse: !args.no_mouse,
             alternate_screen: !args.no_alternate_screen,
-        };
-        apply_matches(non_search, &matches, false)
+        })
     }
 
     fn get_colors(args: &Args) -> Colors {
         Colors {
-            file: args
-                .file_color
-                .as_ref()
-                .map(|v| v.get())
-                .unwrap_or(style::FILE_COLOR_DEFAULT),
-            dir: args
-                .dir_color
-                .as_ref()
-                .map(|v| v.get())
-                .unwrap_or(style::DIR_COLOR_DEFAULT),
+            file: args.file_color.unwrap_or(style::FILE_COLOR_DEFAULT),
+            dir: args.dir_color.unwrap_or(style::DIR_COLOR_DEFAULT),
             line_number: args
                 .line_number_color
-                .as_ref()
-                .map(|v| v.get())
                 .unwrap_or(style::LINE_NUMBER_COLOR_DEFAULT),
-            text: args.text_color.as_ref().map(|v| v.get()),
-            branch: args.branch_color.as_ref().map(|v| v.get()),
-            selected_bg: args
-                .selected_bg_color
-                .as_ref()
-                .map(|v| v.get())
-                .unwrap_or(style::SELECTED_BG_DEFAULT),
-            selected_indicator: args.selected_indicator_color.as_ref().map(|v| v.get()),
+            text: args.text_color,
+            branch: args.branch_color,
+            selected_bg: args.selected_bg_color.unwrap_or(style::SELECTED_BG_DEFAULT),
+            selected_indicator: args.selected_indicator_color,
             filter_highlight: args
                 .filter_highlight_color
-                .as_ref()
-                .map(|v| v.get())
                 .unwrap_or(style::FILTER_HIGHLIGHT_DEFAULT),
             matches: if args.match_colors.is_empty() {
                 style::MATCHED_COLORS_DEFAULT.to_vec()
             } else {
-                args.match_colors.iter().map(|v| v.get()).collect()
+                args.match_colors.clone()
             },
         }
     }
@@ -781,22 +714,46 @@ fn id_to_flag(id: &str) -> String {
     format!("--{}", id.replace('_', "-"))
 }
 
+fn flag_arg(id: &str, value: impl AsRef<OsStr>) -> OsString {
+    let mut arg = OsString::from(id_to_flag(id));
+    arg.push("=");
+    arg.push(value);
+    arg
+}
+
 impl SearchParams {
     pub fn has_expr(&self) -> bool {
         !self.regexps.is_empty() || !self.scoped.is_empty()
     }
 
+    pub fn input_paths(&self) -> Vec<PathBuf> {
+        match (&self.input, self.input_type) {
+            (Some(raw), Some(InputType::Paths)) => parse_paths(raw),
+            _ => Vec::new(),
+        }
+    }
+
     fn to_args(&self) -> Vec<OsString> {
         let mut args: Vec<OsString> = Vec::new();
         for r in &self.regexps {
-            args.push(format!("{}={r}", id_to_flag(args::REGEXP)).into());
+            args.push(flag_arg(args::REGEXP, r));
         }
         for s in &self.scoped {
-            args.push(format!("{}={}={}", id_to_flag(args::REGEXP_GLOB), s.glob, s.regexp).into());
+            args.push(flag_arg(
+                args::REGEXP_GLOB,
+                format!("{}={}", s.glob, s.regexp),
+            ));
         }
-        args.push(format!("{}={}", id_to_flag(args::PATH), self.path.display()).into());
+        for p in &self.paths {
+            args.push(flag_arg(args::PATH, p));
+        }
+        if self.input.is_some()
+            && let Some(t) = self.input_type.and_then(|t| t.to_possible_value())
+        {
+            args.push(flag_arg(args::INPUT_TYPE, t.get_name()));
+        }
         for g in &self.globs {
-            args.push(format!("{}={g}", id_to_flag(args::GLOB)).into());
+            args.push(flag_arg(args::GLOB, g));
         }
         if self.hidden {
             args.push(id_to_flag(args::HIDDEN).into());
@@ -823,23 +780,22 @@ impl SearchParams {
             args.push(id_to_flag(args::PCRE2).into());
         }
         if let Some(d) = self.max_depth {
-            args.push(format!("{}={d}", id_to_flag(args::MAX_DEPTH)).into());
+            args.push(flag_arg(args::MAX_DEPTH, d.to_string()));
         }
         if let Some(l) = self.max_length {
-            args.push(format!("{}={l}", id_to_flag(args::MAX_LENGTH)).into());
+            args.push(flag_arg(args::MAX_LENGTH, l.to_string()));
         }
         if self.before_context > 0 {
-            args.push(
-                format!(
-                    "{}={}",
-                    id_to_flag(args::BEFORE_CONTEXT),
-                    self.before_context
-                )
-                .into(),
-            );
+            args.push(flag_arg(
+                args::BEFORE_CONTEXT,
+                self.before_context.to_string(),
+            ));
         }
         if self.after_context > 0 {
-            args.push(format!("{}={}", id_to_flag(args::AFTER_CONTEXT), self.after_context).into());
+            args.push(flag_arg(
+                args::AFTER_CONTEXT,
+                self.after_context.to_string(),
+            ));
         }
         if self.overview {
             args.push(id_to_flag(args::OVERVIEW).into());
@@ -848,35 +804,64 @@ impl SearchParams {
             args.push(id_to_flag(args::OVERVIEW_ONLY).into());
         }
         if self.branch_each > 1 {
-            args.push(
-                format!(
-                    "{}={}",
-                    id_to_flag(args::LONG_BRANCHES_EACH),
-                    self.branch_each
-                )
-                .into(),
-            );
+            args.push(flag_arg(
+                args::LONG_BRANCHES_EACH,
+                self.branch_each.to_string(),
+            ));
         }
         args
     }
 }
 
 pub fn save_search_params(file: &Path, config: &Config) -> Result<(), Message> {
-    save_to_repeat_file(file, &config.search.to_args())
+    save_to_repeat_file(
+        file,
+        &config.search.to_args(),
+        config.search.input.as_deref(),
+    )
 }
 
-pub fn save_to_repeat_file(file: &std::path::Path, args: &[OsString]) -> Result<(), Message> {
+fn save_to_repeat_file(
+    file: &Path,
+    args: &[OsString],
+    input: Option<&[u8]>,
+) -> Result<(), Message> {
     let mut buffer = Vec::new();
+    buffer.extend_from_slice(&(args.len() as u32).to_le_bytes());
     for arg in args {
-        let bytes = arg.as_encoded_bytes();
-        let len = bytes.len() as u32;
-        buffer.extend_from_slice(&len.to_le_bytes());
-        buffer.extend_from_slice(bytes);
+        write_record(&mut buffer, arg.as_encoded_bytes());
+    }
+    if let Some(input) = input {
+        write_record(&mut buffer, input);
     }
     std::fs::write(file, buffer).map_err(|e| mes!("{}", e))
 }
 
-pub fn parse_menu_query(query: &str) -> Result<Config, Message> {
+fn write_record(buffer: &mut Vec<u8>, bytes: &[u8]) {
+    buffer.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
+    buffer.extend_from_slice(bytes);
+}
+
+fn take<'a>(data: &'a [u8], pos: &mut usize, len: usize) -> Result<&'a [u8], Message> {
+    let bytes = pos
+        .checked_add(len)
+        .and_then(|end| data.get(*pos..end))
+        .ok_or_else(|| mes!("invalid repeat file"))?;
+    *pos += len;
+    Ok(bytes)
+}
+
+fn read_u32(data: &[u8], pos: &mut usize) -> Result<usize, Message> {
+    let bytes = take(data, pos, size_of::<u32>())?;
+    Ok(u32::from_le_bytes(bytes.try_into().map_err(|e| mes!("{}", e))?) as usize)
+}
+
+fn read_record<'a>(data: &'a [u8], pos: &mut usize) -> Result<&'a [u8], Message> {
+    let len = read_u32(data, pos)?;
+    take(data, pos, len)
+}
+
+pub fn parse_menu_query(query: &str) -> Result<(Config, Option<String>), Message> {
     let base = base_config();
     let tokens = shlex::split(query).ok_or_else(|| mes!("invalid query syntax"))?;
 
@@ -891,13 +876,19 @@ pub fn parse_menu_query(query: &str) -> Result<Config, Message> {
             mes!("{}", e.render().to_string().trim_end())
         })?;
 
+    let explicit =
+        |id: &str| matches.value_source(id) == Some(clap::parser::ValueSource::CommandLine);
+    if explicit(args::INPUT_TYPE) && !explicit(args::INPUT_CMD) {
+        return Err(mes!(
+            "{} requires {} in menu search",
+            id_to_flag(args::INPUT_TYPE),
+            id_to_flag(args::INPUT_CMD)
+        ));
+    }
     let unsupported: Vec<&str> = matches
         .ids()
         .map(|id| id.as_str())
-        .filter(|id| {
-            matches.value_source(id) == Some(clap::parser::ValueSource::CommandLine)
-                && MENU_UNSUPPORTED.contains(id)
-        })
+        .filter(|id| explicit(id) && MENU_UNSUPPORTED.contains(id))
         .collect();
     if !unsupported.is_empty() {
         return Err(mes!(
@@ -911,26 +902,10 @@ pub fn parse_menu_query(query: &str) -> Result<Config, Message> {
     }
 
     let args = Args::from_arg_matches(&matches).map_err(|e| mes!("{}", e))?;
-    let explicit =
-        |id: &str| matches.value_source(id) == Some(clap::parser::ValueSource::CommandLine);
-    let non_search = NonSearchFields {
-        selection_file: base.selection_file.clone(),
-        repeat_file: base.repeat_file.clone(),
-        select: false,
-        menu: true,
-        live: base.live,
-        live_delay: base.live_delay,
-        auto_open: base.auto_open,
-        repeat: base.repeat,
-        threads: base.threads,
-        editor: base.editor.clone(),
-        open_like: base.open_like.clone(),
-        completion_target: base.completion_target,
-        keys: base.keys.clone(),
-        mouse: base.mouse,
-        alternate_screen: base.alternate_screen,
-    };
-    let mut c = apply_matches(non_search, &matches, true)?;
+    let mut c = (*base).clone();
+    c.select = false;
+    c.menu = true;
+    apply_explicit(&mut c, &args, &matches)?;
     let explicit_pattern = explicit(args::POSITIONAL_REGEXP) || explicit(args::REGEXP);
     if explicit(args::FILES) && !explicit_pattern {
         c.search.regexps.clear();
@@ -938,8 +913,7 @@ pub fn parse_menu_query(query: &str) -> Result<Config, Message> {
     if explicit_pattern && !explicit(args::FILES) {
         c.search.files = false;
     }
-    drop(args);
-    Ok(c)
+    Ok((c, args.input_cmd))
 }
 
 #[cfg(test)]
@@ -975,14 +949,14 @@ mod tests {
         T: Into<OsString> + Clone,
     {
         let matches = generate_command().get_matches_from(args);
-        Config::get_config(matches).ok().unwrap()
+        Config::get_config(matches, None).ok().unwrap()
     }
 
     #[test]
     fn test_env_opts() {
         unsafe { std::env::set_var(args::DEFAULT_OPTS_ENV_NAME, EXAMPLE_LONG_OPTS.join(" ")) };
         let matches = get_matches(Vec::new()).unwrap();
-        let config = Config::get_config(matches).ok().unwrap();
+        let config = Config::get_config(matches, None).ok().unwrap();
         check_parsed_config_from_example_opts(config);
     }
 

@@ -128,39 +128,62 @@ nnoremap <leader>tf :call TgrepWith('--files --select')<cr>
 
 ```
 src: 9
-├──term.rs: 1
+├──args.rs: 11
 │  ├──-1: 
-│  ├──15: pub struct Term<'a> {
-│  ╰──+1:     pub height: u16,
-├──style.rs: 1
+│  ├──25: impl ValueEnum for OpenStrategy {
+│  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
 │  ├──-1: 
-│  ├──23: pub struct DisplayRepeater<T>(T, usize);
-│  ╰──+1: impl<T: Display> Display for DisplayRepeater<T> {
-├──match_system.rs: 8
+│  ├──64: impl ValueEnum for CompletionShell {
+│  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
 │  ├──-1: 
-│  ├──23: pub struct Directory {
-│  ├──+1:     pub path: PathBuf,
-│  ├──-1: 
-│  ├──30: impl Directory {
-│  ├──+1:     pub fn new(path: &Path, links: bool) -> Result<Self, Message> {
-│  ├──-1: 
-│  ├──41: pub struct File {
-│  ├──+1:     pub path: PathBuf,
-│  ├──-1: 
-│  ├──47: impl File {
-│  ├──+1:     pub fn from_pathbuf(path: PathBuf, links: bool) -> Result<Self, Message> {
+│  ├──90: impl CompletionShell {
+│  ├──+1:     pub fn generate(&self, cmd: &mut Command, bin: &str, out: &mut dyn std::io::Write) {
+│  ├──-1: #[derive(Clone)]
+│  ├──142: pub struct ColorParser;
+│  ├──+1: 
+│  ├──144: impl clap::builder::TypedValueParser for ColorParser {
+│  ├──+1:     type Value = Color;
+│  ├──-1: #[derive(Clone)]
+│  ├──205: pub struct KeyCodeParser;
+│  ├──+1: 
+│  ├──207: impl clap::builder::TypedValueParser for KeyCodeParser {
+│  ├──+1:     type Value = KeyCode;
 │  ├──-1: #[cfg_attr(test, derive(PartialEq, Debug))]
-│  ├──73: pub struct Match {
-│  ├──+1:     pub regexp_id: usize,
+│  ├──290: pub struct ScopedRegexp {
+│  ├──+1:     pub glob: String,
+│  ├──-1: #[derive(Clone)]
+│  ├──296: pub struct RegexpGlobParser;
+│  ├──+1: 
+│  ├──298: impl clap::builder::TypedValueParser for RegexpGlobParser {
+│  ├──+1:     type Value = ScopedRegexp;
+│  ├──-1: )]
+│  ├──450: pub struct Args {
+│  ╰──+1:     #[arg(
+├──config.rs: 8
+│  ├──-1: #[derive(Clone)]
+│  ├──33: pub struct KeyBindings {
+│  ├──+1:     pub down: Vec<KeyCode>,
+│  ├──-1: #[derive(Clone)]
+│  ├──58: pub struct Characters {
+│  ├──+1:     pub bl: char,
+│  ├──-1: #[derive(Clone)]
+│  ├──79: pub struct Colors {
+│  ├──+1:     pub file: Color,
+│  ├──-1: #[derive(Clone)]
+│  ├──92: pub struct SearchParams {
+│  ├──+1:     pub regexps: Vec<String>,
+│  ├──-1: #[derive(Clone)]
+│  ├──117: pub struct Config {
+│  ├──+1:     pub search: SearchParams,
 │  ├──-1: 
-│  ├──79: impl Match {
-│  ├──+1:     pub fn new(regexp_id: usize, start: usize, end: usize) -> Self {
+│  ├──394: impl Config {
+│  ├──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
 │  ├──-1: 
-│  ├──104: pub struct Line {
-│  ├──+1:     pub content: Vec<u8>,
+│  ├──717: fn flag_arg(id: &str, value: impl AsRef<OsStr>) -> OsString {
+│  ├──+1:     let mut arg = OsString::from(id_to_flag(id));
 │  ├──-1: 
-│  ├──111: impl Line {
-│  ╰──+1:     pub fn new(content: Vec<u8>, mut matches: Vec<Match>, line_num: usize) -> Self {
+│  ├──724: impl SearchParams {
+│  ╰──+1:     pub fn has_expr(&self) -> bool {
 ├──errors.rs: 4
 │  ├──-1: 
 │  ├──14: pub struct Message {
@@ -174,169 +197,146 @@ src: 9
 │  ├──-1: 
 │  ├──40: impl fmt::Display for Message {
 │  ╰──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+├──match_system.rs: 8
+│  ├──-1: 
+│  ├──25: pub struct Directory {
+│  ├──+1:     pub path: PathBuf,
+│  ├──-1: 
+│  ├──32: impl Directory {
+│  ├──+1:     pub fn new(path: &Path, links: bool) -> Result<Self, Message> {
+│  ├──-1: 
+│  ├──43: pub struct File {
+│  ├──+1:     pub path: PathBuf,
+│  ├──-1: 
+│  ├──49: impl File {
+│  ├──+1:     pub fn from_pathbuf(path: PathBuf, links: bool) -> Result<Self, Message> {
+│  ├──-1: #[cfg_attr(test, derive(PartialEq, Debug))]
+│  ├──75: pub struct Match {
+│  ├──+1:     pub regexp_id: usize,
+│  ├──-1: 
+│  ├──81: impl Match {
+│  ├──+1:     pub fn new(regexp_id: usize, start: usize, end: usize) -> Self {
+│  ├──-1: 
+│  ├──106: pub struct Line {
+│  ├──+1:     pub content: Vec<u8>,
+│  ├──-1: 
+│  ├──113: impl Line {
+│  ╰──+1:     pub fn new(content: Vec<u8>, mut matches: Vec<Match>, line_num: usize) -> Self {
 ├──matcher.rs: 5
 │  ├──-1: 
 │  ├──32: struct Matcher {
 │  ├──+1:     patterns: Vec<String>,
 │  ├──-1: 
-│  ├──64: impl Combined {
+│  ├──84: impl Combined {
 │  ├──+1:     fn new(patterns: &[&str], use_pcre2: bool) -> Result<Self, Message> {
 │  ├──-1: 
-│  ├──94: impl Individual {
+│  ├──114: impl Individual {
 │  ├──+1:     fn new(patterns: &[String], use_pcre2: bool) -> Result<Self, Message> {
 │  ├──-1: 
-│  ├──124: impl Matcher {
-│  ├──+1:     fn new(search: &SearchParams, root: &Path) -> Result<Self, Message> {
+│  ├──144: impl Matcher {
+│  ├──+1:     fn new(search: &SearchParams) -> Result<Self, Message> {
 │  ├──-1: 
-│  ├──218: struct MatchSink<'a> {
+│  ├──220: struct MatchSink<'a> {
 │  ╰──+1:     lines: Vec<Line>,
-├──config.rs: 9
-│  ├──-1: #[derive(Clone)]
-│  ├──30: pub struct KeyBindings {
-│  ├──+1:     pub down: Vec<KeyCode>,
-│  ├──-1: #[derive(Clone)]
-│  ├──55: pub struct Characters {
-│  ├──+1:     pub bl: char,
-│  ├──-1: #[derive(Clone)]
-│  ├──76: pub struct Colors {
-│  ├──+1:     pub file: Color,
+├──menu.rs: 8
 │  ├──-1: 
-│  ├──88: impl args::Color {
-│  ├──+1:     fn get(&self) -> Color {
-│  ├──-1: #[derive(Clone)]
-│  ├──107: pub struct SearchParams {
-│  ├──+1:     pub regexps: Vec<String>,
-│  ├──-1: #[derive(Clone)]
-│  ├──130: pub struct Config {
-│  ├──+1:     pub search: SearchParams,
-│  ├──-1: 
-│  ├──457: struct NonSearchFields {
-│  ├──+1:     selection_file: Option<PathBuf>,
-│  ├──-1: 
-│  ├──475: impl Config {
-│  ├──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
-│  ├──-1: 
-│  ├──784: impl SearchParams {
-│  ╰──+1:     pub fn has_expr(&self) -> bool {
-├──args.rs: 11
-│  ├──-1: 
-│  ├──25: impl ValueEnum for OpenStrategy {
-│  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
-│  ├──-1: 
-│  ├──59: impl ValueEnum for CompletionShell {
-│  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
-│  ├──-1: 
-│  ├──85: impl CompletionShell {
-│  ├──+1:     pub fn generate(&self, cmd: &mut Command, bin: &str, out: &mut dyn std::io::Write) {
-│  ├──-1: #[derive(Clone)]
-│  ├──152: pub struct ColorParser;
-│  ├──+1: 
-│  ├──154: impl clap::builder::TypedValueParser for ColorParser {
-│  ├──+1:     type Value = Color;
-│  ├──-1: #[derive(Clone)]
-│  ├──211: pub struct KeyCodeParser;
-│  ├──+1: 
-│  ├──213: impl clap::builder::TypedValueParser for KeyCodeParser {
-│  ├──+1:     type Value = KeyCode;
-│  ├──-1: #[cfg_attr(test, derive(PartialEq, Debug))]
-│  ├──296: pub struct ScopedRegexp {
-│  ├──+1:     pub glob: String,
-│  ├──-1: #[derive(Clone)]
-│  ├──302: pub struct RegexpGlobParser;
-│  ├──+1: 
-│  ├──304: impl clap::builder::TypedValueParser for RegexpGlobParser {
-│  ├──+1:     type Value = ScopedRegexp;
-│  ├──-1: )]
-│  ├──454: pub struct Args {
-│  ╰──+1:     #[arg(
-├──menu.rs: 10
-│  ├──-1: 
-│  ├──59: impl ViewAnchor {
+│  ├──58: impl ViewAnchor {
 │  ├──+1:     fn next(&mut self) {
 │  ├──-1: 
-│  ├──76: impl FoldCycle {
+│  ├──75: impl FoldCycle {
 │  ├──+1:     fn next(&mut self) {
 │  ├──-1: 
-│  ├──86: struct DoubleClick {
+│  ├──85: struct DoubleClick {
 │  ├──+1:     down_row: u16,
 │  ├──-1: 
-│  ├──91: impl DoubleClick {
+│  ├──90: impl DoubleClick {
 │  ├──+1:     fn new() -> Self {
 │  ├──-1: 
-│  ├──118: struct Window {
+│  ├──117: struct Window {
 │  ├──+1:     first: isize,
 │  ├──-1: 
-│  ├──123: impl Window {
+│  ├──122: impl Window {
 │  ├──+1:     fn new() -> Self {
 │  ├──-1: 
-│  ├──529: struct CurrentResults {
-│  ├──+1:     lines: Vec<Box<dyn Entry>>,
-│  ├──-1: 
-│  ├──533: impl CurrentResults {
-│  ├──+1:     fn new(matches: Matches, config: Arc<Config>) -> io::Result<Self> {
-│  ├──-1: 
-│  ├──541: pub struct Menu<'a, 'b> {
+│  ├──528: pub struct Menu<'a, 'b> {
 │  ├──+1:     in_menu: bool,
 │  ├──-1: 
-│  ├──1789: impl OpenStrategy {
+│  ├──1756: impl OpenStrategy {
 │  ╰──+1:     fn from(editor: &str) -> Self {
-╰──writer.rs: 19
+├──style.rs: 1
+│  ├──-1: 
+│  ├──23: pub struct DisplayRepeater<T>(T, usize);
+│  ╰──+1: impl<T: Display> Display for DisplayRepeater<T> {
+├──term.rs: 1
+│  ├──-1: 
+│  ├──15: pub struct Term<'a> {
+│  ╰──+1:     pub height: u16,
+╰──writer.rs: 22
    ├──-1: 
-   ├──56: impl HighlightEvent<'_> {
+   ├──57: impl HighlightEvent<'_> {
    ├──+1:     fn priority(&self) -> u8 {
    ├──-1: 
-   ├──190: pub struct OpenInfo<'a> {
+   ├──68: struct RenderStyle<'a> {
+   ├──+1:     selected: bool,
+   ├──-1: 
+   ├──73: impl RenderStyle<'_> {
+   ├──+1:     fn bg(&self) -> Option<Color> {
+   ├──-1: 
+   ├──218: pub struct OpenInfo<'a> {
    ├──+1:     pub path: &'a Path,
    ├──-1: 
-   ├──203: pub struct WithFilter<'a> {
+   ├──231: pub struct WithFilter<'a> {
    ├──+1:     pub entry: &'a dyn Entry,
    ├──-1: 
-   ├──208: impl Display for WithFilter<'_> {
+   ├──237: impl Display for WithFilter<'_> {
    ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
    ├──-1: 
-   ├──214: struct PathDisplay {
+   ├──243: struct PathDisplay {
    ├──+1:     prefix: Option<Vec<PrefixComponent>>,
    ├──-1: 
-   ├──225: impl PathDisplay {
+   ├──254: impl PathDisplay {
    ├──+1:     fn new(
    ├──-1: 
-   ├──258: impl Entry for PathDisplay {
-   ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
+   ├──287: impl Entry for PathDisplay {
+   ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result {
    ├──-1: 
-   ├──297: impl Display for PathDisplay {
+   ├──330: impl Display for PathDisplay {
    ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
    ├──-1: 
-   ├──355: struct LineDisplay {
+   ├──394: struct LineDisplay {
    ├──+1:     prefix: Vec<PrefixComponent>,
    ├──-1: 
-   ├──366: impl Entry for LineDisplay {
-   ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
+   ├──405: impl Entry for LineDisplay {
+   ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result {
    ├──-1: 
-   ├──505: impl Display for LineDisplay {
+   ├──551: impl Display for LineDisplay {
    ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
    ├──-1: 
-   ├──511: struct LongBranchDisplay {
+   ├──557: struct LongBranchDisplay {
    ├──+1:     prefix: Vec<PrefixComponent>,
    ├──-1: 
-   ├──518: impl Entry for LongBranchDisplay {
-   ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
+   ├──564: impl Entry for LongBranchDisplay {
+   ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result {
    ├──-1: 
-   ├──564: impl Display for LongBranchDisplay {
+   ├──614: impl Display for LongBranchDisplay {
    ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
    ├──-1: 
-   ├──570: struct OverviewDisplay {
+   ├──620: struct OverviewDisplay {
    ├──+1:     dirs: usize,
    ├──-1: 
-   ├──579: impl Entry for OverviewDisplay {
-   ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
+   ├──630: impl OverviewDisplay {
+   ├──+1:     fn add_dir(&mut self, dir: &Directory) {
    ├──-1: 
-   ├──620: impl Display for OverviewDisplay {
+   ├──654: impl Entry for OverviewDisplay {
+   ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result {
+   ├──-1: 
+   ├──699: impl Display for OverviewDisplay {
    ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
    ├──-1: 
-   ├──642: impl Directory {
+   ├──721: impl Directory {
    ├──+1:     fn to_lines(
    ├──-1: 
-   ├──747: impl File {
+   ├──825: impl File {
    ╰──+1:     fn to_lines(
 ```
 </details>
@@ -346,20 +346,22 @@ src: 9
 
 ```
 menu.rs
-+--19: style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
-+--403: Print(format!(
-+--414: Print(format!(
-+--426: Print(format!(
-+--759: queue!(self.term, Print(WithFilter { entry, filter }))?;
-+--762: queue!(self.term, Print(&cfg.chars.ellipsis))?;
-+--781: Print(style::style_with(
-+--789: queue!(self.term, Print(cfg.chars.selected_indicator.as_str()))?;
-+--810: Print(cfg.chars.selected_indicator_clear.as_str()),
-+--1166: Print(top),
-+--1188: Print(display),
-+--1284: Print(line)
-+--1304: queue!(self.term, cursor::MoveTo(0, y), Print(msg))?;
-+--1521: Print(cfg.chars.selected_indicator_clear.as_str())
++--19: style::{Color, Print, ResetColor, SetForegroundColor, Stylize},
++--402: Print(format!(
++--413: Print(format!(
++--425: Print(format!(
++--736: Print(WithFilter {
++--744: queue!(self.term, Print(&cfg.chars.ellipsis))?;
++--760: Print(style::style_with(indicator, c, &cfg).on(b))
++--762: (Some(b), None) => queue!(self.term, Print(indicator.on(b)))?,
++--763: (None, _) => queue!(self.term, Print(indicator))?,
++--783: Print(cfg.chars.selected_indicator_clear.as_str()),
++--1122: Print(&top),
++--1137: Print(hint),
++--1164: Print(display),
++--1260: Print(line)
++--1280: queue!(self.term, cursor::MoveTo(0, y), Print(msg))?;
++--1497: Print(cfg.chars.selected_indicator_clear.as_str())
 ```
 </details>
 
@@ -368,88 +370,82 @@ menu.rs
 
 ```
 treegrep
-├──src
-│  ├──match_system.rs
-│  ├──menu.rs
-│  ├──args.rs
-│  ├──writer.rs
-│  ├──main.rs
-│  ├──errors.rs
-│  ├──style.rs
-│  ├──log.rs
-│  ├──config.rs
-│  ├──matcher.rs
-│  ╰──term.rs
-├──doc
-│  ├──treegrep.vim9.txt
-│  ╰──treegrep.nvim.txt
 ├──.github
 │  ╰──workflows
-│     ├──update_readme
+│     ├──cr.yml
 │     ├──test.yml
-│     ├──update_readme.yml
-│     ╰──cr.yml
+│     ├──update_readme
+│     ╰──update_readme.yml
 ├──benchmarks
 │  ├──runner
 │  ╰──times
+├──doc
+│  ├──treegrep.nvim.txt
+│  ╰──treegrep.vim9.txt
 ├──lua
 │  ╰──treegrep.lua
 ├──plugin
 │  ├──treegrep.el
 │  ╰──treegrep.vim
+├──src
+│  ├──args.rs
+│  ├──config.rs
+│  ├──errors.rs
+│  ├──log.rs
+│  ├──main.rs
+│  ├──match_system.rs
+│  ├──matcher.rs
+│  ├──menu.rs
+│  ├──style.rs
+│  ├──term.rs
+│  ╰──writer.rs
 ├──tests
 │  ├──pool
 │  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
-│  │  ├──summary_dir
-│  │  ├──files_1
-│  │  ├──wide_2
-│  │  ├──links_4
-│  │  ├──links_3
-│  │  ├──links_2
-│  │  ├──menu_jump_2
-│  │  ├──files_long_branch_expr_2
-│  │  ├──summary_file
-│  │  ├──menu_fold_cycle
-│  │  ├──menu_navigate_1
-│  │  ├──glob_exclusion
-│  │  ├──regexp_glob_2
-│  │  ├──no_matches
-│  │  ├──files_long_branch_1
-│  │  ├──context_b1
 │  │  ├──context_a1
-│  │  ├──files_long_branch_expr_count_2
-│  │  ├──pcre2_lookbehind
-│  │  ├──overview_dir
-│  │  ├──menu_filter
-│  │  ├──wide_1
-│  │  ├──files_2
-│  │  ├──menu_search_mode
-│  │  ├──deep
+│  │  ├──context_b1
 │  │  ├──context_c1
-│  │  ├──links_1
-│  │  ├──menu_jump_1
-│  │  ├──overview_file
-│  │  ├──files_long_branch_expr_1
-│  │  ├──overlapping
-│  │  ├──menu_navigate_2
+│  │  ├──deep
 │  │  ├──file
+│  │  ├──files
+│  │  ├──files_long_branch
+│  │  ├──files_long_branch_expr
+│  │  ├──files_long_branch_expr_count
+│  │  ├──files_with_expr
+│  │  ├──glob_exclusion
+│  │  ├──input_cmd
+│  │  ├──input_stdin
+│  │  ├──links
 │  │  ├──max_depth
-│  │  ├──files_long_branch_2
-│  │  ├──regexp_glob_1
 │  │  ├──menu_custom_keys
-│  │  ├──files_long_branch_expr_count_1
-│  │  ╰──files_with_expr
+│  │  ├──menu_filter
+│  │  ├──menu_fold_cycle
+│  │  ├──menu_input_cmd
+│  │  ├──menu_jump
+│  │  ├──menu_navigate
+│  │  ├──menu_search_args
+│  │  ├──menu_search_mode
+│  │  ├──multiple_paths
+│  │  ├──no_matches
+│  │  ├──overlapping
+│  │  ├──overview_dir
+│  │  ├──overview_file
+│  │  ├──pcre2_lookbehind
+│  │  ├──regexp_glob
+│  │  ├──summary_dir
+│  │  ├──summary_file
+│  │  ╰──wide
 │  ├──file_system.rs
 │  ├──tests.rs
 │  ├──tmux.rs
 │  ╰──utils.rs
+├──.gitignore
 ├──Cargo.lock
-├──LICENSE
-├──rustfmt.toml
-├──README.md
 ├──Cargo.toml
-╰──.gitignore
+├──LICENSE
+├──README.md
+╰──rustfmt.toml
 ```
 </details>
 
@@ -458,36 +454,35 @@ treegrep
 
 ```
 treegrep
-├──src
-│  ├──match_system.rs, menu.rs, args.rs, writer.rs, main.rs
-│  ├──errors.rs, style.rs, log.rs, config.rs, matcher.rs
-│  ╰──term.rs
-├──doc
-│  ╰──treegrep.vim9.txt, treegrep.nvim.txt
 ├──.github
 │  ╰──workflows
-│     ╰──update_readme, test.yml, update_readme.yml, cr.yml
+│     ╰──cr.yml, test.yml, update_readme, update_readme.yml
 ├──benchmarks
 │  ╰──runner, times
+├──doc
+│  ╰──treegrep.nvim.txt, treegrep.vim9.txt
 ├──lua
 │  ╰──treegrep.lua
 ├──plugin
 │  ╰──treegrep.el, treegrep.vim
+├──src
+│  ├──args.rs, config.rs, errors.rs, log.rs, main.rs
+│  ├──match_system.rs, matcher.rs, menu.rs, style.rs, term.rs
+│  ╰──writer.rs
 ├──tests
 │  ├──pool
 │  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
-│  │  ├──summary_dir, files_1, wide_2, links_4, links_3
-│  │  ├──links_2, menu_jump_2, files_long_branch_expr_2, summary_file, menu_fold_cycle
-│  │  ├──menu_navigate_1, glob_exclusion, regexp_glob_2, no_matches, files_long_branch_1
-│  │  ├──context_b1, context_a1, files_long_branch_expr_count_2, pcre2_lookbehind, overview_dir
-│  │  ├──menu_filter, wide_1, files_2, menu_search_mode, deep
-│  │  ├──context_c1, links_1, menu_jump_1, overview_file, files_long_branch_expr_1
-│  │  ├──overlapping, menu_navigate_2, file, max_depth, files_long_branch_2
-│  │  ╰──regexp_glob_1, menu_custom_keys, files_long_branch_expr_count_1, files_with_expr
-│  ╰──utils.rs, tests.rs, file_system.rs, tmux.rs
-├──README.md, .gitignore, LICENSE, rustfmt.toml, Cargo.toml
-╰──Cargo.lock
+│  │  ├──context_a1, context_b1, context_c1, deep, file
+│  │  ├──files, files_long_branch, files_long_branch_expr, files_long_branch_expr_count, files_with_expr
+│  │  ├──glob_exclusion, input_cmd, input_stdin, links, max_depth
+│  │  ├──menu_custom_keys, menu_filter, menu_fold_cycle, menu_input_cmd, menu_jump
+│  │  ├──menu_navigate, menu_search_args, menu_search_mode, multiple_paths, no_matches
+│  │  ├──overlapping, overview_dir, overview_file, pcre2_lookbehind, regexp_glob
+│  │  ╰──summary_dir, summary_file, wide
+│  ╰──file_system.rs, tests.rs, tmux.rs, utils.rs
+├──.gitignore, Cargo.lock, Cargo.toml, LICENSE, README.md
+╰──rustfmt.toml
 ```
 </details>
 
@@ -496,28 +491,28 @@ treegrep
 
 ```
 treegrep
-├──src
-│  ├──term.rs
-│  │  ├──20:     with_mouse: bool,
-│  │  ├──28:         with_mouse: bool,
-│  │  ├──38:             with_mouse,
-│  │  ├──59:         if self.with_mouse {
-│  │  ├──65:             let with_mouse = self.with_mouse;
-│  │  ├──68:                 Term::exit(&mut io::stderr(), with_mouse, with_alternate_screen).ok();
-│  │  ├──77:     fn exit<W>(w: &mut W, with_mouse: bool, with_alternate_screen: bool) -> io::Result<()>
-│  │  ├──92:         if with_mouse {
-│  │  ╰──104:         Term::exit(self, self.with_mouse, self.with_alternate_screen)?;
-│  ├──args.rs
-│  │  ╰──684:     pub no_mouse: bool,
-│  ╰──config.rs
-│     ╰──572:             mouse: !args.no_mouse,
-╰──lua
-   ╰──treegrep.lua
-      ├──23: local current_file_path = debug.getinfo(1, 'S').source:sub(2)
-      ├──24: local plugin_name = vim.fn.fnamemodify(current_file_path, ':t:r')
-      ├──25: local project_root = vim.fs.abspath(vim.fs.dirname(vim.fs.dirname(current_file_path)))
-      ├──26: local tgrep_bin = vim.fs.joinpath(project_root, 'target', 'release', 'tgrep')
-      ╰──109:         '--manifest-path=' .. vim.fn.fnameescape(vim.fs.joinpath(project_root, 'Cargo.toml'))
+├──lua
+│  ╰──treegrep.lua
+│     ├──23: local current_file_path = debug.getinfo(1, 'S').source:sub(2)
+│     ├──24: local plugin_name = vim.fn.fnamemodify(current_file_path, ':t:r')
+│     ├──25: local project_root = vim.fs.abspath(vim.fs.dirname(vim.fs.dirname(current_file_path)))
+│     ├──26: local tgrep_bin = vim.fs.joinpath(project_root, 'target', 'release', 'tgrep')
+│     ╰──109:         '--manifest-path=' .. vim.fn.fnameescape(vim.fs.joinpath(project_root, 'Cargo.toml'))
+╰──src
+   ├──args.rs
+   │  ╰──693:     pub no_mouse: bool,
+   ├──config.rs
+   │  ╰──522:             mouse: !args.no_mouse,
+   ╰──term.rs
+      ├──20:     with_mouse: bool,
+      ├──28:         with_mouse: bool,
+      ├──38:             with_mouse,
+      ├──59:         if self.with_mouse {
+      ├──65:             let with_mouse = self.with_mouse;
+      ├──68:                 Term::exit(&mut io::stderr(), with_mouse, with_alternate_screen).ok();
+      ├──77:     fn exit<W>(w: &mut W, with_mouse: bool, with_alternate_screen: bool) -> io::Result<()>
+      ├──92:         if with_mouse {
+      ╰──104:         Term::exit(self, self.with_mouse, self.with_alternate_screen)?;
 ```
 </details>
 
@@ -531,14 +526,14 @@ home page: https://github.com/4imothy/treegrep
 
 regex pattern matcher that displays results in a tree structure with an interface to jump to matched text
 
-tgrep [OPTIONS] <POSITIONAL_REGEXP|--regexp <>|--regexp-glob <glob=regexp>|--files|--completions <>|--menu|--repeat> [POSITIONAL_PATH]
+tgrep [OPTIONS] <POSITIONAL_REGEXP|--regexp <>|--regexp-glob <glob=regexp>|--files|--completions <>|--menu|--repeat> [POSITIONAL_PATH]...
 
 arguments:
   [POSITIONAL_REGEXP]
           a regex expression to search for
 
-  [POSITIONAL_PATH]
-          the path to search, if not provided, search the current directory
+  [POSITIONAL_PATH]...
+          the paths to search, if none provided, search the current directory
 
 options:
   -e, --regexp <>
@@ -548,7 +543,15 @@ options:
           search for a regex expression only in files matching a glob (saved for repeat)
 
   -p, --path <>
-          the path to search, if not provided, search the current directory (saved for repeat)
+          the paths to search, if none provided, search the current directory (saved for repeat)
+
+      --input-cmd <>
+          command whose output is read in place of stdin
+
+      --input-type <>
+          read input as this type (saved for repeat)
+          
+          [possible values: paths]
 
   -s, --select
           results are shown in a selection interface for opening

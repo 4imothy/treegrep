@@ -32,7 +32,6 @@ use std::{
 struct Matcher {
     patterns: Vec<String>,
     pcre2: bool,
-    overrides: Vec<Option<Override>>,
     individual: Individual,
     base_combined: Arc<Combined>,
     full_mask: u64,
@@ -59,6 +58,27 @@ fn build_scoped_override(root: &Path, glob: &str) -> Result<Override, Message> {
     builder
         .build()
         .map_err(|_| mes!("failed to build override for glob {}", glob))
+}
+
+fn scoped_overrides(search: &SearchParams, root: &Path) -> Result<Vec<Option<Override>>, Message> {
+    let mut overrides: Vec<Option<Override>> = search.regexps.iter().map(|_| None).collect();
+    for s in &search.scoped {
+        overrides.push(Some(build_scoped_override(root, &s.glob)?));
+    }
+    Ok(overrides)
+}
+
+fn allowed_mask(overrides: &[Option<Override>], path: &Path) -> u64 {
+    let mut mask = 0;
+    for (id, ov) in overrides.iter().enumerate() {
+        if ov
+            .as_ref()
+            .is_none_or(|ov| !ov.matched(path, false).is_ignore())
+        {
+            mask |= 1 << id;
+        }
+    }
+    mask
 }
 
 impl Combined {
@@ -122,13 +142,9 @@ impl Individual {
 }
 
 impl Matcher {
-    fn new(search: &SearchParams, root: &Path) -> Result<Self, Message> {
+    fn new(search: &SearchParams) -> Result<Self, Message> {
         let mut patterns: Vec<String> = search.regexps.clone();
-        let mut overrides: Vec<Option<Override>> = search.regexps.iter().map(|_| None).collect();
-        for s in &search.scoped {
-            patterns.push(s.regexp.clone());
-            overrides.push(Some(build_scoped_override(root, &s.glob)?));
-        }
+        patterns.extend(search.scoped.iter().map(|s| s.regexp.clone()));
         if patterns.len() > 64 {
             return Err(mes!("at most 64 patterns are supported"));
         }
@@ -140,25 +156,11 @@ impl Matcher {
         Ok(Self {
             patterns,
             pcre2: search.pcre2,
-            overrides,
             individual,
             base_combined,
             full_mask,
             cache: Mutex::new(HashMap::new()),
         })
-    }
-
-    fn allowed_mask(&self, path: &Path) -> u64 {
-        let mut mask = 0;
-        for (id, ov) in self.overrides.iter().enumerate() {
-            if ov
-                .as_ref()
-                .is_none_or(|ov| !ov.matched(path, false).is_ignore())
-            {
-                mask |= 1 << id;
-            }
-        }
-        mask
     }
 
     fn combined_for(&self, mask: u64) -> Result<Arc<Combined>, Message> {
@@ -268,17 +270,7 @@ impl<'a> Sink for MatchSink<'a> {
 }
 
 pub fn search(abort: Arc<AtomicBool>, config: Arc<Config>) -> Result<Option<Matches>, Message> {
-    let override_root = if config.is_dir {
-        config.search.path.clone()
-    } else {
-        config
-            .search
-            .path
-            .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| PathBuf::from("."))
-    };
-    let matchers = Matcher::new(&config.search, &override_root)?;
+    let matcher = Arc::new(Matcher::new(&config.search)?);
     let mut searcher = SearcherBuilder::new()
         .line_number(true)
         .line_terminator(LineTerminator::byte(b'\n'))
@@ -288,48 +280,45 @@ pub fn search(abort: Arc<AtomicBool>, config: Arc<Config>) -> Result<Option<Matc
         .after_context(config.search.after_context)
         .build();
 
-    if config.is_dir {
-        let matchers = Arc::new(matchers);
-        Ok(wrap_dirs(search_dir(
-            &matchers,
-            &mut searcher,
-            abort,
-            config,
-        )?))
-    } else {
-        Ok(wrap_file(
-            search_file(
-                config.search.path.to_path_buf(),
-                &matchers,
-                &mut searcher,
-                &config,
-            )?,
-            config.search.files && !config.search.has_expr(),
-        ))
+    let input_paths = config.search.input_paths();
+    let mut roots = Vec::new();
+    for path in config.search.paths.iter().chain(&input_paths) {
+        if abort.load(Ordering::Relaxed) {
+            break;
+        }
+        let root = if path.is_dir() {
+            let overrides = Arc::new(scoped_overrides(&config.search, path)?);
+            wrap_dirs(search_dir(
+                path,
+                &matcher,
+                &overrides,
+                &searcher,
+                Arc::clone(&abort),
+                Arc::clone(&config),
+            )?)
+        } else {
+            let parent = path.parent().unwrap_or(Path::new("."));
+            let overrides = scoped_overrides(&config.search, parent)?;
+            wrap_file(
+                search_file(path.clone(), &matcher, &overrides, &mut searcher, &config)?,
+                config.search.files && !config.search.has_expr(),
+            )
+        };
+        roots.extend(root);
     }
+    Ok((!roots.is_empty()).then_some(roots))
 }
 
 fn search_dir(
-    matchers: &Arc<Matcher>,
-    searcher: &mut Searcher,
-    abort: Arc<AtomicBool>,
-    config: Arc<Config>,
-) -> Result<Vec<Directory>, Message> {
-    let path = config.search.path.clone();
-    let globs = config.search.globs.clone();
-    search_dir_impl(&path, &globs, matchers, searcher, abort, config)
-}
-
-fn search_dir_impl(
-    path: &PathBuf,
-    globs: &[String],
-    matchers: &Arc<Matcher>,
-    searcher: &mut Searcher,
+    path: &Path,
+    matcher: &Arc<Matcher>,
+    overrides: &Arc<Vec<Option<Override>>>,
+    searcher: &Searcher,
     abort: Arc<AtomicBool>,
     config: Arc<Config>,
 ) -> Result<Vec<Directory>, Message> {
     let mut override_builder = OverrideBuilder::new(path);
-    for glob in globs {
+    for glob in &config.search.globs {
         override_builder
             .add(glob)
             .map_err(|_| mes!("glob {} is invalid", glob))?;
@@ -357,7 +346,8 @@ fn search_dir_impl(
 
     walker.run(|| {
         let tx = tx.clone();
-        let matchers = Arc::clone(matchers);
+        let matcher = Arc::clone(matcher);
+        let overrides = Arc::clone(overrides);
         let mut searcher = searcher.clone();
         let abort = Arc::clone(&abort);
         let config = Arc::clone(&config);
@@ -379,7 +369,7 @@ fn search_dir_impl(
             }
 
             let path = entry.into_path();
-            match search_file(path, &matchers, &mut searcher, &config) {
+            match search_file(path, &matcher, &overrides, &mut searcher, &config) {
                 Ok(Some(file)) => {
                     let _ = tx.send(file);
                 }
@@ -408,6 +398,7 @@ fn search_dir_impl(
 fn search_file(
     pb: PathBuf,
     matcher: &Matcher,
+    overrides: &[Option<Override>],
     searcher: &mut Searcher,
     config: &Config,
 ) -> Result<Option<File>, Message> {
@@ -415,7 +406,7 @@ fn search_file(
         return Ok(Some(File::from_pathbuf(pb, config.search.links)?));
     }
 
-    let mask = matcher.allowed_mask(&pb);
+    let mask = allowed_mask(overrides, &pb);
     if mask == 0 {
         return Ok(None);
     }
@@ -471,6 +462,20 @@ fn build_directory_tree(
             )?;
             directories[dir_idx].files.push(file);
         }
+    }
+
+    for i in 0..directories.len() {
+        let mut children = std::mem::take(&mut directories[i].children);
+        children.sort_unstable_by(|&a, &b| {
+            directories[a]
+                .path
+                .as_os_str()
+                .cmp(directories[b].path.as_os_str())
+        });
+        let dir = &mut directories[i];
+        dir.children = children;
+        dir.files
+            .sort_unstable_by(|a, b| a.path.as_os_str().cmp(b.path.as_os_str()));
     }
 
     Ok(directories)

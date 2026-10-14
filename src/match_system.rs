@@ -3,19 +3,21 @@
 use crate::errors::Message;
 use std::path::{Path, PathBuf};
 
-pub fn wrap_dirs(dirs: Vec<Directory>) -> Option<Matches> {
+pub fn wrap_dirs(dirs: Vec<Directory>) -> Option<Root> {
     if dirs.first().unwrap().children.is_empty() && dirs.first().unwrap().files.is_empty() {
         return None;
     }
-    Some(Matches::Dir(dirs))
+    Some(Root::Dir(dirs))
 }
 
-pub fn wrap_file(file: Option<File>, files_no_regex: bool) -> Option<Matches> {
+pub fn wrap_file(file: Option<File>, files_no_regex: bool) -> Option<Root> {
     file.filter(|f| !f.lines.is_empty() || files_no_regex)
-        .map(Matches::File)
+        .map(Root::File)
 }
 
-pub enum Matches {
+pub type Matches = Vec<Root>;
+
+pub enum Root {
     Dir(Vec<Directory>),
     File(File),
 }

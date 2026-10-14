@@ -11,16 +11,15 @@ use crate::{
 };
 use crossbeam_channel::{Receiver, Sender};
 
-type SearchResult = (Matches, Arc<Config>);
+type SearchResult = (u64, Result<(Option<Matches>, Arc<Config>), String>);
 use crossterm::{
     cursor, event,
     event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEventKind},
     queue,
-    style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
+    style::{Color, Print, ResetColor, SetForegroundColor, Stylize},
     terminal::{self, ClearType},
 };
 use std::{
-    collections::HashSet,
     ffi::OsString,
     io::{self, Write},
     process::Command,
@@ -514,7 +513,7 @@ fn help_popup() -> String {
         "text bars\n\
          {}\n\
          modes\n\
-         \x20- search ({sp})  {}/backtab → navigate, esc → navigate\n\
+         \x20- search ({sp})  {} → search and navigate, backtab/esc → navigate\n\
          \x20- filter ({fp})  enter/backtab → navigate, esc → clear and navigate\n\
          \x20- navigate ({np})\n\
          {}\n\
@@ -526,18 +525,6 @@ fn help_popup() -> String {
     )
 }
 
-struct CurrentResults {
-    lines: Vec<Box<dyn Entry>>,
-}
-
-impl CurrentResults {
-    fn new(matches: Matches, config: Arc<Config>) -> io::Result<Self> {
-        let lines =
-            matches_to_display_lines(&matches, config).map_err(|e| io::Error::other(e.mes))?;
-        Ok(CurrentResults { lines })
-    }
-}
-
 pub struct Menu<'a, 'b> {
     in_menu: bool,
     needs_search: bool,
@@ -545,19 +532,19 @@ pub struct Menu<'a, 'b> {
     filter: String,
     search_cursor: usize,
     term: &'a mut Term<'b>,
-    current: Option<Box<CurrentResults>>,
+    lines: Vec<Box<dyn Entry>>,
     mode: Mode,
     error_msg: Option<String>,
     search_gen: u64,
     search_started: Option<Instant>,
     abort: Arc<AtomicBool>,
-    result_rx: Receiver<(u64, Result<Option<SearchResult>, String>)>,
-    result_tx: Sender<(u64, Result<Option<SearchResult>, String>)>,
+    result_rx: Receiver<SearchResult>,
+    result_tx: Sender<SearchResult>,
     selected_id: usize,
     cursor_y: u16,
     max: usize,
     jump: ViewAnchor,
-    folded: HashSet<usize>,
+    folded: Vec<bool>,
     fold_cycle: FoldCycle,
     visible: Vec<usize>,
     big_jump: u16,
@@ -565,8 +552,9 @@ pub struct Menu<'a, 'b> {
     bars_below: u16,
     term_height: u16,
     window: Window,
-    pending_save: bool,
+    last_input: Option<Arc<[u8]>>,
     debounce_deadline: Option<Instant>,
+    input_pending: bool,
 }
 
 impl<'a, 'b> Menu<'a, 'b> {
@@ -580,7 +568,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             search: String::new(),
             search_cursor: 0,
             term,
-            current: None,
+            lines: Vec::new(),
             mode: if in_menu {
                 Mode::Search
             } else {
@@ -596,7 +584,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             cursor_y: in_menu as u16,
             max: 0,
             jump: ViewAnchor::Middle,
-            folded: HashSet::new(),
+            folded: Vec::new(),
             fold_cycle: FoldCycle::None,
             visible: Vec::new(),
             big_jump: (term_height / 5).max(1),
@@ -605,8 +593,9 @@ impl<'a, 'b> Menu<'a, 'b> {
             bars_below: 0,
             term_height,
             window: Window::new(),
-            pending_save: false,
+            last_input: None,
             debounce_deadline: None,
+            input_pending: false,
         }
     }
 
@@ -633,10 +622,6 @@ impl<'a, 'b> Menu<'a, 'b> {
         config::base_config().chars.selected_indicator_clear.len() as u16
     }
 
-    fn lines(&self) -> &[Box<dyn Entry + 'static>] {
-        self.current.as_ref().map_or(&[], |c| &c.lines)
-    }
-
     fn open_result(
         &mut self,
         path: OsString,
@@ -648,11 +633,7 @@ impl<'a, 'b> Menu<'a, 'b> {
 
     fn update_visible(&mut self) {
         let lower = self.filter.to_lowercase();
-        let lines = self
-            .current
-            .as_ref()
-            .map(|c| c.lines.as_slice())
-            .unwrap_or(&[]);
+        let lines = &self.lines;
         let include = if lower.is_empty() {
             None
         } else {
@@ -679,7 +660,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             if include.as_ref().is_none_or(|inc| inc[i]) {
                 visible.push(i);
             }
-            i = if self.folded.contains(&i) {
+            i = if self.folded[i] {
                 fold_end(i, lines)
             } else {
                 i + 1
@@ -701,12 +682,10 @@ impl<'a, 'b> Menu<'a, 'b> {
             return false;
         }
         let orig = self.visible[self.selected_id];
-        if !self.lines().get(orig).is_some_and(|l| l.is_path()) {
+        if !self.lines.get(orig).is_some_and(|l| l.is_path()) {
             return false;
         }
-        if !self.folded.remove(&orig) {
-            self.folded.insert(orig);
-        }
+        self.folded[orig] = !self.folded[orig];
         self.fold_cycle = FoldCycle::None;
         self.update_visible();
         true
@@ -718,11 +697,11 @@ impl<'a, 'b> Menu<'a, 'b> {
         }
         self.fold_cycle.next();
         let state = self.fold_cycle;
-        let lines = self.lines();
+        let lines = &self.lines;
         let folded = match state {
-            FoldCycle::None => HashSet::new(),
+            FoldCycle::None => vec![false; lines.len()],
             FoldCycle::Dirs => (0..lines.len())
-                .filter(|&i| {
+                .map(|i| {
                     lines[i].is_path() && {
                         let depth = lines[i].depth();
                         let end = fold_end(i, lines);
@@ -733,7 +712,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                 })
                 .collect(),
             FoldCycle::Files => (0..lines.len())
-                .filter(|&i| {
+                .map(|i| {
                     lines[i].is_path() && {
                         let end = fold_end(i, lines);
                         end > i + 1 && !(i + 1..end).any(|j| lines[j].is_path())
@@ -748,16 +727,19 @@ impl<'a, 'b> Menu<'a, 'b> {
         true
     }
 
-    fn print_line(&mut self, orig: usize) -> io::Result<()> {
-        let lines = self
-            .current
-            .as_ref()
-            .map(|c| c.lines.as_slice())
-            .unwrap_or(&[]);
+    fn print_line(&mut self, orig: usize, selected: bool) -> io::Result<()> {
+        let lines = &self.lines;
         let entry = &*lines[orig];
         let filter = self.filter.as_str();
-        queue!(self.term, Print(WithFilter { entry, filter }))?;
-        if self.folded.contains(&orig) && fold_end(orig, lines) > orig + 1 {
+        queue!(
+            self.term,
+            Print(WithFilter {
+                entry,
+                filter,
+                selected
+            })
+        )?;
+        if self.folded[orig] && fold_end(orig, lines) > orig + 1 {
             let cfg = config::base_config();
             queue!(self.term, Print(&cfg.chars.ellipsis))?;
         }
@@ -769,28 +751,20 @@ impl<'a, 'b> Menu<'a, 'b> {
             return Ok(());
         }
         let cfg = config::base_config();
+        let bg = cfg.with_colors.then_some(cfg.colors.selected_bg);
+        let indicator = cfg.chars.selected_indicator.as_str();
         queue!(self.term, cursor::MoveTo(0, self.cursor_y))?;
-        if cfg.with_colors {
-            queue!(self.term, SetBackgroundColor(cfg.colors.selected_bg))?;
-        }
-        if cfg.with_colors
-            && let Some(c) = cfg.colors.selected_indicator
-        {
-            queue!(
+        match (bg, cfg.colors.selected_indicator) {
+            (Some(b), Some(c)) => queue!(
                 self.term,
-                Print(style::style_with(
-                    cfg.chars.selected_indicator.as_str(),
-                    c,
-                    &cfg,
-                )),
-                SetBackgroundColor(cfg.colors.selected_bg)
-            )?;
-        } else {
-            queue!(self.term, Print(cfg.chars.selected_indicator.as_str()))?;
+                Print(style::style_with(indicator, c, &cfg).on(b))
+            )?,
+            (Some(b), None) => queue!(self.term, Print(indicator.on(b)))?,
+            (None, _) => queue!(self.term, Print(indicator))?,
         }
         queue!(self.term, cursor::MoveTo(Self::start_x(), self.cursor_y))?;
         let orig = self.visible[self.selected_id];
-        self.print_line(orig)
+        self.print_line(orig, true)
     }
 
     fn top_visible(&self) -> bool {
@@ -805,13 +779,12 @@ impl<'a, 'b> Menu<'a, 'b> {
         let cfg = config::base_config();
         queue!(
             self.term,
-            ResetColor,
             cursor::MoveTo(0, self.cursor_y),
             Print(cfg.chars.selected_indicator_clear.as_str()),
             cursor::MoveTo(Self::start_x(), self.cursor_y),
         )?;
         let orig = self.visible[self.selected_id];
-        self.print_line(orig)
+        self.print_line(orig, false)
     }
 
     fn scroll_fill(&mut self, scrolling_down: bool) -> io::Result<()> {
@@ -851,7 +824,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             .flatten();
         if let Some(orig) = orig {
             queue!(self.term, cursor::MoveTo(Self::start_x(), fill_y))?;
-            self.print_line(orig)?;
+            self.print_line(orig, false)?;
         }
         Ok(())
     }
@@ -886,7 +859,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                 terminal::Clear(ClearType::CurrentLine),
                 cursor::MoveTo(Self::start_x(), row)
             )?;
-            self.print_line(orig)?;
+            self.print_line(orig, false)?;
         }
         for y in (start_row + actual_take as u16)..(self.start_y() + ch) {
             queue!(
@@ -991,7 +964,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         if self.visible.is_empty() {
             return false;
         }
-        let lines = self.lines();
+        let lines = &self.lines;
         let d = self.visible[self.selected_id + 1..]
             .iter()
             .position(|&o| lines[o].is_path());
@@ -1005,7 +978,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         if self.visible.is_empty() {
             return false;
         }
-        let lines = self.lines();
+        let lines = &self.lines;
         let i = self.visible[..self.selected_id]
             .iter()
             .rposition(|&o| lines[o].is_path());
@@ -1019,7 +992,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         if self.visible.is_empty() {
             return false;
         }
-        let lines = self.lines();
+        let lines = &self.lines;
         let orig = self.visible[self.selected_id];
         if !lines[orig].is_path() {
             return self.down_path();
@@ -1038,7 +1011,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         if self.visible.is_empty() {
             return false;
         }
-        let lines = self.lines();
+        let lines = &self.lines;
         let orig = self.visible[self.selected_id];
         if !lines[orig].is_path() {
             return self.up_path();
@@ -1079,8 +1052,9 @@ impl<'a, 'b> Menu<'a, 'b> {
         }
     }
 
-    fn trigger_search(&mut self) {
+    fn trigger_search(&mut self, submit: bool) {
         self.needs_search = false;
+        self.input_pending = false;
         self.search_gen += 1;
         let search_id = self.search_gen;
         self.abort.store(true, Ordering::Relaxed);
@@ -1091,23 +1065,27 @@ impl<'a, 'b> Menu<'a, 'b> {
             return;
         }
         match config::parse_menu_query(&self.search) {
-            Ok(new_config) => {
+            Ok((mut new_config, input_cmd)) => {
                 if !new_config.search.has_expr() && !new_config.search.files {
                     self.error_msg = None;
                     self.apply_results(None);
                     return;
                 }
                 self.error_msg = None;
-                let new_config = Arc::new(new_config);
-                let thread_config = Arc::clone(&new_config);
+                let mut run_cmd = None;
+                if let Some(cmd) = input_cmd {
+                    if submit {
+                        run_cmd = Some(cmd);
+                    } else {
+                        self.input_pending = true;
+                        new_config.search.input = self.last_input.clone();
+                    }
+                }
                 self.search_started = Some(Instant::now());
                 let abort = Arc::clone(&self.abort);
                 let tx = self.result_tx.clone();
                 std::thread::spawn(move || {
-                    let result = matcher::search(abort, thread_config.clone())
-                        .map(|opt| opt.map(|m| (m, thread_config)))
-                        .map_err(|e| e.mes);
-                    let _ = tx.send((search_id, result));
+                    let _ = tx.send((search_id, run_search(abort, new_config, run_cmd, submit)));
                 });
             }
             Err(msg) => {
@@ -1117,37 +1095,16 @@ impl<'a, 'b> Menu<'a, 'b> {
         }
     }
 
-    fn apply_results(&mut self, result: Option<SearchResult>) {
+    fn apply_results(&mut self, result: Option<(Matches, Arc<Config>)>) {
         self.search_started = None;
-        self.current = None;
-        if let Some((m, config)) = result
-            && let Ok(r) = CurrentResults::new(m, config)
-        {
-            self.current = Some(Box::new(r));
-        }
-        if self.pending_save {
-            self.pending_save = false;
-            if self.current.is_some() {
-                self.save_query_for_repeat();
-            }
-        }
+        self.lines = result
+            .and_then(|(m, config)| matches_to_display_lines(&m, config).ok())
+            .unwrap_or_default();
         self.selected_id = 0;
         self.cursor_y = self.start_y();
-        self.folded.clear();
+        self.folded = vec![false; self.lines.len()];
         self.fold_cycle = FoldCycle::None;
         self.update_visible();
-    }
-
-    fn save_query_for_repeat(&self) {
-        let cfg = config::base_config();
-        let Some(file) = &cfg.repeat_file else {
-            return;
-        };
-        if self.search.is_empty() {
-            let _ = config::save_search_params(file, &cfg);
-        } else if let Ok(merged) = config::parse_menu_query(&self.search) {
-            let _ = config::save_search_params(file, &merged);
-        }
     }
 
     fn queue_query_bar(&mut self) -> io::Result<()> {
@@ -1160,11 +1117,31 @@ impl<'a, 'b> Menu<'a, 'b> {
         let (top, _) = bar_display(prompt, &self.search, self.search_cursor, width);
         queue!(
             self.term,
-            ResetColor,
             cursor::MoveTo(0, TOP_ROW),
             terminal::Clear(ClearType::CurrentLine),
-            Print(top),
-        )
+            Print(&top),
+        )?;
+        if self.input_pending {
+            let hint = format!(
+                "input command runs on {}",
+                format_keys(&cfg.keys.submit_search)
+            );
+            let hint_len = hint.chars().count();
+            if top.chars().count() + 1 + hint_len <= width {
+                if cfg.with_colors {
+                    queue!(self.term, style::DIM)?;
+                }
+                queue!(
+                    self.term,
+                    cursor::MoveTo((width - hint_len) as u16, TOP_ROW),
+                    Print(hint),
+                )?;
+                if cfg.with_colors {
+                    queue!(self.term, style::RESET)?;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn queue_filter_bar(&mut self) -> io::Result<()> {
@@ -1182,7 +1159,6 @@ impl<'a, 'b> Menu<'a, 'b> {
         );
         queue!(
             self.term,
-            ResetColor,
             cursor::MoveTo(0, y),
             terminal::Clear(ClearType::CurrentLine),
             Print(display),
@@ -1384,7 +1360,7 @@ impl<'a, 'b> Menu<'a, 'b> {
             return Ok(Loop::Continue);
         }
         let orig = self.visible[self.selected_id];
-        let info = match self.current.as_ref().map(|c| c.lines[orig].open_info()) {
+        let info = match self.lines.get(orig).map(|l| l.open_info()) {
             Some(Ok(info)) => info,
             Some(Err(mes)) => {
                 draw_popup(self.term, &mes.mes)?;
@@ -1534,7 +1510,7 @@ impl<'a, 'b> Menu<'a, 'b> {
         loop {
             if self.debounce_deadline.is_some_and(|d| Instant::now() >= d) {
                 self.debounce_deadline = None;
-                self.trigger_search();
+                self.trigger_search(false);
                 self.draw_results()?;
                 self.draw_query()?;
                 self.draw_filter()?;
@@ -1543,9 +1519,10 @@ impl<'a, 'b> Menu<'a, 'b> {
             while let Ok((id, result)) = self.result_rx.try_recv() {
                 if id == self.search_gen {
                     match result {
-                        Ok(r) => {
+                        Ok((m, config)) => {
+                            self.last_input = config.search.input.clone();
                             self.error_msg = None;
-                            self.apply_results(r);
+                            self.apply_results(m.map(|m| (m, config)));
                         }
                         Err(e) => {
                             self.error_msg = Some(e);
@@ -1570,7 +1547,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                     .is_some_and(|t| t.elapsed() > Duration::from_millis(150))
                     && !self.visible.is_empty()
                 {
-                    self.current = None;
+                    self.lines.clear();
                     self.visible.clear();
                     self.draw_results()?;
                     self.draw_query()?;
@@ -1651,33 +1628,23 @@ impl<'a, 'b> Menu<'a, 'b> {
                                 if is_jump { Loop::Continue } else { r }
                             } else {
                                 let cfg = config::base_config();
-                                if code == KeyCode::BackTab
-                                    || cfg.keys.submit_search.contains(&code)
-                                {
-                                    let had_pending_debounce =
-                                        self.debounce_deadline.take().is_some();
-                                    if cfg.live {
-                                        if had_pending_debounce && !self.search.is_empty() {
-                                            self.trigger_search();
-                                            self.pending_save = true;
-                                        } else if self.current.is_some() && !self.search.is_empty()
-                                        {
-                                            self.save_query_for_repeat();
-                                        }
-                                    } else {
-                                        if !self.search.is_empty() {
-                                            self.trigger_search();
-                                            self.pending_save = true;
-                                        }
+                                if cfg.keys.submit_search.contains(&code) {
+                                    self.debounce_deadline = None;
+                                    if !self.search.is_empty() {
+                                        self.trigger_search(true);
                                     }
                                     self.mode = Mode::Navigate;
                                     self.draw_results()?;
                                     self.draw_query()?;
                                     self.draw_filter()?;
-                                } else if code == KeyCode::Esc {
-                                    self.debounce_deadline = None;
+                                } else if code == KeyCode::BackTab || code == KeyCode::Esc {
+                                    if self.debounce_deadline.take().is_some() {
+                                        self.trigger_search(false);
+                                    }
                                     self.mode = Mode::Navigate;
+                                    self.draw_results()?;
                                     self.draw_query()?;
+                                    self.draw_filter()?;
                                 } else {
                                     let changed = edit_bar(
                                         &mut self.search,
@@ -1698,7 +1665,7 @@ impl<'a, 'b> Menu<'a, 'b> {
                                                     self.draw_query()?;
                                                     self.draw_filter()?;
                                                 } else {
-                                                    self.trigger_search();
+                                                    self.trigger_search(false);
                                                     if !event::poll(Duration::ZERO)? {
                                                         self.draw_results()?;
                                                         self.draw_query()?;
@@ -1860,4 +1827,24 @@ pub fn open_path(mut path: OsString, line_num: Option<usize>) -> io::Result<()> 
         cmd.spawn()?;
         Ok(())
     }
+}
+
+fn run_search(
+    abort: Arc<AtomicBool>,
+    mut config: Config,
+    cmd: Option<String>,
+    save: bool,
+) -> Result<(Option<Matches>, Arc<Config>), String> {
+    if let Some(cmd) = cmd {
+        config.search.input = Some(config::run_input_cmd(&cmd).map_err(|e| e.mes)?);
+    }
+    if save
+        && !abort.load(Ordering::Relaxed)
+        && let Some(file) = &config.repeat_file
+    {
+        let _ = config::save_search_params(file, &config);
+    }
+    let config = Arc::new(config);
+    let matches = matcher::search(abort, Arc::clone(&config)).map_err(|e| e.mes)?;
+    Ok((matches, config))
 }

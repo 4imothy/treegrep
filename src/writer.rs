@@ -3,13 +3,14 @@
 use crate::{
     config::Config,
     errors::Message,
-    match_system::{Directory, File, Match, Matches},
+    match_system::{Directory, File, Match, Matches, Root},
     mes, style,
     term::{TERM_WIDTH, Term},
 };
 use core::fmt::{self, Display};
-use crossterm::style::Color;
+use crossterm::style::{Color, Stylize};
 use std::{
+    collections::HashSet,
     io::{self, Write},
     path::{Path, PathBuf},
     sync::{Arc, atomic::Ordering},
@@ -64,28 +65,55 @@ impl HighlightEvent<'_> {
     }
 }
 
+struct RenderStyle<'a> {
+    selected: bool,
+    config: &'a Config,
+}
+
+impl RenderStyle<'_> {
+    fn bg(&self) -> Option<Color> {
+        (self.selected && self.config.with_colors).then_some(self.config.colors.selected_bg)
+    }
+}
+
+fn write_plain(f: &mut fmt::Formatter, text: &str, bg: Option<Color>) -> fmt::Result {
+    match bg {
+        Some(c) => write!(f, "{}", text.on(c)),
+        None => f.write_str(text),
+    }
+}
+
 fn write_segment(
     f: &mut fmt::Formatter,
     seg: &str,
     regex_m: Option<&Match>,
     in_filter: bool,
     text_fg: Option<Color>,
-    config: &Config,
+    rs: &RenderStyle,
 ) -> fmt::Result {
+    let (bg, config) = (rs.bg(), rs.config);
     let sh = config.colors.filter_highlight;
     match (regex_m, in_filter) {
         (Some(m), true) => {
             let fg = config.colors.matches[m.regexp_id % config.colors.matches.len()];
             write!(f, "{}", style::style_with_on(seg, fg, sh, config))
         }
-        (Some(m), false) => write!(f, "{}", style::match_substring(seg, m.regexp_id, config)),
+        (Some(m), false) => write!(
+            f,
+            "{}",
+            style::with_bg(style::match_substring(seg, m.regexp_id, config), bg)
+        ),
         (None, true) => match text_fg {
             Some(c) => write!(f, "{}", style::style_with_on(seg, c, sh, config)),
             None => write!(f, "{}", style::style_on(seg, sh, config)),
         },
         (None, false) => match text_fg {
-            Some(c) => write!(f, "{}", style::style_with(seg, c, config)),
-            None => f.write_str(seg),
+            Some(c) => write!(
+                f,
+                "{}",
+                style::with_bg(style::style_with(seg, c, config), bg)
+            ),
+            None => write_plain(f, seg, bg),
         },
     }
 }
@@ -124,7 +152,7 @@ fn write_content_with_highlights(
     cut: usize,
     text_fg: Option<Color>,
     filter: &str,
-    config: &Config,
+    rs: &RenderStyle,
 ) -> fmt::Result {
     let content_cow = String::from_utf8_lossy(raw);
     let content: &str = &content_cow;
@@ -162,7 +190,7 @@ fn write_content_with_highlights(
                 regex_m,
                 in_filter,
                 text_fg,
-                config,
+                rs,
             )?;
             pos = *event_pos;
         }
@@ -174,7 +202,7 @@ fn write_content_with_highlights(
         }
     }
     if pos < content.len() {
-        write_segment(f, &content[pos..], regex_m, in_filter, text_fg, config)?;
+        write_segment(f, &content[pos..], regex_m, in_filter, text_fg, rs)?;
     }
     Ok(())
 }
@@ -193,7 +221,7 @@ pub struct OpenInfo<'a> {
 }
 
 pub trait Entry: Display {
-    fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result;
+    fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result;
     fn open_info(&self) -> Result<OpenInfo<'_>, Message>;
     fn depth(&self) -> usize;
     fn is_path(&self) -> bool;
@@ -203,11 +231,12 @@ pub trait Entry: Display {
 pub struct WithFilter<'a> {
     pub entry: &'a dyn Entry,
     pub filter: &'a str,
+    pub selected: bool,
 }
 
 impl Display for WithFilter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.entry.render(f, self.filter)
+        self.entry.render(f, self.filter, self.selected)
     }
 }
 
@@ -256,9 +285,13 @@ impl PathDisplay {
 }
 
 impl Entry for PathDisplay {
-    fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
+    fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result {
+        let rs = RenderStyle {
+            selected,
+            config: &self.config,
+        };
         if let Some(p) = &self.prefix {
-            write_prefix(f, p, &self.config)?;
+            write_prefix(f, p, &rs)?;
         }
         write_path(
             f,
@@ -267,7 +300,7 @@ impl Entry for PathDisplay {
             self.linked.as_deref(),
             self.count,
             filter,
-            &self.config,
+            &rs,
         )?;
         if self.new_line {
             writeln!(f)?;
@@ -296,7 +329,7 @@ impl Entry for PathDisplay {
 
 impl Display for PathDisplay {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.render(f, "")
+        self.render(f, "", false)
     }
 }
 
@@ -307,22 +340,23 @@ fn write_path(
     linked: Option<&str>,
     count: usize,
     filter: &str,
-    config: &Config,
+    rs: &RenderStyle,
 ) -> fmt::Result {
+    let (bg, config) = (rs.bg(), rs.config);
     if cfg!(feature = "test") {
         write!(f, "[ps]{}[pe]", name)?;
         if let Some(l) = linked {
             write!(f, " -> [ps]{}[pe]", l)?;
         }
     } else {
-        write_content_with_highlights(f, name.as_bytes(), &[], 0, Some(color), filter, config)?;
+        write_content_with_highlights(f, name.as_bytes(), &[], 0, Some(color), filter, rs)?;
         if let Some(l) = linked {
-            f.write_str(" -> ")?;
-            write_content_with_highlights(f, l.as_bytes(), &[], 0, Some(color), filter, config)?;
+            write_plain(f, " -> ", bg)?;
+            write_content_with_highlights(f, l.as_bytes(), &[], 0, Some(color), filter, rs)?;
         }
     }
     if config.search.count && count > 0 {
-        write!(f, ": {}", count)?;
+        write_plain(f, &format!(": {}", count), bg)?;
     }
     if config.with_colors || config.with_bold {
         write!(f, "{}", style::RESET)?;
@@ -333,8 +367,9 @@ fn write_path(
 fn write_prefix(
     f: &mut fmt::Formatter,
     prefix_components: &[PrefixComponent],
-    config: &Config,
+    rs: &RenderStyle,
 ) -> fmt::Result {
+    let (bg, config) = (rs.bg(), rs.config);
     let mut prefix: String = String::new();
     prefix.reserve(config.chars.spacer.len() * prefix_components.len());
     for c in prefix_components {
@@ -346,9 +381,13 @@ fn write_prefix(
         });
     }
     if let Some(c) = config.colors.branch {
-        write!(f, "{}", style::style_with(&prefix, c, config))
+        write!(
+            f,
+            "{}",
+            style::with_bg(style::style_with(&prefix, c, config), bg)
+        )
     } else {
-        f.write_str(&prefix)
+        write_plain(f, &prefix, bg)
     }
 }
 
@@ -364,8 +403,12 @@ struct LineDisplay {
 }
 
 impl Entry for LineDisplay {
-    fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
-        write_prefix(f, &self.prefix, &self.config)?;
+    fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result {
+        let rs = RenderStyle {
+            selected,
+            config: &self.config,
+        };
+        write_prefix(f, &self.prefix, &rs)?;
         if self.config.with_colors || self.config.with_bold {
             write!(f, "{}", style::RESET)?;
         }
@@ -410,7 +453,10 @@ impl Entry for LineDisplay {
             write!(
                 f,
                 "{}",
-                style::style_with(n.as_str(), self.config.colors.line_number, &self.config)
+                style::with_bg(
+                    style::style_with(n.as_str(), self.config.colors.line_number, &self.config),
+                    rs.bg(),
+                )
             )?;
         }
 
@@ -463,7 +509,7 @@ impl Entry for LineDisplay {
                 cut,
                 self.config.colors.text,
                 filter,
-                &self.config,
+                &rs,
             )?;
         }
 
@@ -504,7 +550,7 @@ impl Entry for LineDisplay {
 
 impl Display for LineDisplay {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.render(f, "")
+        self.render(f, "", false)
     }
 }
 
@@ -516,8 +562,12 @@ struct LongBranchDisplay {
 }
 
 impl Entry for LongBranchDisplay {
-    fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
-        write_prefix(f, &self.prefix, &self.config)?;
+    fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result {
+        let rs = RenderStyle {
+            selected,
+            config: &self.config,
+        };
+        write_prefix(f, &self.prefix, &rs)?;
         if self.config.with_colors || self.config.with_bold {
             write!(f, "{}", style::RESET)?;
         }
@@ -529,10 +579,10 @@ impl Entry for LongBranchDisplay {
                 file.linked.as_deref(),
                 file.count,
                 filter,
-                &self.config,
+                &rs,
             )?;
             if i + 1 != self.files.len() {
-                f.write_str(style::LONG_BRANCH_FILE_SEPARATOR)?;
+                write_plain(f, style::LONG_BRANCH_FILE_SEPARATOR, rs.bg())?;
             }
         }
         if self.new_line {
@@ -563,7 +613,7 @@ impl Entry for LongBranchDisplay {
 
 impl Display for LongBranchDisplay {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.render(f, "")
+        self.render(f, "", false)
     }
 }
 
@@ -572,17 +622,46 @@ struct OverviewDisplay {
     files: usize,
     lines: usize,
     count: usize,
+    seen: HashSet<PathBuf>,
     new_line: bool,
     config: Arc<Config>,
 }
 
+impl OverviewDisplay {
+    fn add_dir(&mut self, dir: &Directory) {
+        if self.seen.insert(dir.path.clone()) {
+            self.dirs += 1;
+        }
+        for file in &dir.files {
+            self.add_file(file);
+        }
+    }
+
+    fn add_file(&mut self, file: &File) {
+        if !self.seen.insert(file.path.clone()) {
+            return;
+        }
+        self.files += 1;
+        self.lines += file
+            .lines
+            .iter()
+            .filter(|l| l.context_offset.is_none())
+            .count();
+        self.count += file.count();
+    }
+}
+
 impl Entry for OverviewDisplay {
-    fn render(&self, f: &mut fmt::Formatter, filter: &str) -> fmt::Result {
+    fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result {
         if self.config.with_colors || self.config.with_bold {
             write!(f, "{}", style::RESET)?;
         }
+        let rs = RenderStyle {
+            selected,
+            config: &self.config,
+        };
         let text = self.filter_text();
-        write_content_with_highlights(f, text.as_bytes(), &[], 0, None, filter, &self.config)?;
+        write_content_with_highlights(f, text.as_bytes(), &[], 0, None, filter, &rs)?;
         if self.new_line {
             writeln!(f)?;
         }
@@ -610,7 +689,7 @@ impl Entry for OverviewDisplay {
             self.files,
             if self.files == 1 { "file" } else { "files" }
         ));
-        if self.config.is_dir {
+        if self.dirs > 0 {
             s.push_str(&format!(" within {} directories", self.dirs));
         }
         s
@@ -619,7 +698,7 @@ impl Entry for OverviewDisplay {
 
 impl Display for OverviewDisplay {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.render(f, "")
+        self.render(f, "", false)
     }
 }
 
@@ -666,8 +745,7 @@ impl Directory {
         }
 
         if let Some(o) = overview {
-            o.dirs += 1;
-            o.files += files.len();
+            o.add_dir(self);
         }
 
         for (i, child_id) in children.iter().enumerate() {
@@ -697,7 +775,7 @@ impl Directory {
                 self.long_branch_files_to_lines(lines, child_prefix, config)?;
             } else {
                 for (i, file) in files.iter().enumerate() {
-                    file.to_lines(lines, child_prefix, i + 1 != flen, overview, config)?;
+                    file.to_lines(lines, child_prefix, Some(i + 1 != flen), overview, config)?;
                 }
             }
         }
@@ -749,32 +827,25 @@ impl File {
         &self,
         lines: &mut Vec<Box<dyn Entry>>,
         prefix: &[PrefixComponent],
-        parent_has_next: bool,
+        parent_has_next: Option<bool>,
         overview: &mut Option<&mut Box<OverviewDisplay>>,
         config: &Arc<Config>,
     ) -> Result<(), Message> {
-        if let Some(o) = overview {
-            o.lines += self
-                .lines
-                .iter()
-                .filter(|l| l.context_offset.is_none())
-                .count();
-            o.count += self.lines.iter().map(|l| l.matches.len()).sum::<usize>();
+        if let Some(o) = overview
+            && parent_has_next.is_none()
+        {
+            o.add_file(self);
         }
-        let (cur_p, line_p) = if config.is_dir {
-            if parent_has_next {
-                (
-                    with_push(prefix, PrefixComponent::MatchWithNext),
-                    with_push(prefix, PrefixComponent::SpacerVert),
-                )
-            } else {
-                (
-                    with_push(prefix, PrefixComponent::MatchNoNext),
-                    with_push(prefix, PrefixComponent::Spacer),
-                )
-            }
-        } else {
-            (prefix.to_vec(), prefix.to_vec())
+        let (cur_p, line_p) = match parent_has_next {
+            Some(true) => (
+                with_push(prefix, PrefixComponent::MatchWithNext),
+                with_push(prefix, PrefixComponent::SpacerVert),
+            ),
+            Some(false) => (
+                with_push(prefix, PrefixComponent::MatchNoNext),
+                with_push(prefix, PrefixComponent::Spacer),
+            ),
+            None => (prefix.to_vec(), prefix.to_vec()),
         };
 
         lines.push(Box::new(PathDisplay::new(
@@ -823,26 +894,29 @@ pub fn matches_to_display_lines(
         || config.search.overview_only)
         .then(|| OverviewDisplay {
             dirs: 0,
-            files: usize::from(!config.is_dir),
+            files: 0,
             lines: 0,
             count: 0,
+            seen: HashSet::new(),
             new_line: !config.select && !config.menu,
             config: Arc::clone(&config),
         })
         .map(Box::new);
-    match &result {
-        Matches::Dir(dirs) => {
-            dirs.first().unwrap().to_lines(
-                &mut lines,
-                &[],
-                &[],
-                dirs,
-                &mut overview.as_mut(),
-                &config,
-            )?;
-        }
-        Matches::File(file) => {
-            file.to_lines(&mut lines, &[], false, &mut overview.as_mut(), &config)?;
+    for root in result {
+        match root {
+            Root::Dir(dirs) => {
+                dirs.first().unwrap().to_lines(
+                    &mut lines,
+                    &[],
+                    &[],
+                    dirs,
+                    &mut overview.as_mut(),
+                    &config,
+                )?;
+            }
+            Root::File(file) => {
+                file.to_lines(&mut lines, &[], None, &mut overview.as_mut(), &config)?;
+            }
         }
     }
     if let Some(o) = overview.take() {

@@ -1,0 +1,7 @@
+[ps]c[pe]
+╰──1: [m0s]nice[m0e] in c
+[ps]a[pe]
+╰──1: [m0s]nice[m0e] in a
+[ps]sub[pe]
+╰──[ps]inner[pe]
+   ╰──1: [m0s]nice[m0e] in inner

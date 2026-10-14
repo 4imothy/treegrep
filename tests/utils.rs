@@ -5,7 +5,7 @@ use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Output, Stdio},
 };
 
 fn normalize_newlines(content: &mut Vec<u8>) {
@@ -55,33 +55,14 @@ pub fn assert_pass(tar_path: &Path, result: Vec<u8>) {
     check_results(tar_path, &result, true);
 }
 
-pub fn assert_pass_pool(tar_paths: &[&Path], results: Vec<u8>) {
-    if cfg!(feature = "overwrite") {
-        check_results(tar_paths[0], &results, true);
-        return;
-    }
-    let mut has_match = false;
-    for tar_path in tar_paths {
-        if let Some(true) = check_results(tar_path, &results, false) {
-            has_match = true;
-        };
-    }
-    assert!(has_match)
+fn tgrep() -> Command {
+    let mut tg = Command::new(env!("CARGO_BIN_EXE_tgrep"));
+    tg.env("TREEGREP_DEFAULT_OPTS", "");
+    tg.args(["--no-color", "--no-bold", "--threads=1"]);
+    tg
 }
 
-pub fn get_output(path: &Path, args: &str) -> Vec<u8> {
-    let cmd_path = env!("CARGO_BIN_EXE_tgrep");
-    let mut tg = Command::new(cmd_path);
-    tg.env("TREEGREP_DEFAULT_OPTS", "");
-
-    tg.args(["--no-color", "--no-bold"]);
-    tg.arg("--threads=1");
-
-    tg.args(args.split_whitespace());
-
-    tg.arg(format!("-p={}", path.to_string_lossy()));
-
-    let out = tg.output().ok().unwrap();
+fn checked_stdout(out: Output) -> Vec<u8> {
     if !out.status.success() && !out.stderr.is_empty() {
         panic!("cmd failed {}", String::from_utf8_lossy(&out.stderr));
     }
@@ -94,6 +75,31 @@ pub fn get_output(path: &Path, args: &str) -> Vec<u8> {
     normalize_newlines(&mut stdout);
 
     stdout
+}
+
+pub fn get_output(path: &Path, args: &[&str]) -> Vec<u8> {
+    let mut tg = tgrep();
+    tg.args(args);
+    tg.arg(format!("-p={}", path.to_string_lossy()));
+
+    checked_stdout(tg.output().ok().unwrap())
+}
+
+pub fn run_in(dir: &Path, args: &[&str], stdin: &[u8]) -> Output {
+    let mut child = tgrep()
+        .current_dir(dir)
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let _ = child.stdin.take().unwrap().write_all(stdin);
+    child.wait_with_output().unwrap()
+}
+
+pub fn get_output_in(dir: &Path, args: &[&str], stdin: &[u8]) -> Vec<u8> {
+    checked_stdout(run_in(dir, args, stdin))
 }
 
 pub fn target_dir() -> PathBuf {

@@ -1,0 +1,12 @@
+[ps]inner[pe]
+╰──[ps]inner_file[pe]
+   ╰──1: [m0s]nice[m0e] text in inner
+[ps]top_file[pe]
+╰──1: some [m0s]nice[m0e] top text
+[ps]first[pe]
+├──[ps]inner[pe]
+│  ╰──[ps]inner_file[pe]
+│     ╰──1: [m0s]nice[m0e] text in inner
+╰──[ps]first_file[pe]
+   ╰──1: [m0s]nice[m0e] text in first
+found 3 matches in 3 lines across 3 files within 2 directories

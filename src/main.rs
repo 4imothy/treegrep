@@ -13,7 +13,7 @@ mod writer;
 use clap::ArgMatches;
 use config::Config;
 use errors::Message;
-use match_system::Matches;
+use match_system::{Matches, Root};
 use std::{
     io::{StdoutLock, stdout},
     sync::{Arc, atomic::AtomicBool},
@@ -58,7 +58,7 @@ fn main() {
 }
 
 fn build_config_and_term(matches: ArgMatches, out: StdoutLock) -> Result<(Config, Term), Message> {
-    let mut c = Config::get_config(matches)?;
+    let mut c = Config::get_config(matches, None)?;
     if let Some(repeated) = c.handle_repeat()? {
         c = repeated;
     }
@@ -68,10 +68,13 @@ fn build_config_and_term(matches: ArgMatches, out: StdoutLock) -> Result<(Config
 }
 
 fn auto_open_target(m: &Matches, files_only: bool) -> Option<(&std::path::Path, Option<usize>)> {
-    let files: Vec<&match_system::File> = match m {
-        Matches::Dir(dirs) => dirs.iter().flat_map(|d| d.files.iter()).collect(),
-        Matches::File(file) => vec![file],
-    };
+    let files: Vec<&match_system::File> = m
+        .iter()
+        .flat_map(|r| match r {
+            Root::Dir(dirs) => dirs.iter().flat_map(|d| d.files.iter()).collect(),
+            Root::File(file) => vec![file],
+        })
+        .collect();
     if files_only {
         return if files.len() == 1 {
             Some((files[0].path.as_path(), None))

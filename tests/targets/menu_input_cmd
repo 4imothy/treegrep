@@ -1,0 +1,3 @@
+- nice --input-cmd='printf a' --input-type=paths
+-> [ps]a[pe]
+   +--[m0s]nice[m0e] in a

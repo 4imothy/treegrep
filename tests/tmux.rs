@@ -74,6 +74,19 @@ impl TmuxSession {
         );
     }
 
+    fn wait_for_menu(&self) {
+        for _ in 0..100 {
+            thread::sleep(Duration::from_millis(50));
+            if !self.capture().contains("TREEGREP_DEFAULT_OPTS") {
+                return;
+            }
+        }
+        panic!(
+            "tgrep never entered the menu after 5s\nfinal pane:\n{}",
+            self.capture()
+        );
+    }
+
     pub fn wait_stable(&self) -> Vec<u8> {
         let mut prev = String::new();
         let mut stable_count = 0;
@@ -117,19 +130,20 @@ fn normalize(s: String) -> Vec<u8> {
 fn tgrep_cmd(path: &Path, mode_args: &str) -> String {
     let cmd_path = env!("CARGO_BIN_EXE_tgrep");
     format!(
-        "TREEGREP_DEFAULT_OPTS=\"\" {} --no-color --no-bold --threads=1 {} -p={} \
+        "cd {} && TREEGREP_DEFAULT_OPTS=\"\" {} --no-color --no-bold --threads=1 {} -p={} \
          --char-vertical='|' --char-horizontal=- --char-tee=+ --char-bottom-left=+ \
          --ellipsis='~' --selected-indicator=\"-> \"",
+        path.to_string_lossy(),
         cmd_path,
         mode_args,
         path.to_string_lossy()
     )
 }
 
-pub fn get_menu_output_from_search(path: &Path, keys: &[&str]) -> Vec<u8> {
+pub fn get_menu_output_from_search(path: &Path, tgrep_args: &str, keys: &[&str]) -> Vec<u8> {
     let session = TmuxSession::new(80, 24);
-    session.run_cmd(&tgrep_cmd(path, "--menu"));
-    session.wait_stable();
+    session.run_cmd(&tgrep_cmd(path, &format!("--menu {}", tgrep_args)));
+    session.wait_for_menu();
 
     for key in keys {
         session.send_key(key);

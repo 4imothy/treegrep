@@ -6,7 +6,7 @@ use clap::{
     error::{ContextKind, ContextValue, Error, ErrorKind},
     value_parser,
 };
-use crossterm::event::KeyCode;
+use crossterm::{event::KeyCode, style::Color};
 use std::{ffi::OsStr, path::PathBuf};
 
 pub mod names {
@@ -44,6 +44,11 @@ impl ValueEnum for OpenStrategy {
         };
         Some(PossibleValue::new(name))
     }
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+pub enum InputType {
+    Paths,
 }
 
 #[derive(Clone, Copy)]
@@ -115,23 +120,8 @@ fn positive(s: &str) -> Result<usize, String> {
     }
 }
 
-#[derive(Clone, Copy)]
-pub enum Color {
-    Black,
-    White,
-    Red,
-    Green,
-    Yellow,
-    Blue,
-    Magenta,
-    Cyan,
-    Grey,
-    Rgb(u8, u8, u8),
-    Ansi(u8),
-}
-
 pub const REGEXP_HELP: &str = "a regex expression to search for";
-pub const PATH_HELP: &str = "the path to search, if not provided, search the current directory";
+pub const PATH_HELP: &str = "the paths to search, if none provided, search the current directory";
 const COLOR_HELP: &str =
     "black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)";
 
@@ -180,7 +170,11 @@ impl clap::builder::TypedValueParser for ColorParser {
                     .collect::<Result<_, _>>()
                     .map_err(|_| color_validation_error(cmd, "rgb", inner))?;
                 if nums.len() == 3 {
-                    Color::Rgb(nums[0], nums[1], nums[2])
+                    Color::Rgb {
+                        r: nums[0],
+                        g: nums[1],
+                        b: nums[2],
+                    }
                 } else {
                     return Err(color_validation_error(cmd, "rgb", inner));
                 }
@@ -190,7 +184,7 @@ impl clap::builder::TypedValueParser for ColorParser {
                 let v = inner
                     .parse::<u8>()
                     .map_err(|_| color_validation_error(cmd, "ansi", inner))?;
-                Color::Ansi(v)
+                Color::AnsiValue(v)
             }
             _ => {
                 let mut err = Error::new(ErrorKind::InvalidValue).with_cmd(cmd);
@@ -405,6 +399,8 @@ pub const BEFORE_CONTEXT: &str = "before_context";
 pub const AFTER_CONTEXT: &str = "after_context";
 pub const CONTEXT: &str = "context";
 pub const PCRE2: &str = "pcre2";
+pub const INPUT_CMD: &str = "input_cmd";
+pub const INPUT_TYPE: &str = "input_type";
 
 pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
 
@@ -412,6 +408,7 @@ pub const REPEAT_STORED: &[&str] = &[
     REGEXP,
     REGEXP_GLOB,
     PATH,
+    INPUT_TYPE,
     GLOB,
     HIDDEN,
     LINE_NUMBER,
@@ -449,7 +446,6 @@ pub const HELP_TEMPLATE: &str = concat!(
     next_help_heading = "options",
     group(ArgGroup::new("mode").required(true).multiple(true).args([POSITIONAL_REGEXP, REGEXP, REGEXP_GLOB, FILES, COMPLETIONS, MENU, REPEAT])),
     group(ArgGroup::new(REGEXP_GROUP).multiple(true).args([POSITIONAL_REGEXP, REGEXP, REGEXP_GLOB])),
-    group(ArgGroup::new("paths").args([PATH_POSITIONAL, PATH])),
 )]
 pub struct Args {
     #[arg(
@@ -467,9 +463,10 @@ pub struct Args {
         help_heading = "arguments",
         display_order = 2,
         index = 2,
+        num_args = 0..,
         help = PATH_HELP,
     )]
-    pub positional_path: Option<PathBuf>,
+    pub positional_path: Vec<PathBuf>,
 
     #[arg(
         long,
@@ -490,8 +487,20 @@ pub struct Args {
     )]
     pub regexp_glob: Vec<ScopedRegexp>,
 
-    #[arg(long, short = 'p', value_name = "", help = PATH_HELP)]
-    pub path: Option<PathBuf>,
+    #[arg(long, short = 'p', value_name = "", action = ArgAction::Append, help = PATH_HELP)]
+    pub path: Vec<PathBuf>,
+
+    #[arg(
+        long,
+        value_name = "",
+        value_hint = ValueHint::CommandString,
+        requires = INPUT_TYPE,
+        help = "command whose output is read in place of stdin"
+    )]
+    pub input_cmd: Option<String>,
+
+    #[arg(long, value_name = "", help = "read input as this type")]
+    pub input_type: Option<InputType>,
 
     #[arg(
         long,

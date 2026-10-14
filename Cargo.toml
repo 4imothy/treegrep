@@ -31,15 +31,15 @@ pcre2 = ["dep:grep-pcre2", "dep:pcre2"]
 
 [dependencies]
 crossterm = {version = "0.29.0", features = ["use-dev-tty"]}
-clap = { version = "4.6.1", features = ["derive"] }
-clap_complete = "4.6.7"
-clap_complete_nushell = "4.6.0"
+clap = { version = "4.6.7", features = ["derive"] }
+clap_complete = "4.6.11"
+clap_complete_nushell = "4.6.2"
 dunce = "1.0.5"
-ignore = "0.4.28"
+ignore = "0.4.33"
 grep = "0.4.1"
-regex = "1.13.0"
-grep-pcre2 = { version = "0.1.9", optional = true }
+regex = "1.13.1"
+grep-pcre2 = { version = "0.1.10", optional = true }
 pcre2 = { version = "0.2.11", optional = true }
-signal-hook = "0.4.4"
+signal-hook = "0.4.5"
 shlex = "2.0.1"
-crossbeam-channel = "0.5.16"
+crossbeam-channel = "0.5.17"
