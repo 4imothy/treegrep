@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 
-use core::panic;
 use std::{
     fs,
     io::Write,
@@ -85,8 +84,9 @@ pub fn get_output(path: &Path, args: &[&str]) -> Vec<u8> {
     checked_stdout(tg.output().ok().unwrap())
 }
 
-pub fn run_in(dir: &Path, args: &[&str], stdin: &[u8]) -> Output {
+fn run(dir: &Path, args: &[&str], stdin: &[u8]) -> Output {
     let mut child = tgrep()
+        .envs(GIT_ENV)
         .current_dir(dir)
         .args(args)
         .stdin(Stdio::piped())
@@ -98,8 +98,12 @@ pub fn run_in(dir: &Path, args: &[&str], stdin: &[u8]) -> Output {
     child.wait_with_output().unwrap()
 }
 
-pub fn get_output_in(dir: &Path, args: &[&str], stdin: &[u8]) -> Vec<u8> {
-    checked_stdout(run_in(dir, args, stdin))
+pub fn get_output_in(dir: &Path, args: &[&str]) -> Vec<u8> {
+    checked_stdout(run(dir, args, b""))
+}
+
+pub fn get_output_with_stdin(dir: &Path, args: &[&str], stdin: &[u8]) -> Vec<u8> {
+    checked_stdout(run(dir, args, stdin))
 }
 
 pub fn target_dir() -> PathBuf {
@@ -132,4 +136,31 @@ fn print_diff(output: &str, target: &str) {
         }
     }
     println!();
+}
+
+const GIT_ENV: [(&str, &str); 6] = [
+    (
+        "GIT_CONFIG_GLOBAL",
+        if cfg!(windows) { "NUL" } else { "/dev/null" },
+    ),
+    ("GIT_CONFIG_NOSYSTEM", "1"),
+    ("GIT_AUTHOR_NAME", "t"),
+    ("GIT_AUTHOR_EMAIL", "t@t"),
+    ("GIT_COMMITTER_NAME", "t"),
+    ("GIT_COMMITTER_EMAIL", "t@t"),
+];
+
+pub fn git(dir: &Path, args: &[&str]) {
+    let out = Command::new("git")
+        .envs(GIT_ENV)
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "git {} failed: {}",
+        args.join(" "),
+        String::from_utf8_lossy(&out.stderr)
+    );
 }

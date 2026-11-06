@@ -3,13 +3,14 @@
 use crate::{
     config::Config,
     errors::Message,
-    match_system::{Directory, File, Match, Matches, Root},
+    match_system::{Diff, Directory, File, Match, Matches, Root},
     mes, style,
     term::{TERM_WIDTH, Term},
 };
 use core::fmt::{self, Display};
 use crossterm::style::{Color, Stylize};
 use std::{
+    borrow::Cow,
     collections::HashSet,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -208,7 +209,7 @@ fn write_content_with_highlights(
 }
 
 #[derive(Clone)]
-pub enum PrefixComponent {
+enum PrefixComponent {
     MatchWithNext,
     MatchNoNext,
     SpacerVert,
@@ -266,10 +267,10 @@ impl PathDisplay {
         } else {
             config.colors.file
         };
-        let name = path_name(path)?.to_owned();
+        let name = path_name(path)?.into_owned();
         let linked = linked
             .as_ref()
-            .map(|l| path_name(l).map(|s| s.to_owned()))
+            .map(|l| path_name(l).map(Cow::into_owned))
             .transpose()?;
         Ok(PathDisplay {
             prefix,
@@ -398,6 +399,7 @@ struct LineDisplay {
     matches: Vec<Match>,
     line_num: usize,
     context_offset: Option<isize>,
+    diff: Option<Diff>,
     new_line: bool,
     config: Arc<Config>,
 }
@@ -423,13 +425,19 @@ impl Entry for LineDisplay {
             0
         };
 
-        let line_num = if self.config.search.line_number {
-            Some(
+        let (sign, line_color) = match self.diff {
+            Some(Diff::Added) => ("+", self.config.colors.diff_added),
+            Some(Diff::Removed) => ("-", self.config.colors.diff_removed),
+            _ => (" ", self.config.colors.line_number),
+        };
+        let line_num = match (self.diff, self.config.search.line_number) {
+            (Some(_), true) => Some(format!("{}: {} ", self.line_num, sign)),
+            (Some(_), false) => Some(format!("{} ", sign)),
+            (None, true) => Some(
                 self.context_offset
                     .map_or_else(|| format!("{}: ", self.line_num), |o| format!("{:+}: ", o)),
-            )
-        } else {
-            None
+            ),
+            (None, false) => None,
         };
 
         if self.config.select || self.config.menu {
@@ -454,13 +462,13 @@ impl Entry for LineDisplay {
                 f,
                 "{}",
                 style::with_bg(
-                    style::style_with(n.as_str(), self.config.colors.line_number, &self.config),
+                    style::style_with(n.as_str(), line_color, &self.config),
                     rs.bg(),
                 )
             )?;
         }
 
-        if self.context_offset.is_some() && self.config.with_colors {
+        if self.matches.is_empty() && self.config.with_colors {
             write!(f, "{}", style::DIM)?;
         }
 
@@ -513,7 +521,7 @@ impl Entry for LineDisplay {
             )?;
         }
 
-        if self.context_offset.is_some() && self.config.with_colors {
+        if self.matches.is_empty() && self.config.with_colors {
             write!(f, "{}", style::RESET)?;
         }
         if self.new_line {
@@ -642,11 +650,7 @@ impl OverviewDisplay {
             return;
         }
         self.files += 1;
-        self.lines += file
-            .lines
-            .iter()
-            .filter(|l| l.context_offset.is_none())
-            .count();
+        self.lines += file.lines.iter().filter(|l| !l.matches.is_empty()).count();
         self.count += file.count();
     }
 }
@@ -702,14 +706,15 @@ impl Display for OverviewDisplay {
     }
 }
 
-fn path_name(path: &Path) -> Result<&str, Message> {
-    let err = || {
-        mes!(
-            "failed to get name of `{}`",
-            path.as_os_str().to_string_lossy()
-        )
-    };
-    path.file_name().ok_or_else(err)?.to_str().ok_or_else(err)
+fn path_name(path: &Path) -> Result<Cow<'_, str>, Message> {
+    path.file_name()
+        .map(|n| n.to_string_lossy())
+        .ok_or_else(|| {
+            mes!(
+                "failed to get name of `{}`",
+                path.as_os_str().to_string_lossy()
+            )
+        })
 }
 
 fn with_push(prefix: &[PrefixComponent], item: PrefixComponent) -> Vec<PrefixComponent> {
@@ -872,6 +877,7 @@ impl File {
                     matches: line.matches.clone(),
                     line_num: line.line_num,
                     context_offset: line.context_offset,
+                    diff: line.diff,
                     new_line: !config.select && !config.menu,
                     config: Arc::clone(config),
                 }));
@@ -956,15 +962,15 @@ mod tests {
     #[test]
     fn test_path_name() {
         let mut path = Path::new("/path/to/file.txt");
-        assert_eq!(path_name(path).ok(), Some("file.txt"));
+        assert_eq!(path_name(path).ok().as_deref(), Some("file.txt"));
 
         path = Path::new("/path/to/unicode_åß∂ƒ.txt");
-        assert_eq!(path_name(path).ok(), Some("unicode_åß∂ƒ.txt"));
+        assert_eq!(path_name(path).ok().as_deref(), Some("unicode_åß∂ƒ.txt"));
 
         path = Path::new("/path/to/directory/");
-        assert_eq!(path_name(path).ok(), Some("directory"));
+        assert_eq!(path_name(path).ok().as_deref(), Some("directory"));
 
         path = Path::new("/");
-        assert_eq!(path_name(path).ok(), None);
+        assert_eq!(path_name(path).ok().as_deref(), None);
     }
 }

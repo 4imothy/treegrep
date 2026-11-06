@@ -5,7 +5,9 @@ use crate::{
         self, Args, CompletionShell, InputType, OpenStrategy, REPEAT_FILE, ScopedRegexp,
         generate_command,
     },
+    diff::{DiffFile, parse_diff},
     errors::Message,
+    match_system::bytes_to_path,
     mes, style,
 };
 use clap::{ArgMatches, Error, FromArgMatches, ValueEnum};
@@ -80,6 +82,8 @@ pub struct Colors {
     pub file: Color,
     pub dir: Color,
     pub line_number: Color,
+    pub diff_added: Color,
+    pub diff_removed: Color,
     pub text: Option<Color>,
     pub branch: Option<Color>,
     pub selected_indicator: Option<Color>,
@@ -204,10 +208,11 @@ fn read_stdin() -> Result<Arc<[u8]>, Message> {
 }
 
 fn parse_paths(bytes: &[u8]) -> Vec<PathBuf> {
-    String::from_utf8_lossy(bytes)
-        .lines()
+    bytes
+        .split(|&b| b == b'\n')
+        .map(|l| l.strip_suffix(b"\r").unwrap_or(l))
         .filter(|l| !l.is_empty())
-        .filter_map(|l| process_path(Path::new(l), true).ok())
+        .filter_map(|l| process_path(&bytes_to_path(l.to_vec()), true).ok())
         .collect()
 }
 
@@ -372,6 +377,16 @@ fn apply_explicit(c: &mut Config, args: &Args, matches: &ArgMatches) -> Result<(
     {
         c.colors.line_number = *v;
     }
+    if applies("diff_added_color")
+        && let Some(v) = &args.diff_added_color
+    {
+        c.colors.diff_added = *v;
+    }
+    if applies("diff_removed_color")
+        && let Some(v) = &args.diff_removed_color
+    {
+        c.colors.diff_removed = *v;
+    }
     if applies("match_colors") && !args.match_colors.is_empty() {
         c.colors.matches = args.match_colors.clone();
     }
@@ -531,6 +546,12 @@ impl Config {
             line_number: args
                 .line_number_color
                 .unwrap_or(style::LINE_NUMBER_COLOR_DEFAULT),
+            diff_added: args
+                .diff_added_color
+                .unwrap_or(style::DIFF_ADDED_COLOR_DEFAULT),
+            diff_removed: args
+                .diff_removed_color
+                .unwrap_or(style::DIFF_REMOVED_COLOR_DEFAULT),
             text: args.text_color,
             branch: args.branch_color,
             selected_bg: args.selected_bg_color.unwrap_or(style::SELECTED_BG_DEFAULT),
@@ -729,6 +750,13 @@ impl SearchParams {
     pub fn input_paths(&self) -> Vec<PathBuf> {
         match (&self.input, self.input_type) {
             (Some(raw), Some(InputType::Paths)) => parse_paths(raw),
+            _ => Vec::new(),
+        }
+    }
+
+    pub fn input_diff(&self) -> Vec<DiffFile> {
+        match (&self.input, self.input_type) {
+            (Some(raw), Some(InputType::Diff)) => parse_diff(raw),
             _ => Vec::new(),
         }
     }

@@ -635,12 +635,173 @@ fn input_stdin() {
     let tar_dir = target_dir();
     let dir = input_dir("input_stdin");
 
-    let result = get_output_in(
+    let result = get_output_with_stdin(
         &dir.path,
         &["nice", "--input-type=paths", "--line-number"],
         b"a\nmissing\n\nsub\n",
     );
     assert_pass(&tar_dir.join("input_stdin"), result);
+}
+
+fn git_diff_dir(name: &str) -> Dir {
+    let dir = Dir::new(name);
+    let numbered = |f: fn(usize) -> String| (1..=12).map(f).collect::<String>();
+    dir.create_file_fill(
+        &PathBuf::from("a"),
+        numbered(|i| format!("nice {}\n", i)).as_bytes(),
+    );
+    dir.create_file_fill(&PathBuf::from("gone"), b"nice gone\n");
+    dir.create_file_fill(
+        &PathBuf::from("old name"),
+        b"keep 1\nkeep 2\nkeep 3\nkeep 4\nkeep 5\nkeep 6\nnice before\n",
+    );
+    dir.create_file_fill(&PathBuf::from("sp ace"), b"nice space\n");
+    dir.create_file_fill(&PathBuf::from("unchanged"), b"nice unchanged\n");
+    dir.create_file_fill(&PathBuf::from("signs"), b"-- nice dashes\n");
+    dir.create_file_fill(&PathBuf::from("f\u{f6}o"), b"x\n");
+    git(&dir.path, &["init", "-q"]);
+    git(&dir.path, &["add", "-A"]);
+    git(&dir.path, &["commit", "-qm", "first"]);
+
+    dir.create_file_fill(
+        &PathBuf::from("a"),
+        numbered(|i| match i {
+            2 => "nice two\n".into(),
+            11 => "nice eleven\n".into(),
+            _ => format!("nice {}\n", i),
+        })
+        .as_bytes(),
+    );
+    fs::remove_file(dir.path.join("gone")).unwrap();
+    fs::remove_file(dir.path.join("old name")).unwrap();
+    let sub = PathBuf::from("sub");
+    dir.add_child(&sub);
+    dir.create_file_fill(
+        &sub.join("new name"),
+        b"keep 1\nkeep 2\nkeep 3\nkeep 4\nkeep 5\nkeep 6\nnice after\n",
+    );
+    dir.create_file_fill(&sub.join("added"), b"nice added\n");
+    dir.create_file_fill(&PathBuf::from("sp ace"), b"nice spaces\n");
+    dir.create_file_fill(&PathBuf::from("signs"), b"++ nice pluses\n");
+    dir.create_file_fill(&PathBuf::from("f\u{f6}o"), b"nice quoted\n");
+    git(&dir.path, &["add", "-A"]);
+    git(&dir.path, &["commit", "-qm", "nice message"]);
+    dir.create_file_fill(&PathBuf::from("sp ace"), b"nice spaces\nnice unstaged\n");
+
+    dir
+}
+
+#[test]
+fn input_diff_git_show() {
+    let tar_dir = target_dir();
+    let dir = git_diff_dir("input_diff_git_show");
+
+    let result = get_output_in(
+        &dir.path,
+        &[
+            "nice",
+            "--input-cmd=git show",
+            "--input-type=diff",
+            "--line-number",
+        ],
+    );
+    assert_pass(&tar_dir.join("input_diff_git_show"), result);
+}
+
+#[test]
+fn input_diff_git_context() {
+    let tar_dir = target_dir();
+    let dir = git_diff_dir("input_diff_git_context");
+
+    let result = get_output_in(
+        &dir.path,
+        &[
+            "two",
+            "--input-cmd=git show",
+            "--input-type=diff",
+            "--line-number",
+            "--context=1",
+        ],
+    );
+    assert_pass(&tar_dir.join("input_diff_git_context"), result);
+}
+
+#[test]
+fn input_diff_git_unstaged() {
+    let tar_dir = target_dir();
+    let dir = git_diff_dir("input_diff_git_unstaged");
+
+    let result = get_output_in(
+        &dir.path,
+        &[
+            "^nice",
+            "--input-cmd=git diff",
+            "--input-type=diff",
+            "--line-number",
+        ],
+    );
+    assert_pass(&tar_dir.join("input_diff_git_unstaged"), result);
+}
+
+#[test]
+fn input_diff_git_glob() {
+    let tar_dir = target_dir();
+    let dir = git_diff_dir("input_diff_git_glob");
+
+    let result = get_output_in(
+        &dir.path,
+        &[
+            "nice",
+            "--input-cmd=git show",
+            "--input-type=diff",
+            "--glob=sub/*",
+            "--glob=!added",
+        ],
+    );
+    assert_pass(&tar_dir.join("input_diff_git_glob"), result);
+}
+
+#[cfg(unix)]
+#[test]
+fn input_diff_concat() {
+    let tar_dir = target_dir();
+    let dir = Dir::new("input_diff_concat");
+    dir.create_file_fill(&PathBuf::from("a1"), b"keep\nnice old a\n");
+    dir.create_file_fill(&PathBuf::from("a2"), b"keep\nnice new a\n");
+    dir.create_file_fill(&PathBuf::from("b1"), b"nice old b\nkeep\n");
+    dir.create_file_fill(&PathBuf::from("b2"), b"nice new b\nkeep\n");
+
+    let result = get_output_in(
+        &dir.path,
+        &[
+            "nice",
+            "--input-cmd=diff -u a1 a2; diff -u b1 b2",
+            "--input-type=diff",
+            "--line-number",
+            "--context=1",
+        ],
+    );
+    assert_pass(&tar_dir.join("input_diff_concat"), result);
+}
+
+#[cfg(unix)]
+#[test]
+fn input_diff_deletion() {
+    let tar_dir = target_dir();
+    let dir = Dir::new("input_diff_deletion");
+    dir.create_file_fill(&PathBuf::from("a1"), b"keep\nnice gone\nkeep\n");
+    dir.create_file_fill(&PathBuf::from("a2"), b"keep\nkeep\n");
+
+    let result = get_output_in(
+        &dir.path,
+        &[
+            "nice",
+            "--input-cmd=diff -U0 a1 a2",
+            "--input-type=diff",
+            "--line-number",
+        ],
+    );
+    assert_pass(&tar_dir.join("input_diff_deletion"), result);
 }
 
 #[cfg(unix)]
@@ -694,8 +855,8 @@ fn menu_input_repeat() {
     );
     assert!(repeat_file_path.exists());
 
-    let expected = get_output_in(&dir.path, &["nice", "--input-type=paths"], b"a\n");
-    let repeated = get_output_in(&dir.path, &["--repeat", &repeat_file], b"");
+    let expected = get_output_with_stdin(&dir.path, &["nice", "--input-type=paths"], b"a\n");
+    let repeated = get_output_in(&dir.path, &["--repeat", &repeat_file]);
     assert!(!expected.is_empty());
     assert!(expected == repeated);
 }

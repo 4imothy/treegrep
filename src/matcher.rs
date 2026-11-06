@@ -2,8 +2,9 @@
 
 use crate::{
     config::{Config, SearchParams},
+    diff::DiffFile,
     errors::Message,
-    match_system::{Directory, File, Line, Match, Matches, wrap_dirs, wrap_file},
+    match_system::{Diff, Directory, File, Line, Match, Matches, wrap_dirs, wrap_file},
     mes,
 };
 use crossbeam_channel::{Receiver, Sender};
@@ -21,6 +22,7 @@ use ignore::{
 use std::{
     collections::HashMap,
     ffi::OsString,
+    fmt::Display,
     io,
     path::{Path, PathBuf},
     sync::{
@@ -60,12 +62,37 @@ fn build_scoped_override(root: &Path, glob: &str) -> Result<Override, Message> {
         .map_err(|_| mes!("failed to build override for glob {}", glob))
 }
 
+fn globs_override(root: &Path, globs: &[String]) -> Result<Override, Message> {
+    let mut builder = OverrideBuilder::new(root);
+    for glob in globs {
+        builder
+            .add(glob)
+            .map_err(|_| mes!("glob {} is invalid", glob))?;
+    }
+    builder
+        .build()
+        .map_err(|_| mes!("failed to build override builder with given globs"))
+}
+
 fn scoped_overrides(search: &SearchParams, root: &Path) -> Result<Vec<Option<Override>>, Message> {
     let mut overrides: Vec<Option<Override>> = search.regexps.iter().map(|_| None).collect();
     for s in &search.scoped {
         overrides.push(Some(build_scoped_override(root, &s.glob)?));
     }
     Ok(overrides)
+}
+
+fn glob_ignored(globs: &Override, path: &Path) -> bool {
+    globs.matched(path, false).is_ignore()
+        || path
+            .ancestors()
+            .skip(1)
+            .filter(|p| !p.as_os_str().is_empty())
+            .any(|p| globs.matched(p, true).is_ignore())
+}
+
+fn match_error(path: &Path, e: impl Display) -> Message {
+    mes!("pcre2 match error on {}: {}", path.display(), e)
 }
 
 fn allowed_mask(overrides: &[Option<Override>], path: &Path) -> u64 {
@@ -306,7 +333,67 @@ pub fn search(abort: Arc<AtomicBool>, config: Arc<Config>) -> Result<Option<Matc
         };
         roots.extend(root);
     }
+    let diffs = config.search.input_diff();
+    if !diffs.is_empty() {
+        let globs = globs_override(Path::new("."), &config.search.globs)?;
+        let overrides = scoped_overrides(&config.search, Path::new("."))?;
+        for diff in diffs {
+            if abort.load(Ordering::Relaxed) {
+                break;
+            }
+            if glob_ignored(&globs, &diff.path) {
+                continue;
+            }
+            roots.extend(wrap_file(
+                search_diff(diff, &matcher, &overrides, &config)?,
+                config.search.files && !config.search.has_expr(),
+            ));
+        }
+    }
     Ok((!roots.is_empty()).then_some(roots))
+}
+
+fn search_diff(
+    diff: DiffFile,
+    matcher: &Matcher,
+    overrides: &[Option<Override>],
+    config: &Config,
+) -> Result<Option<File>, Message> {
+    let mut file = File::from_pathbuf(diff.path, config.search.links)?;
+    if config.search.files && !config.search.has_expr() {
+        return Ok(Some(file));
+    }
+    let mask = allowed_mask(overrides, &file.path);
+    if mask == 0 {
+        return Ok(None);
+    }
+    let (before, after) = (config.search.before_context, config.search.after_context);
+    for hunk in diff.hunks {
+        let len = hunk.len();
+        let mut keep = vec![false; len];
+        let mut lines = Vec::with_capacity(len);
+        for (i, d) in hunk.into_iter().enumerate() {
+            let mut matches = Vec::new();
+            if !matches!(d.diff, Diff::Unchanged) {
+                matcher
+                    .find_all_matches(&d.content, mask, &mut matches)
+                    .map_err(|e| match_error(&file.path, e))?;
+            }
+            if !matches.is_empty() {
+                keep[i.saturating_sub(before)..(i + after + 1).min(len)].fill(true);
+            }
+            let mut line = Line::new(d.content, matches, d.line_num);
+            line.diff = Some(d.diff);
+            lines.push(line);
+        }
+        file.lines.extend(
+            lines
+                .into_iter()
+                .zip(keep)
+                .filter_map(|(l, k)| k.then_some(l)),
+        );
+    }
+    Ok(Some(file))
 }
 
 fn search_dir(
@@ -317,13 +404,6 @@ fn search_dir(
     abort: Arc<AtomicBool>,
     config: Arc<Config>,
 ) -> Result<Vec<Directory>, Message> {
-    let mut override_builder = OverrideBuilder::new(path);
-    for glob in &config.search.globs {
-        override_builder
-            .add(glob)
-            .map_err(|_| mes!("glob {} is invalid", glob))?;
-    }
-
     let walker = WalkBuilder::new(path)
         .hidden(!config.search.hidden)
         .max_depth(config.search.max_depth)
@@ -334,11 +414,7 @@ fn search_dir(
         .git_exclude(config.search.ignore)
         .require_git(false)
         .threads(config.threads)
-        .overrides(
-            override_builder
-                .build()
-                .map_err(|_| mes!("failed to build override builder with given globs"))?,
-        )
+        .overrides(globs_override(path, &config.search.globs)?)
         .build_parallel();
 
     let (tx, rx): (Sender<File>, Receiver<File>) = crossbeam_channel::unbounded();
@@ -424,7 +500,7 @@ fn search_file(
         return Ok(None);
     }
     if let Some(e) = sink.match_error {
-        return Err(mes!("pcre2 match error on {}: {}", pb.display(), e));
+        return Err(match_error(&pb, e));
     }
 
     if sink.lines.is_empty() {

@@ -1,0 +1,20 @@
+[ps]a[pe]
+├──2: - [m0s]nice[m0e] 2
+├──2: + [m0s]nice[m0e] two
+├──11: - [m0s]nice[m0e] 11
+╰──11: + [m0s]nice[m0e] eleven
+[ps]föo[pe]
+╰──1: + [m0s]nice[m0e] quoted
+[ps]gone[pe]
+╰──1: - [m0s]nice[m0e] gone
+[ps]signs[pe]
+├──1: - -- [m0s]nice[m0e] dashes
+╰──1: + ++ [m0s]nice[m0e] pluses
+[ps]sp ace[pe]
+├──1: - [m0s]nice[m0e] space
+╰──1: + [m0s]nice[m0e] spaces
+[ps]added[pe]
+╰──1: + [m0s]nice[m0e] added
+[ps]new name[pe]
+├──7: - [m0s]nice[m0e] before
+╰──7: + [m0s]nice[m0e] after

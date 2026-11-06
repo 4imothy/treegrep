@@ -2,6 +2,7 @@
 
 mod args;
 mod config;
+mod diff;
 mod errors;
 mod log;
 mod match_system;

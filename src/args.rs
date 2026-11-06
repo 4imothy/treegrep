@@ -48,7 +48,12 @@ impl ValueEnum for OpenStrategy {
 
 #[derive(Clone, Copy, ValueEnum)]
 pub enum InputType {
+    #[value(help = "newline separated paths")]
     Paths,
+    #[value(
+        help = "unified diff (diff -u, git diff, git show, hg diff, ...), only changed lines are searched"
+    )]
+    Diff,
 }
 
 #[derive(Clone, Copy)]
@@ -120,8 +125,8 @@ fn positive(s: &str) -> Result<usize, String> {
     }
 }
 
-pub const REGEXP_HELP: &str = "a regex expression to search for";
-pub const PATH_HELP: &str = "the paths to search, if none provided, search the current directory";
+const REGEXP_HELP: &str = "a regex expression to search for";
+const PATH_HELP: &str = "the paths to search, if none provided, search the current directory";
 const COLOR_HELP: &str =
     "black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)";
 
@@ -139,7 +144,7 @@ fn color_validation_error(cmd: &Command, kind: &str, value: &str) -> Error {
 }
 
 #[derive(Clone)]
-pub struct ColorParser;
+struct ColorParser;
 
 impl clap::builder::TypedValueParser for ColorParser {
     type Value = Color;
@@ -202,7 +207,7 @@ impl clap::builder::TypedValueParser for ColorParser {
 }
 
 #[derive(Clone)]
-pub struct KeyCodeParser;
+struct KeyCodeParser;
 
 impl clap::builder::TypedValueParser for KeyCodeParser {
     type Value = KeyCode;
@@ -293,7 +298,7 @@ pub struct ScopedRegexp {
 }
 
 #[derive(Clone)]
-pub struct RegexpGlobParser;
+struct RegexpGlobParser;
 
 impl clap::builder::TypedValueParser for RegexpGlobParser {
     type Value = ScopedRegexp;
@@ -337,7 +342,7 @@ pub const LONG_BRANCHES_EACH: &str = "branch_each";
 pub const NO_BOLD: &str = "no_bold";
 pub const POSITIONAL_REGEXP: &str = "positional_regexp";
 pub const REGEXP: &str = "regexp";
-pub const REGEXP_GROUP: &str = "regexp_group";
+const REGEXP_GROUP: &str = "regexp_group";
 pub const REGEXP_GLOB: &str = "regexp_glob";
 pub const PATH_POSITIONAL: &str = "positional_path";
 pub const PATH: &str = "path";
@@ -404,7 +409,7 @@ pub const INPUT_TYPE: &str = "input_type";
 
 pub const DEFAULT_OPTS_ENV_NAME: &str = "TREEGREP_DEFAULT_OPTS";
 
-pub const REPEAT_STORED: &[&str] = &[
+const REPEAT_STORED: &[&str] = &[
     REGEXP,
     REGEXP_GLOB,
     PATH,
@@ -427,7 +432,7 @@ pub const REPEAT_STORED: &[&str] = &[
     PCRE2,
 ];
 
-pub const HELP_TEMPLATE: &str = concat!(
+const HELP_TEMPLATE: &str = concat!(
     "{name} {version}\n\nby {author}\n\nhome page: ",
     env!("CARGO_PKG_HOMEPAGE"),
     "\n\n{about}\n\n{usage}\n\n{all-args}{after-help}"
@@ -713,6 +718,12 @@ pub struct Args {
 
     #[arg(long, value_parser = ColorParser, value_name = "", hide_short_help = true, help = COLOR_HELP)]
     pub line_number_color: Option<Color>,
+
+    #[arg(long, value_parser = ColorParser, value_name = "", hide_short_help = true, help = COLOR_HELP)]
+    pub diff_added_color: Option<Color>,
+
+    #[arg(long, value_parser = ColorParser, value_name = "", hide_short_help = true, help = COLOR_HELP)]
+    pub diff_removed_color: Option<Color>,
 
     #[arg(long, value_parser = ColorParser, value_name = "", value_delimiter = ',', hide_short_help = true, help = COLOR_HELP)]
     pub match_colors: Vec<Color>,

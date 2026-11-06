@@ -1,0 +1,8 @@
+[ps]a2[pe]
+├──1:   keep
+├──2: - [m0s]nice[m0e] old a
+╰──2: + [m0s]nice[m0e] new a
+[ps]b2[pe]
+├──1: - [m0s]nice[m0e] old b
+├──1: + [m0s]nice[m0e] new b
+╰──2:   keep

@@ -64,7 +64,9 @@ impl TmuxSession {
         for _ in 0..100 {
             thread::sleep(Duration::from_millis(50));
             let curr = self.capture();
-            if curr.lines().any(|l| l.trim_start().starts_with("-> ")) {
+            if !curr.contains("TREEGREP_DEFAULT_OPTS")
+                && curr.lines().any(|l| l.trim_start().starts_with("-> "))
+            {
                 return;
             }
         }

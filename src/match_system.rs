@@ -70,6 +70,16 @@ fn get_linked(path: &Path, links: bool) -> Option<PathBuf> {
     })
 }
 
+pub fn bytes_to_path(bytes: Vec<u8>) -> PathBuf {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStringExt;
+        std::ffi::OsString::from_vec(bytes).into()
+    }
+    #[cfg(not(unix))]
+    String::from_utf8_lossy(&bytes).into_owned().into()
+}
+
 #[derive(Clone, Copy)]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct Match {
@@ -103,11 +113,19 @@ impl Match {
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum Diff {
+    Added,
+    Removed,
+    Unchanged,
+}
+
 pub struct Line {
     pub content: Vec<u8>,
     pub matches: Vec<Match>,
     pub line_num: usize,
     pub context_offset: Option<isize>,
+    pub diff: Option<Diff>,
 }
 
 impl Line {
@@ -118,6 +136,7 @@ impl Line {
             matches,
             line_num,
             context_offset: None,
+            diff: None,
         }
     }
 
@@ -127,6 +146,7 @@ impl Line {
             matches: Vec::new(),
             line_num,
             context_offset: None,
+            diff: None,
         }
     }
 

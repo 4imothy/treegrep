@@ -127,63 +127,70 @@ nnoremap <leader>tf :call TgrepWith('--files --select')<cr>
 <summary><code>tgrep --regexp \bstruct\s+\w+ --regexp \bimpl\s+\w+ --path src --line-number --context=1 --count</code></summary>
 
 ```
-src: 9
+src: 10
 ├──args.rs: 11
 │  ├──-1: 
 │  ├──25: impl ValueEnum for OpenStrategy {
 │  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
 │  ├──-1: 
-│  ├──64: impl ValueEnum for CompletionShell {
+│  ├──69: impl ValueEnum for CompletionShell {
 │  ├──+1:     fn value_variants<'a>() -> &'a [Self] {
 │  ├──-1: 
-│  ├──90: impl CompletionShell {
+│  ├──95: impl CompletionShell {
 │  ├──+1:     pub fn generate(&self, cmd: &mut Command, bin: &str, out: &mut dyn std::io::Write) {
 │  ├──-1: #[derive(Clone)]
-│  ├──142: pub struct ColorParser;
+│  ├──147: struct ColorParser;
 │  ├──+1: 
-│  ├──144: impl clap::builder::TypedValueParser for ColorParser {
+│  ├──149: impl clap::builder::TypedValueParser for ColorParser {
 │  ├──+1:     type Value = Color;
 │  ├──-1: #[derive(Clone)]
-│  ├──205: pub struct KeyCodeParser;
+│  ├──210: struct KeyCodeParser;
 │  ├──+1: 
-│  ├──207: impl clap::builder::TypedValueParser for KeyCodeParser {
+│  ├──212: impl clap::builder::TypedValueParser for KeyCodeParser {
 │  ├──+1:     type Value = KeyCode;
 │  ├──-1: #[cfg_attr(test, derive(PartialEq, Debug))]
-│  ├──290: pub struct ScopedRegexp {
+│  ├──295: pub struct ScopedRegexp {
 │  ├──+1:     pub glob: String,
 │  ├──-1: #[derive(Clone)]
-│  ├──296: pub struct RegexpGlobParser;
+│  ├──301: struct RegexpGlobParser;
 │  ├──+1: 
-│  ├──298: impl clap::builder::TypedValueParser for RegexpGlobParser {
+│  ├──303: impl clap::builder::TypedValueParser for RegexpGlobParser {
 │  ├──+1:     type Value = ScopedRegexp;
 │  ├──-1: )]
-│  ├──450: pub struct Args {
+│  ├──455: pub struct Args {
 │  ╰──+1:     #[arg(
 ├──config.rs: 8
 │  ├──-1: #[derive(Clone)]
-│  ├──33: pub struct KeyBindings {
+│  ├──35: pub struct KeyBindings {
 │  ├──+1:     pub down: Vec<KeyCode>,
 │  ├──-1: #[derive(Clone)]
-│  ├──58: pub struct Characters {
+│  ├──60: pub struct Characters {
 │  ├──+1:     pub bl: char,
 │  ├──-1: #[derive(Clone)]
-│  ├──79: pub struct Colors {
+│  ├──81: pub struct Colors {
 │  ├──+1:     pub file: Color,
 │  ├──-1: #[derive(Clone)]
-│  ├──92: pub struct SearchParams {
+│  ├──96: pub struct SearchParams {
 │  ├──+1:     pub regexps: Vec<String>,
 │  ├──-1: #[derive(Clone)]
-│  ├──117: pub struct Config {
+│  ├──121: pub struct Config {
 │  ├──+1:     pub search: SearchParams,
 │  ├──-1: 
-│  ├──394: impl Config {
+│  ├──409: impl Config {
 │  ├──+1:     pub fn get_styling(matches: &ArgMatches) -> (bool, bool) {
 │  ├──-1: 
-│  ├──717: fn flag_arg(id: &str, value: impl AsRef<OsStr>) -> OsString {
+│  ├──738: fn flag_arg(id: &str, value: impl AsRef<OsStr>) -> OsString {
 │  ├──+1:     let mut arg = OsString::from(id_to_flag(id));
 │  ├──-1: 
-│  ├──724: impl SearchParams {
+│  ├──745: impl SearchParams {
 │  ╰──+1:     pub fn has_expr(&self) -> bool {
+├──diff.rs: 2
+│  ├──-1: 
+│  ├──6: pub struct DiffLine {
+│  ├──+1:     pub content: Vec<u8>,
+│  ├──-1: 
+│  ├──12: pub struct DiffFile {
+│  ╰──+1:     pub path: PathBuf,
 ├──errors.rs: 4
 │  ├──-1: 
 │  ├──14: pub struct Message {
@@ -211,32 +218,35 @@ src: 9
 │  ├──49: impl File {
 │  ├──+1:     pub fn from_pathbuf(path: PathBuf, links: bool) -> Result<Self, Message> {
 │  ├──-1: #[cfg_attr(test, derive(PartialEq, Debug))]
-│  ├──75: pub struct Match {
+│  ├──85: pub struct Match {
 │  ├──+1:     pub regexp_id: usize,
 │  ├──-1: 
-│  ├──81: impl Match {
+│  ├──91: impl Match {
 │  ├──+1:     pub fn new(regexp_id: usize, start: usize, end: usize) -> Self {
 │  ├──-1: 
-│  ├──106: pub struct Line {
+│  ├──123: pub struct Line {
 │  ├──+1:     pub content: Vec<u8>,
 │  ├──-1: 
-│  ├──113: impl Line {
+│  ├──131: impl Line {
 │  ╰──+1:     pub fn new(content: Vec<u8>, mut matches: Vec<Match>, line_num: usize) -> Self {
-├──matcher.rs: 5
+├──matcher.rs: 6
 │  ├──-1: 
-│  ├──32: struct Matcher {
+│  ├──34: struct Matcher {
 │  ├──+1:     patterns: Vec<String>,
 │  ├──-1: 
-│  ├──84: impl Combined {
+│  ├──94: fn match_error(path: &Path, e: impl Display) -> Message {
+│  ├──+1:     mes!("pcre2 match error on {}: {}", path.display(), e)
+│  ├──-1: 
+│  ├──111: impl Combined {
 │  ├──+1:     fn new(patterns: &[&str], use_pcre2: bool) -> Result<Self, Message> {
 │  ├──-1: 
-│  ├──114: impl Individual {
+│  ├──141: impl Individual {
 │  ├──+1:     fn new(patterns: &[String], use_pcre2: bool) -> Result<Self, Message> {
 │  ├──-1: 
-│  ├──144: impl Matcher {
+│  ├──171: impl Matcher {
 │  ├──+1:     fn new(search: &SearchParams) -> Result<Self, Message> {
 │  ├──-1: 
-│  ├──220: struct MatchSink<'a> {
+│  ├──247: struct MatchSink<'a> {
 │  ╰──+1:     lines: Vec<Line>,
 ├──menu.rs: 8
 │  ├──-1: 
@@ -265,7 +275,7 @@ src: 9
 │  ╰──+1:     fn from(editor: &str) -> Self {
 ├──style.rs: 1
 │  ├──-1: 
-│  ├──23: pub struct DisplayRepeater<T>(T, usize);
+│  ├──25: pub struct DisplayRepeater<T>(T, usize);
 │  ╰──+1: impl<T: Display> Display for DisplayRepeater<T> {
 ├──term.rs: 1
 │  ├──-1: 
@@ -273,70 +283,70 @@ src: 9
 │  ╰──+1:     pub height: u16,
 ╰──writer.rs: 22
    ├──-1: 
-   ├──57: impl HighlightEvent<'_> {
+   ├──58: impl HighlightEvent<'_> {
    ├──+1:     fn priority(&self) -> u8 {
    ├──-1: 
-   ├──68: struct RenderStyle<'a> {
+   ├──69: struct RenderStyle<'a> {
    ├──+1:     selected: bool,
    ├──-1: 
-   ├──73: impl RenderStyle<'_> {
+   ├──74: impl RenderStyle<'_> {
    ├──+1:     fn bg(&self) -> Option<Color> {
    ├──-1: 
-   ├──218: pub struct OpenInfo<'a> {
+   ├──219: pub struct OpenInfo<'a> {
    ├──+1:     pub path: &'a Path,
    ├──-1: 
-   ├──231: pub struct WithFilter<'a> {
+   ├──232: pub struct WithFilter<'a> {
    ├──+1:     pub entry: &'a dyn Entry,
    ├──-1: 
-   ├──237: impl Display for WithFilter<'_> {
+   ├──238: impl Display for WithFilter<'_> {
    ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
    ├──-1: 
-   ├──243: struct PathDisplay {
+   ├──244: struct PathDisplay {
    ├──+1:     prefix: Option<Vec<PrefixComponent>>,
    ├──-1: 
-   ├──254: impl PathDisplay {
+   ├──255: impl PathDisplay {
    ├──+1:     fn new(
    ├──-1: 
-   ├──287: impl Entry for PathDisplay {
+   ├──288: impl Entry for PathDisplay {
    ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result {
    ├──-1: 
-   ├──330: impl Display for PathDisplay {
+   ├──331: impl Display for PathDisplay {
    ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
    ├──-1: 
-   ├──394: struct LineDisplay {
+   ├──395: struct LineDisplay {
    ├──+1:     prefix: Vec<PrefixComponent>,
    ├──-1: 
-   ├──405: impl Entry for LineDisplay {
+   ├──407: impl Entry for LineDisplay {
    ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result {
    ├──-1: 
-   ├──551: impl Display for LineDisplay {
+   ├──559: impl Display for LineDisplay {
    ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
    ├──-1: 
-   ├──557: struct LongBranchDisplay {
+   ├──565: struct LongBranchDisplay {
    ├──+1:     prefix: Vec<PrefixComponent>,
    ├──-1: 
-   ├──564: impl Entry for LongBranchDisplay {
+   ├──572: impl Entry for LongBranchDisplay {
    ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result {
    ├──-1: 
-   ├──614: impl Display for LongBranchDisplay {
+   ├──622: impl Display for LongBranchDisplay {
    ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
    ├──-1: 
-   ├──620: struct OverviewDisplay {
+   ├──628: struct OverviewDisplay {
    ├──+1:     dirs: usize,
    ├──-1: 
-   ├──630: impl OverviewDisplay {
+   ├──638: impl OverviewDisplay {
    ├──+1:     fn add_dir(&mut self, dir: &Directory) {
    ├──-1: 
-   ├──654: impl Entry for OverviewDisplay {
+   ├──658: impl Entry for OverviewDisplay {
    ├──+1:     fn render(&self, f: &mut fmt::Formatter, filter: &str, selected: bool) -> fmt::Result {
    ├──-1: 
-   ├──699: impl Display for OverviewDisplay {
+   ├──703: impl Display for OverviewDisplay {
    ├──+1:     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
    ├──-1: 
-   ├──721: impl Directory {
+   ├──726: impl Directory {
    ├──+1:     fn to_lines(
    ├──-1: 
-   ├──825: impl File {
+   ├──830: impl File {
    ╰──+1:     fn to_lines(
 ```
 </details>
@@ -390,6 +400,7 @@ treegrep
 ├──src
 │  ├──args.rs
 │  ├──config.rs
+│  ├──diff.rs
 │  ├──errors.rs
 │  ├──log.rs
 │  ├──main.rs
@@ -415,6 +426,12 @@ treegrep
 │  │  ├──files_with_expr
 │  │  ├──glob_exclusion
 │  │  ├──input_cmd
+│  │  ├──input_diff_concat
+│  │  ├──input_diff_deletion
+│  │  ├──input_diff_git_context
+│  │  ├──input_diff_git_glob
+│  │  ├──input_diff_git_show
+│  │  ├──input_diff_git_unstaged
 │  │  ├──input_stdin
 │  │  ├──links
 │  │  ├──max_depth
@@ -466,20 +483,21 @@ treegrep
 ├──plugin
 │  ╰──treegrep.el, treegrep.vim
 ├──src
-│  ├──args.rs, config.rs, errors.rs, log.rs, main.rs
-│  ├──match_system.rs, matcher.rs, menu.rs, style.rs, term.rs
-│  ╰──writer.rs
+│  ├──args.rs, config.rs, diff.rs, errors.rs, log.rs
+│  ├──main.rs, match_system.rs, matcher.rs, menu.rs, style.rs
+│  ╰──term.rs, writer.rs
 ├──tests
 │  ├──pool
 │  │  ╰──alice_adventures_in_wonderland_by_lewis_carroll.txt
 │  ├──targets
 │  │  ├──context_a1, context_b1, context_c1, deep, file
 │  │  ├──files, files_long_branch, files_long_branch_expr, files_long_branch_expr_count, files_with_expr
-│  │  ├──glob_exclusion, input_cmd, input_stdin, links, max_depth
-│  │  ├──menu_custom_keys, menu_filter, menu_fold_cycle, menu_input_cmd, menu_jump
-│  │  ├──menu_navigate, menu_search_args, menu_search_mode, multiple_paths, no_matches
-│  │  ├──overlapping, overview_dir, overview_file, pcre2_lookbehind, regexp_glob
-│  │  ╰──summary_dir, summary_file, wide
+│  │  ├──glob_exclusion, input_cmd, input_diff_concat, input_diff_deletion, input_diff_git_context
+│  │  ├──input_diff_git_glob, input_diff_git_show, input_diff_git_unstaged, input_stdin, links
+│  │  ├──max_depth, menu_custom_keys, menu_filter, menu_fold_cycle, menu_input_cmd
+│  │  ├──menu_jump, menu_navigate, menu_search_args, menu_search_mode, multiple_paths
+│  │  ├──no_matches, overlapping, overview_dir, overview_file, pcre2_lookbehind
+│  │  ╰──regexp_glob, summary_dir, summary_file, wide
 │  ╰──file_system.rs, tests.rs, tmux.rs, utils.rs
 ├──.gitignore, Cargo.lock, Cargo.toml, LICENSE, README.md
 ╰──rustfmt.toml
@@ -500,9 +518,9 @@ treegrep
 │     ╰──109:         '--manifest-path=' .. vim.fn.fnameescape(vim.fs.joinpath(project_root, 'Cargo.toml'))
 ╰──src
    ├──args.rs
-   │  ╰──693:     pub no_mouse: bool,
+   │  ╰──698:     pub no_mouse: bool,
    ├──config.rs
-   │  ╰──522:             mouse: !args.no_mouse,
+   │  ╰──537:             mouse: !args.no_mouse,
    ╰──term.rs
       ├──20:     with_mouse: bool,
       ├──28:         with_mouse: bool,
@@ -550,8 +568,10 @@ options:
 
       --input-type <>
           read input as this type (saved for repeat)
-          
-          [possible values: paths]
+
+          Possible values:
+          - paths: newline separated paths
+          - diff:  unified diff (diff -u, git diff, git show, hg diff, ...), only changed lines are searched
 
   -s, --select
           results are shown in a selection interface for opening
@@ -670,6 +690,12 @@ options:
           black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
 
       --line-number-color <>
+          black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
+
+      --diff-added-color <>
+          black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
+
+      --diff-removed-color <>
           black, white, red, green, yellow, blue, magenta, cyan, grey, rgb(_._._), ansi(_)
 
       --match-colors <>
